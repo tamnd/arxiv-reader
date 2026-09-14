@@ -417,6 +417,104 @@ jobs:
             echo "an entry with no hash was read as a manifest entry"
             exit 1
           fi
+      - name: the extract refuses the arguments it should refuse
+        run: |
+          if ax extract; then
+            echo "an extract with no subcommand was allowed"
+            exit 1
+          fi
+          for c in "extract render" "extract render -n 2312.00752" "extract render -n not-an-arxiv-id" "extract sideways -n 2312.00752v2" "extract render 2312.00752v2"; do
+            if ARXIV_CORPUS=/tmp/empty-corpus ax $c; then
+              echo "ax $c was allowed"
+              exit 1
+            fi
+          done
+          # The manifest and not the disk says where a rendering is, so a
+          # version nobody recorded is refused even in a corpus that has one.
+          if ARXIV_CORPUS=/tmp/empty-corpus ax extract render -n 2312.00752v2; then
+            echo "a rendering the manifest has never heard of was read anyway"
+            exit 1
+          fi
+      # The fixture is a rendering of a paper that does not exist, built out of
+      # the markup shapes arXiv's own renderings use. Running the whole command
+      # over it is the only way to know the reader and the report still agree.
+      - name: a rendering is read end to end
+        run: |
+          mkdir -p /tmp/extract-corpus/work/html/2501 /tmp/extract-corpus/manifests
+          cp extract/testdata/rendering.html /tmp/extract-corpus/work/html/2501/2501.00001v3.html
+          sum=$(sha256sum /tmp/extract-corpus/work/html/2501/2501.00001v3.html | cut -d' ' -f1)
+          cat > /tmp/extract-corpus/manifests/sources.yaml <<YAML
+          sources:
+            - id: "2501.00001"
+              version: 3
+              route: render
+              url: https://arxiv.org/html/2501.00001v3
+              path: work/html/2501/2501.00001v3.html
+              sha256: $sum
+              bytes: 1
+              fetched: 2026-09-14T00:00:00Z
+              licence: cc-by
+              licence_from: abs
+          YAML
+          ARXIV_CORPUS=/tmp/extract-corpus ax extract render -n -outline 2501.00001v3 | tee /tmp/extract.txt
+          grep -q "A Paper About Nothing" /tmp/extract.txt
+          grep -q "Ada First, Bo Second" /tmp/extract.txt
+          grep -q "CC BY 4.0" /tmp/extract.txt
+          grep -q "faults      1, 0 of them inside the body" /tmp/extract.txt
+          # The one fault is in the bibliography, which is a reference that
+          # prints badly and not a sentence of the paper that is gone.
+          ARXIV_CORPUS=/tmp/extract-corpus ax extract render -n 2501.00001v3
+      - name: a rendering of the wrong version is refused
+        run: |
+          mkdir -p /tmp/swapped-corpus/work/html/2501 /tmp/swapped-corpus/manifests
+          cp extract/testdata/rendering.html /tmp/swapped-corpus/work/html/2501/2501.00001v2.html
+          sum=$(sha256sum /tmp/swapped-corpus/work/html/2501/2501.00001v2.html | cut -d' ' -f1)
+          cat > /tmp/swapped-corpus/manifests/sources.yaml <<YAML
+          sources:
+            - id: "2501.00001"
+              version: 2
+              route: render
+              url: https://arxiv.org/html/2501.00001v2
+              path: work/html/2501/2501.00001v2.html
+              sha256: $sum
+              bytes: 1
+              fetched: 2026-09-14T00:00:00Z
+              licence: cc-by
+              licence_from: abs
+          YAML
+          out=$(ARXIV_CORPUS=/tmp/swapped-corpus ax extract render -n 2501.00001v2 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "says it is of v3"
+          if ARXIV_CORPUS=/tmp/swapped-corpus ax extract render -n 2501.00001v2; then
+            echo "a rendering of one version was read as another"
+            exit 1
+          fi
+      - name: a rendering with a hole in the paper is rejected
+        run: |
+          mkdir -p /tmp/faulty-corpus/work/html/2501 /tmp/faulty-corpus/manifests
+          cp extract/testdata/faulty.html /tmp/faulty-corpus/work/html/2501/2501.00001v3.html
+          sum=$(sha256sum /tmp/faulty-corpus/work/html/2501/2501.00001v3.html | cut -d' ' -f1)
+          cat > /tmp/faulty-corpus/manifests/sources.yaml <<YAML
+          sources:
+            - id: "2501.00001"
+              version: 3
+              route: render
+              url: https://arxiv.org/html/2501.00001v3
+              path: work/html/2501/2501.00001v3.html
+              sha256: $sum
+              bytes: 1
+              fetched: 2026-09-14T00:00:00Z
+              licence: cc-by
+              licence_from: abs
+          YAML
+          out=$(ARXIV_CORPUS=/tmp/faulty-corpus ax extract render -n 2501.00001v3 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "inside the body of the paper"
+          echo "$out" | grep -q "source path"
+          if ARXIV_CORPUS=/tmp/faulty-corpus ax extract render -n 2501.00001v3; then
+            echo "a rendering with a piece of the paper missing exited zero"
+            exit 1
+          fi
       - name: the audit refuses the arguments it should refuse
         run: |
           for c in "audit --plane content" "audit --plane both" "audit -rules S99" "audit -rules" "audit -cap 0" "audit -shard 2113" "audit meta"; do

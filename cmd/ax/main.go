@@ -40,7 +40,7 @@ var commands = []command{
 	{"harvest", "fill the metadata plane from Kaggle, Hugging Face and OAI-PMH", "M1", runHarvest},
 	{"fetch", "download what a paper needs for the path it is on", "M3", runFetch},
 	{"select", "choose what enters the content plane, and say why", "M5", nil},
-	{"extract", "render, source, native or vision, to tagged Markdown", "M3", nil},
+	{"extract", "render, source, native or vision, to tagged Markdown", "M3", runExtract},
 	{"figures", "crop, convert and size cap the figures", "M3", nil},
 	{"tables", "keep every table twice, as Markdown and as LaTeX", "M3", nil},
 	{"refs", "parse a bibliography and resolve it into the corpus", "M3", nil},
