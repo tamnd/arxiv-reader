@@ -324,6 +324,22 @@ jobs:
             echo "a reference that is not one was accepted"
             exit 1
           fi
+      # These stop at the argument check too. ax licence crosscheck reads the
+      # Hugging Face datasets server, and a walk with no limit on it is about
+      # six hours, so the one thing this job must never do is let a default
+      # through.
+      - name: the crosscheck refuses the arguments it should refuse
+        run: |
+          if ARXIV_CORPUS=/tmp/empty-corpus ax licence crosscheck; then
+            echo "a walk with no limit was allowed, and the whole collection is about six hours"
+            exit 1
+          fi
+          for c in "licence crosscheck -limit 0" "licence crosscheck -limit -1" "licence crosscheck -against wikipedia -limit 5" "licence crosscheck -limit 5 -pace 1s" "licence crosscheck -limit 5 extra"; do
+            if ARXIV_CORPUS=/tmp/empty-corpus ax $c; then
+              echo "ax $c was allowed"
+              exit 1
+            fi
+          done
       - name: the audit refuses the arguments it should refuse
         run: |
           for c in "audit --plane content" "audit --plane both" "audit -rules S99" "audit -rules" "audit -cap 0" "audit -shard 2113" "audit meta"; do

@@ -12,6 +12,7 @@ import (
 
 	"github.com/tamnd/arxiv-cli/pkg/axid"
 	"github.com/tamnd/arxiv-reader/corpus"
+	"github.com/tamnd/arxiv-reader/harvest"
 	"github.com/tamnd/arxiv-reader/licence"
 	"github.com/tamnd/arxiv-reader/metadata"
 )
@@ -96,7 +97,7 @@ func licenceResolve(args []string) error {
 
 	plane := metadata.Plane{Root: corpusRoot()}
 	r := &licence.Resolver{
-		UserAgent: "arxiv-reader/" + Version + " (+https://github.com/tamnd/arxiv-reader; tamnd87@gmail.com)",
+		UserAgent: userAgent(),
 		Pace:      *pace,
 		Log:       func(ref string) { fmt.Fprintf(os.Stderr, "reading %s\n", ref) },
 	}
@@ -109,6 +110,80 @@ func licenceResolve(args []string) error {
 		}
 	}
 	return nil
+}
+
+// licenceCrosscheck compares the metadata plane against a third party reading
+// of the same question, and writes reports/crosscheck.md.
+//
+// There is one third party wired up and it is the Common Pile, so -against
+// takes one value. It is a flag rather than a constant because the point of the
+// report is that a second reading exists, and a second one would be read the
+// same way.
+func licenceCrosscheck(args []string) error {
+	fs := flag.NewFlagSet("ax licence crosscheck", flag.ContinueOnError)
+	against := fs.String("against", "common-pile", "whose reading to compare against")
+	limit := fs.Int("limit", 0, "how many of their rows to read, and there is no default because the whole collection is about six hours")
+	offset := fs.Int("offset", 0, "the row to start at, for picking up a walk that stopped")
+	pace := fs.Duration("pace", harvest.RowsPace, "the gap to leave between requests")
+	out := fs.String("o", "", "where to write the report, and the default is reports/crosscheck.md in the corpus")
+	quiet := fs.Bool("q", false, "write the file and print nothing")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if len(fs.Args()) != 0 {
+		return fmt.Errorf("ax licence crosscheck takes no arguments, so drop %s", fs.Args()[0])
+	}
+	if *against != "common-pile" {
+		return fmt.Errorf("%q is not a reading this knows how to read, and the one it knows is common-pile", *against)
+	}
+	if *limit < 1 {
+		return errors.New("pass -limit, because their rows carry the full text of the paper and the whole collection is about six hours at the pace the server asks for")
+	}
+	if *pace < harvest.RowsPace {
+		return fmt.Errorf("a pace of %s is faster than the three seconds this server was measured to tolerate, and it answers a burst with a 429", *pace)
+	}
+
+	plane := metadata.Plane{Root: corpusRoot()}
+	reader := &licence.Reader{
+		Rows: &harvest.Rows{
+			Dataset:   licence.Pile,
+			UserAgent: userAgent(),
+			Pace:      *pace,
+		},
+		Log: func(page, claims, total int) {
+			fmt.Fprintf(os.Stderr, "page %d, %d claims, of %d rows\n", page, claims, total)
+		},
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	check, err := licence.Check(ctx, reader, plane, *offset, *limit)
+	if err != nil {
+		return err
+	}
+	check.Generated = time.Now()
+
+	path := *out
+	if path == "" {
+		path = filepath.Join(plane.Root, "reports", "crosscheck.md")
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(path, []byte(check.Markdown()), 0o644); err != nil {
+		return err
+	}
+	if !*quiet {
+		fmt.Print(check.Text())
+		fmt.Fprintf(os.Stderr, "written to %s\n", path)
+	}
+	return nil
+}
+
+// userAgent names the project and a way to get hold of a person, which is what
+// every surface this tool reads asks for and arXiv enforces.
+func userAgent() string {
+	return "arxiv-reader/" + Version + " (+https://github.com/tamnd/arxiv-reader; tamnd87@gmail.com)"
 }
 
 func resolveOne(ctx context.Context, r *licence.Resolver, plane metadata.Plane, ref string, all, write bool) error {

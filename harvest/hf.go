@@ -203,6 +203,24 @@ func (r *Rows) Total(ctx context.Context) (int, error) {
 	return resp.Total, nil
 }
 
+// Page fetches one page of rows as the server sent it.
+//
+// This is here because the datasets server holds more than one dataset worth
+// reading and only one of them parses into a metadata record. The Common Pile's
+// arXiv collection has different columns and is read for a different reason, so
+// it gets the JSON and parses it itself, but it goes through the same pace, the
+// same backoff and the same set of statuses that mean wait rather than stop.
+// There is one rate limit and it belongs to the server, not to the caller.
+func (r *Rows) Page(ctx context.Context, offset, length int) ([]byte, error) {
+	if offset < 0 {
+		return nil, fmt.Errorf("harvest: offset %d is before the start of the split", offset)
+	}
+	if length < 1 || length > RowsPage {
+		return nil, fmt.Errorf("harvest: %d rows is not a page the server will serve, which is 1 to %d", length, RowsPage)
+	}
+	return r.get(ctx, offset, length)
+}
+
 func (r *Rows) get(ctx context.Context, offset, length int) ([]byte, error) {
 	endpoint := r.Endpoint
 	if endpoint == "" {

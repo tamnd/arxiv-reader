@@ -52,6 +52,27 @@ Roughly two fifths of arXiv has more than one version, so the overstatement is o
 Resolving it properly is one page per version, which is over five million pages at the fifteen seconds arXiv asks for on the website, so `ax licence resolve` runs per paper when a paper is selected rather than over the whole archive.
 `-write` puts what it read back on the record, with the abs page named as the authority, which is the only authority the content plane will accept.
 
+The third thing M2 does is set this corpus against somebody else's reading of the same question.
+The Common Pile publishes 75,747 arXiv papers in full, which means somebody there read arXiv's licence field and decided what they were allowed to republish.
+
+```
+$ ax licence crosscheck -limit 1200
+Of 21 papers read and also held here, all agree, and 1,179 are absent from the metadata plane.
+  rows read                       1,200
+  claims                          1,200
+  held here                          21
+  agreed                             21
+  disagreed                           0
+  of those, costs something           0
+  absent here                     1,179
+```
+
+That agreement is worth less than it looks, and the report says so before it says what it found.
+Their identifiers carry no version either, so both sides are reading one paper level licence and calling it the paper's, and two readings of the same upstream field can be wrong the same way twice.
+The disagreements are the whole of the signal.
+The one that costs something is where their reading permits republishing the English and ours does not, because they have already published it.
+The 1,179 absent are a gap in the harvest and not a licence question: that run was against a plane of 9,242 records, and a paper they hold that this corpus has never heard of says the harvest is short rather than that anybody read a licence wrong.
+
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
 
