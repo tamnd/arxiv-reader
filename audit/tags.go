@@ -23,10 +23,9 @@ import (
 // shape of most of this group: one rule for the register on its own, one for
 // the copy on its own, and one for the two disagreeing.
 //
-// G07 and G08 are in 2166-10 and are not here. G07 is about tombstones and
-// nothing writes one until ax tags diff, and G08 reads git history for a tag
-// that used to be in a register and is not any more. Both are M4. A rule
-// registered before it can run is a rule everybody believes is working.
+// G08 is the exception to all of that. It reads the repository's history rather
+// than the corpus on disk, because the thing it is looking for is a line that is
+// not there any more, and a file cannot show you what used to be in it.
 var tagRules = []Rule{
 	{
 		ID: "G01", Group: GroupTags, Hard: true,
@@ -57,6 +56,16 @@ var tagRules = []Rule{
 		ID: "G06", Group: GroupTags, Hard: true,
 		Says: "every taggable object in a body carries a tag",
 		Why:  "Scanned with the function ax tags assign scans with, so the rule and the command cannot disagree about what a taggable object is. An object with no tag is an object nothing outside this paper can point at, and a paper nobody has run ax tags assign over fails this on every object it has, which is the answer wanted: content is committed tagged.",
+	},
+	{
+		ID: "G07", Group: GroupTags, Hard: true,
+		Says: "every tombstone names the version the object went in",
+		Why:  "A tombstone is what a reader gets instead of the object they asked for, and the one thing it has to answer is when the object went. A tombstone with no version says something used to be here, which is the question the reader arrived with.",
+	},
+	{
+		ID: "G08", Group: GroupTags, Hard: true,
+		Says: "no tag has ever been removed from a register",
+		Why:  "Read from the repository's history rather than from the working tree, because a register is append only and a file cannot show you what used to be in it. This is the rule that makes a tag permanent in fact rather than in intention. A removal it finds is repaired by a revert and not by adding the line back, because anything that cited the tag in the meantime needs the history to say so.",
 	},
 }
 
@@ -111,11 +120,29 @@ func (c Content) tagged(col *collector, id axid.ID, files []content) error {
 			} else {
 				tagLine[e.Tag] = e.line
 			}
+			// A tombstone keeps the identifier the object had, and the next
+			// version of the paper hands that identifier to whatever was
+			// renumbered into its place, so a tombstone and a live entry sharing
+			// one is the ordinary case rather than the fault. The live entry is
+			// the one a body is asking about.
+			if e.buried {
+				continue
+			}
 			if first, ok := localLine[e.Local]; ok {
 				at("G04", e.line, "gives %s a second tag, %s, after the one on line %d", e.Local, e.Tag, first)
 			} else {
 				localLine[e.Local] = e.line
 				byLocal[e.Local] = e.Tag
+			}
+		}
+
+		col.checked("G07")
+		for _, e := range reg.entries {
+			if !e.buried {
+				continue
+			}
+			if !goneVersion.MatchString(e.third) {
+				at("G07", e.line, "buries %s and says %q, and a tombstone says gone:v3", e.Local, e.third)
 			}
 		}
 	}
@@ -225,6 +252,9 @@ var (
 	bareTag  = regexp.MustCompile(`(?:^|[^0-9A-Za-z./_{(#-])#([0-9A-Z]{4})(?:[^0-9A-Za-z]|$)`)
 )
 
+// goneVersion is what G07 wants a tombstone's third field to be.
+var goneVersion = regexp.MustCompile(`^gone:v[1-9][0-9]*$`)
+
 func hasLetter(s string) bool {
 	return strings.ContainsFunc(s, func(r rune) bool { return r >= 'A' && r <= 'Z' })
 }
@@ -267,6 +297,13 @@ type register struct {
 type entry struct {
 	tags.Entry
 	line int
+	// third is the gone field as it was written, which G07 reads. The loader
+	// takes the gone: off the front of it and a tombstone that never said gone:
+	// in the first place has to be reportable.
+	third string
+	// buried says the line is a tombstone rather than a live entry, which is
+	// three fields or more and not what the third one says.
+	buried bool
 }
 
 type problem struct {
@@ -321,6 +358,7 @@ func readRegister(path string) (register, error) {
 		e := entry{line: line}
 		e.Tag, e.Local = tags.Tag(rec[0]), rec[1]
 		if len(rec) > 2 {
+			e.third, e.buried = rec[2], true
 			e.Gone = strings.TrimPrefix(rec[2], "gone:")
 		}
 		if len(rec) > 3 {

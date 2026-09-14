@@ -1412,16 +1412,26 @@ jobs:
       # rule has to say pass and not "not run": a rule with nothing to look at
       # has not passed anything, and telling those two apart is what the four
       # states are for.
+      # G08 reads the repository rather than the corpus, so the corpus has to be
+      # one. A tombstone goes in first, because a register of a paper that has
+      # been revised has one in it and both G07 and G08 have to have something
+      # real to read.
+      - name: the corpus is a repository with a history in it
+        run: |
+          printf '%s\n' 'ZZZZ,eq-7,gone:v2,"removed when section 4 was rewritten"' >> /tmp/extract-corpus/tags/2501/2501.00001.tags
+          git -C /tmp/extract-corpus init -q -b main
+          git -C /tmp/extract-corpus add -A
+          git -C /tmp/extract-corpus -c user.email=ax@example.com -c user.name=ax commit -q -m "the corpus"
       - name: the content plane audit is clean over the paper the tools just built
         run: |
           ARXIV_CORPUS=/tmp/extract-corpus ax audit -plane content -q | tee /tmp/audit-content.txt
           grep -q "3 files over 1 paper, nothing found" /tmp/audit-content.txt
-          test "$(grep -cE '^[STMFRGX][0-9]+ +pass ' /tmp/audit-content.txt)" = 54
+          test "$(grep -cE '^[STMFRGX][0-9]+ +pass ' /tmp/audit-content.txt)" = 56
           if grep -q "not run" /tmp/audit-content.txt; then
             echo "a content rule had nothing to look at"
             exit 1
           fi
-      # And the same fifty four rules over nothing at all, which has to read as
+      # And the same fifty six rules over nothing at all, which has to read as
       # not run rather than as a clean corpus. A green audit over an empty plane
       # is the single easiest way for this project to lie to itself.
       - name: an empty content plane runs nothing rather than passing everything
@@ -1429,7 +1439,7 @@ jobs:
           rm -rf /tmp/empty-corpus && mkdir -p /tmp/empty-corpus
           ARXIV_CORPUS=/tmp/empty-corpus ax audit -plane content -q | tee /tmp/audit-empty.txt
           grep -q "0 files over 0 papers, nothing to check" /tmp/audit-empty.txt
-          test "$(grep -cE '^[STMFRGX][0-9]+ +not run ' /tmp/audit-empty.txt)" = 54
+          test "$(grep -cE '^[STMFRGX][0-9]+ +not run ' /tmp/audit-empty.txt)" = 56
       # Each rule fired by breaking the one thing it is about. A rule that has
       # only ever been watched passing is a rule nobody has tested.
       - name: a content file that is wrong fails the rule that is about it
@@ -1515,6 +1525,10 @@ jobs:
           copy && echo "ZZZZ,s1" >> $reg && fails G04
           copy && sed -i 's/^tag: VIS1$/tag: ZZZZ/' $intro && fails G05
           copy && sed -i 's/ tag=VNYA//' $results && restamp && fails G06
+          copy && sed -i 's/^ZZZZ,eq-7,gone:v2,/ZZZZ,eq-7,v2,/' $reg && fails G07
+          # The one rule that reads the repository. The line is gone from the
+          # file, so the corpus on its own cannot tell you it was ever there.
+          copy && sed -i '/^ZZZZ,eq-7,/d' $reg && fails G08
           copy && sed -i 's/{#thm-1 .statement/{#thm-1 .theorem/' $results && restamp && fails X01
           # The pictures and the tables. A figure is a decision in the
           # manifest, bytes on disk and a line in a body, and these are the ways

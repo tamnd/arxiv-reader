@@ -791,6 +791,14 @@ The register is the record and the content files are the copy, which is the shap
 `G02` is the rule that pays for scoping tags to a paper: a bare `03QK` is not a reference here, because `03QK` exists in thousands of papers and means something different in each, and the reference is `2106.09685#03QK`.
 `G06` scans a body with the same function `ax tags assign` scans it with, so the rule and the command cannot disagree about what a taggable object is, and a paper nobody has tagged fails it on every object it has, which is the answer wanted: content is committed tagged.
 
+`G07` and `G08` are the two that are about a revision rather than about one version of a paper, and neither is in the run above, which was taken before they existed.
+`G07` is the tombstone: a tag whose object is gone keeps its line, and the line has to say which version it went in, because a tombstone with no version answers the reader's question with the question.
+`G08` is the only rule in the audit that reads the repository rather than the corpus.
+A tag is assigned once and never changes, which is a promise about lines that are no longer in a file, and a file cannot show you what used to be in it.
+It reads every register line the history took out, and every one the working tree has taken out since the last commit, and a tag that went and never came back is the finding.
+A removal is repaired by a revert and not by putting the line back, because anything that cited the tag in the meantime needs the history to say so.
+A corpus nobody has committed leaves it not run, because a pass there would be saying that every tag ever handed out is still where it was and nothing has looked.
+
 `X01` is the object model, and it holds every object to one of the sixteen kinds in 06-objects.md, because the kind is what every later group dispatches on.
 A block the extractor gave an anchor and no class is reported by it too.
 That block still gets a tag, on purpose, because an anchor nothing can be written against is worse than a tag on something that turns out to be a footnote, and it is still a hole in the class mapping.
@@ -816,8 +824,7 @@ Three rules of group R are not here.
 `R08` reads a rendered reference section and nothing renders one yet.
 `R09` compares a paper's resolution rate against its category's median, which needs the same baselines `M06` needs, so the two arrive together in M6.
 `M04` and `M06` are not here: `M04` is every span parsing under KaTeX and the reader that carries KaTeX is M6, and `M06` compares a paper's displays per page with its category's median, which needs baselines computed over a corpus with more than two papers in it.
-`G07` and `G08` are not here either: `G07` is about tombstones and nothing writes one until `ax tags diff`, and `G08` reads git history for a tag that used to be in a register and is not any more, which is the same milestone.
-`F04` is not here for the same reason as `G08`: it says nothing under `figures/` is untracked, which is a question for git, and this tool is run over a directory that is a checkout on one machine and an unpacked archive on the next.
+`F04` is not here: it says nothing under `figures/` is untracked, which is a question for git, and the figure manifest has to be read against the working tree at the same time, so it arrives with the rest of the native figure work.
 Of group X only `X01` runs, because the other eight read a result, a concept or an artefact record and none of those three things exist yet.
 Every one of them is named in the source with what it needs, because a rule registered before it can run is a rule everybody believes is working.
 

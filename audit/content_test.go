@@ -3,6 +3,7 @@ package audit
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -81,6 +82,43 @@ func paper(t *testing.T, docs ...extract.Document) string {
 		t.Fatal(err)
 	}
 	return root
+}
+
+// committed gives a fixture the history G08 reads.
+//
+// It is called by the tests that are about that rule rather than by paper,
+// because starting a repository and making a commit costs more than everything
+// else in a test here put together, and every other rule in the package reads
+// the corpus on disk. A fixture with no history leaves G08 reporting not run,
+// which is what a corpus nobody has committed deserves.
+func committed(t *testing.T, root string) {
+	t.Helper()
+	gitIn(t, root, "init", "-q", "-b", "main")
+	commit(t, root)
+}
+
+// commit puts whatever the fixture looks like now into its history.
+func commit(t *testing.T, root string) {
+	t.Helper()
+	gitIn(t, root, "add", "-A")
+	gitIn(t, root, "-c", "gc.auto=0", "commit", "-q", "-m", "the fixture")
+}
+
+func gitIn(t *testing.T, root string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = root
+	// The user's own configuration is kept out so a rule cannot pass on one
+	// machine and fail on another, and the automatic repack is kept out because
+	// it outlives the test and writes into a directory the test framework is
+	// busy removing.
+	cmd.Env = append(os.Environ(),
+		"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null",
+		"GIT_AUTHOR_NAME=ax", "GIT_AUTHOR_EMAIL=ax@example.com",
+		"GIT_COMMITTER_NAME=ax", "GIT_COMMITTER_EMAIL=ax@example.com")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %s: %v: %s", strings.Join(args, " "), err, out)
+	}
 }
 
 // picture is the image line the writer puts down for a committed figure, and
@@ -262,6 +300,7 @@ func TestACleanPaperPassesEveryRule(t *testing.T) {
 		section(1, "One", "## A subsection\n\n"+prose(8)+"\n\n### Deeper\n\n"+prose(8)),
 		section(2, "Two", theorem+prose(12)),
 	)
+	committed(t, root)
 	for id, res := range audited(t, root) {
 		if res.State() != Pass {
 			t.Errorf("%s is %s with %v", id, res.State(), res.Findings)
