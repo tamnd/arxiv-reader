@@ -489,6 +489,107 @@ jobs:
             echo "a rendering of one version was read as another"
             exit 1
           fi
+      # The writing half. The reading half above runs with -n and never puts a
+      # file down, and everything that matters about this stage is what the
+      # files say and what happens on the second run.
+      - name: a paper is written into the content plane
+        run: |
+          mkdir -p /tmp/extract-corpus/metadata
+          printf '%s\n' '{"id":"2501.00001","title":"A Paper About Nothing","abstract":"We say nothing.","authors":[{"surname":"First","forename":"Ada"},{"surname":"Second","forename":"Bo"}],"categories":["cs.LG"],"versions":[{"version":3,"created":"2025-02-02T00:00:00Z","licence":"cc-by","licence_from":"abs"}],"source":"oai","harvested":"2026-09-14"}' > /tmp/extract-corpus/metadata/2501.jsonl
+          ARXIV_CORPUS=/tmp/extract-corpus ax extract render 2501.00001v3 | tee /tmp/write.txt
+          grep -q "3 written, 0 unchanged" /tmp/write.txt
+          dir=/tmp/extract-corpus/content/en/2501/2501.00001
+          test -f $dir/00_front.md
+          test -f $dir/01_introduction.md
+          test -f $dir/02_results.md
+          # The licence is the reason this project is allowed to exist, so it is
+          # on every file rather than in one place somebody has to go and look.
+          grep -q "^licence: CC-BY-4.0" $dir/01_introduction.md
+          grep -q "^licence_from: abs" $dir/01_introduction.md
+          grep -q "^access: open" $dir/01_introduction.md
+          # The author list comes from the metadata plane and not from the
+          # byline in the rendering.
+          grep -q "  - Ada First" $dir/01_introduction.md
+          # A section that is a whole file has its title in the front matter,
+          # because repeating it in the body gives every page two titles.
+          grep -q "^section_title: Introduction" $dir/01_introduction.md
+          grep -q "^local_id: s1" $dir/01_introduction.md
+          # Every object carries its attribute block on the line it starts,
+          # which is what makes the Markdown the source of truth rather than a
+          # rendering of one.
+          grep -q "{#thm-1 .statement env=theorem}" $dir/02_results.md
+          grep -q "{#fig-2 .figure}" $dir/02_results.md
+          grep -q "{#tab-1 .table}" $dir/02_results.md
+          grep -q "{#lst-1 .code}" $dir/02_results.md
+          grep -q "{#eq-1a .equation}" $dir/01_introduction.md
+          # Every cross reference points at a local identifier. A corpus whose
+          # internal links point at LaTeXML's own anchors is a corpus whose
+          # links go nowhere.
+          if grep -q "](#S" $dir/*.md; then
+            echo "a cross reference still points at a rendering anchor"
+            exit 1
+          fi
+      # git status after a re-run of a finished paper is empty, and that is the
+      # test that this stage is honest rather than a claim about it.
+      - name: writing the same paper twice writes nothing
+        run: |
+          ARXIV_CORPUS=/tmp/extract-corpus ax extract render 2501.00001v3 | tee /tmp/again.txt
+          grep -q "0 written, 3 unchanged" /tmp/again.txt
+          ARXIV_CORPUS=/tmp/extract-corpus ax split 2501.00001v3 | grep -q "3 files of 2501.00001, 0 corrected"
+      # A person's work outranks a re-run of a converter. This is the whole
+      # reason the content plane is Markdown rather than a database.
+      - name: a hand correction is noticed and is not thrown away
+        run: |
+          dir=/tmp/extract-corpus/content/en/2501/2501.00001
+          sed -i 's/Nothing is nothing./Nothing is really nothing./' $dir/02_results.md
+          if ARXIV_CORPUS=/tmp/extract-corpus ax split 2501.00001v3; then
+            echo "a corrected file exited zero without anybody having accepted it"
+            exit 1
+          fi
+          if ARXIV_CORPUS=/tmp/extract-corpus ax extract render 2501.00001v3; then
+            echo "a re-extraction over a corrected file exited zero"
+            exit 1
+          fi
+          grep -q "Nothing is really nothing." $dir/02_results.md
+          # Accepting restamps the hash and marks the file edited. After that
+          # the correction is the file, and the next run refuses it because
+          # somebody decided rather than because something looks wrong.
+          ARXIV_CORPUS=/tmp/extract-corpus ax split -accept 2501.00001v3
+          grep -q "^edited: true" $dir/02_results.md
+          ARXIV_CORPUS=/tmp/extract-corpus ax split 2501.00001v3 | grep -q "0 corrected"
+          ARXIV_CORPUS=/tmp/extract-corpus ax extract render 2501.00001v3 2>&1 | grep -q "1 left alone"
+          # Force is the way past it and is deliberately not the default.
+          ARXIV_CORPUS=/tmp/extract-corpus ax extract render -force 2501.00001v3 | grep -q "1 written"
+          grep -q "Nothing is nothing." $dir/02_results.md
+      - name: the split refuses the arguments it should refuse
+        run: |
+          if ax split; then
+            echo "a split with nothing to split was allowed"
+            exit 1
+          fi
+          for c in "split not-an-arxiv-id" "split 2501.00001v3"; do
+            if ARXIV_CORPUS=/tmp/empty-corpus ax $c; then
+              echo "ax $c was allowed"
+              exit 1
+            fi
+          done
+      # The gate runs again at write time. Fetching and extracting are separate
+      # runs and the licence can be re-resolved between them, so the check has
+      # to be at the point something is about to be published and not only at
+      # the point something was downloaded.
+      - name: the gate refuses at write time and not only at fetch time
+        run: |
+          rm -rf /tmp/gate-corpus && cp -r /tmp/extract-corpus /tmp/gate-corpus
+          rm -rf /tmp/gate-corpus/content
+          sed -i 's/"licence_from":"abs"/"licence_from":"kaggle"/' /tmp/gate-corpus/metadata/2501.jsonl
+          if ARXIV_CORPUS=/tmp/gate-corpus ax extract render 2501.00001v3; then
+            echo "a licence read from a bulk surface was published as a licence for a version"
+            exit 1
+          fi
+          if [ -e /tmp/gate-corpus/content ]; then
+            echo "a refused extraction wrote into the content plane"
+            exit 1
+          fi
       - name: a rendering with a hole in the paper is rejected
         run: |
           mkdir -p /tmp/faulty-corpus/work/html/2501 /tmp/faulty-corpus/manifests

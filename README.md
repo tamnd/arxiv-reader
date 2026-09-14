@@ -138,6 +138,53 @@ One in a bibliography entry is a reference that prints badly, and about a quarte
 One inside a section body is a sentence of the paper that is gone, and that is a rejection however many there are.
 A rejected paper is not a failed paper: it falls through to the source path, where LaTeXML runs here with this project's flags rather than arXiv's, and a good share of the errors do not happen twice.
 
+Drop the `-n` and the same command writes the paper into the content plane, one file per top level section.
+
+```
+$ ax extract render 2312.00752v2
+  written  00_front.md
+  written  01_introduction.md
+  ...
+12 files in content/en/2312/2312.00752: 12 written, 0 unchanged, 0 removed, 0 left alone
+```
+
+Every file opens with front matter holding what the metadata plane knows about the paper and what the emitter counted in the file beside it, and then the section itself.
+A section that is a whole file has its title in `section_title` rather than as a heading, because a page with its title in its metadata and again in its body has two titles.
+
+```
+section: 3
+section_title: Selective State Space Models
+local_id: s3
+objects: 28
+figures:
+  - fig-2
+  - fig-3
+statements:
+  - thm-1
+content_sha256: d85d21a42207b36648adfa35e74e3f3a678c870a57057c75068e85697a4b14fd
+edited: false
+```
+
+The body is Markdown with an attribute block on the line each object starts, so `**Theorem 1** {#thm-1 .statement env=theorem}` is a theorem a link can point at.
+The identifiers are local to the paper and readable, which is `thm-1` and `fig-2` and `s3-1`, and the permanent four character tags that survive a re-extraction are assigned later by `ax tags assign`.
+arXiv's rendering names the same objects `S3.F2` and `S3.SS1`, which mean nothing outside the one HTML file they came from, so every cross reference is rewritten once the whole paper has been walked.
+A forward reference in section 1 to a figure in section 4 cannot be resolved before section 4 has been named, which is why nothing is written until everything has been read.
+A reference that cannot be placed is left exactly as it was, since a link that works and goes somewhere wrong is worse than one that visibly does not.
+
+Writing is idempotent and a correction outranks the converter.
+
+```
+$ ax extract render 2312.00752v2
+12 files in content/en/2312/2312.00752: 0 written, 12 unchanged, 0 removed, 0 left alone
+```
+
+`content_sha256` is taken over the body, so a hand correction makes the file disagree with its own front matter and that is the whole mechanism.
+`ax split` reports which files were corrected and prints both hashes, `ax extract render` refuses to overwrite a corrected file and says so, `ax split -accept` restamps the hash and sets `edited: true`, and `ax extract render -force` throws the correction away.
+A file marked edited stays that way, because somebody decided about it and a hash that does not match is only a hint that somebody might have.
+
+The licence gate runs again here and not only at fetch time.
+Fetching and extracting are separate runs and the licence can be re-resolved between them, so the check belongs at the point something is about to be published as well as at the point it was downloaded.
+
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
 

@@ -71,6 +71,31 @@ func (l Licence) URL() string {
 	}
 }
 
+// SPDX is the identifier a licence field in front matter carries.
+//
+// A different string from the Licence value on purpose. The Licence value is
+// arXiv's own and it says which of six choices the submitter made. This is what
+// our file is under, it is written where a tool looking for a licence expects
+// to find one, and SPDX is what those tools read. The empty string is not a
+// licence: it is the answer for a paper none of whose content may be published,
+// and a file carrying it should not exist.
+func (l Licence) SPDX() string {
+	switch l {
+	case LicenceCC0:
+		return "CC0-1.0"
+	case LicenceCCBY:
+		return "CC-BY-4.0"
+	case LicenceCCBYSA:
+		return "CC-BY-SA-4.0"
+	case LicenceCCBYNCSA:
+		return "CC-BY-NC-SA-4.0"
+	case LicenceCCBYNCND:
+		return "CC-BY-NC-ND-4.0"
+	default:
+		return ""
+	}
+}
+
 // ParseLicence reads a licence from a harvested record or from front matter.
 //
 // An empty string is unknown rather than an error, because a record that names
