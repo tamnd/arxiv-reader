@@ -7,37 +7,45 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"text/tabwriter"
 
 	"github.com/tamnd/arxiv-cli/pkg/axid"
 	"github.com/tamnd/arxiv-reader/corpus"
 	"github.com/tamnd/arxiv-reader/fetch"
 	"github.com/tamnd/arxiv-reader/metadata"
+	"github.com/tamnd/arxiv-reader/source"
 )
 
 func runFetch(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: ax fetch render <id>v<n> [...], or ax fetch verify")
+		return errors.New("usage: ax fetch render <id>v<n> [...], ax fetch source <id>v<n> [...], or ax fetch verify")
 	}
 	switch args[0] {
 	case "render":
-		return fetchRender(args[1:])
+		return fetchDownload(fetch.RouteRender, args[1:])
+	case "source":
+		return fetchDownload(fetch.RouteSource, args[1:])
 	case "verify":
 		return fetchVerify(args[1:])
 	default:
-		return fmt.Errorf("unknown fetch subcommand %q, which is render or verify", args[0])
+		return fmt.Errorf("unknown fetch subcommand %q, which is render, source or verify", args[0])
 	}
 }
 
-// fetchRender downloads arXiv's own rendering of the versions it is given.
+// fetchDownload downloads one surface of the versions it is given.
 //
 // One request per version at fifteen seconds, so a run of twenty papers is five
 // minutes and a run of a thousand is four hours. It is built to be left alone:
 // every version already on disk and matching the manifest is skipped without a
 // request, so re-running after an interruption costs only the versions that
 // were never reached.
-func fetchRender(args []string) error {
-	fs := flag.NewFlagSet("ax fetch render", flag.ContinueOnError)
+//
+// The two routes are one command because everything except the URL is the same
+// between them, down to the sentence printed at the end. What differs is what a
+// 404 means, and that is a fact about the route rather than about the run.
+func fetchDownload(route fetch.Route, args []string) error {
+	fs := flag.NewFlagSet("ax fetch "+string(route), flag.ContinueOnError)
 	all := fs.Bool("all", false, "fetch every version of each paper, and not just the one named")
 	accept := fs.Bool("accept", false, "record new bytes for a source whose hash no longer matches the manifest")
 	anyway := fs.Bool("anyway", false, "fetch past the licence gate, for reading a paper this corpus may never publish")
@@ -47,7 +55,7 @@ func fetchRender(args []string) error {
 	}
 	refs := fs.Args()
 	if len(refs) == 0 {
-		return errors.New("usage: ax fetch render <id>v<n> [...], or -all with a bare id")
+		return fmt.Errorf("usage: ax fetch %s <id>v<n> [...], or -all with a bare id", route)
 	}
 	if *pace < fetch.Pace {
 		return fmt.Errorf("a pace of %s is faster than the fifteen seconds arXiv asks for on the website, and this reads the website", *pace)
@@ -72,7 +80,7 @@ func fetchRender(args []string) error {
 	// and a manifest that forgot them would spend them again. A run that
 	// fetched nothing writes nothing, so a refused fetch leaves no trace in the
 	// corpus at all.
-	tally, err := fetchEach(ctx, f, plane, &manifest, refs, *all, fetch.Order{Accept: *accept, Anyway: *anyway})
+	tally, err := fetchEach(ctx, f, route, plane, &manifest, refs, *all, fetch.Order{Accept: *accept, Anyway: *anyway})
 	if tally.fetched > 0 {
 		if werr := manifest.Save(path); werr != nil {
 			return werr
@@ -81,10 +89,10 @@ func fetchRender(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stderr, "%d fetched, %d cached, %d with no rendering, %d sources in %s\n",
-		tally.fetched, tally.cached, len(tally.unrendered), len(manifest.Sources), path)
+	fmt.Fprintf(os.Stderr, "%d fetched, %d cached, %d arXiv does not serve, %d sources in %s\n",
+		tally.fetched, tally.cached, len(tally.absent), len(manifest.Sources), path)
 	if tally.fetched == 0 && tally.cached == 0 {
-		return fmt.Errorf("none of the %d versions asked for has an HTML rendering, so they are all on the source path", len(tally.unrendered))
+		return fmt.Errorf("arXiv serves no %s for any of the %d versions asked for", route, len(tally.absent))
 	}
 	return nil
 }
@@ -92,12 +100,12 @@ func fetchRender(args []string) error {
 // tally is what a run of fetches came to.
 type tally struct {
 	fetched, cached int
-	// unrendered is the versions arXiv has no rendering of, which is a fact
-	// about those papers rather than a fault in the run.
-	unrendered []string
+	// absent is the versions arXiv does not serve this route for, which is a
+	// fact about those papers rather than a fault in the run.
+	absent []string
 }
 
-func fetchEach(ctx context.Context, f *fetch.Fetcher, plane metadata.Plane, m *fetch.Manifest, refs []string, all bool, o fetch.Order) (tally, error) {
+func fetchEach(ctx context.Context, f *fetch.Fetcher, route fetch.Route, plane metadata.Plane, m *fetch.Manifest, refs []string, all bool, o fetch.Order) (tally, error) {
 	var t tally
 	for _, ref := range refs {
 		id, err := axid.Parse(ref)
@@ -121,16 +129,23 @@ func fetchEach(ctx context.Context, f *fetch.Fetcher, plane metadata.Plane, m *f
 		for _, n := range versions {
 			order := o
 			order.Record, order.Version = rec, n
-			res, err := f.Render(ctx, plane.Root, m, order)
+			var res fetch.Result
+			if route == fetch.RouteSource {
+				res, err = f.EPrint(ctx, plane.Root, m, order)
+			} else {
+				res, err = f.Render(ctx, plane.Root, m, order)
+			}
 
-			// A version with no rendering is reported and stepped over.
-			// arXiv began rendering in December 2023 and does not backfill,
-			// so most papers have a rendering of their latest version and
-			// none of their first, and a batch that stopped at the first one
-			// would never reach the papers it can do.
-			var missing *fetch.NotRendered
-			if errors.As(err, &missing) {
-				t.unrendered = append(t.unrendered, missing.Ref)
+			// A version arXiv does not serve this route for is reported and
+			// stepped over. arXiv began rendering in December 2023 and does
+			// not backfill, so most papers have a rendering of their latest
+			// version and none of their first, and a batch that stopped at
+			// the first one would never reach the papers it can do.
+			var unrendered *fetch.NotRendered
+			var noEPrint *fetch.NoEPrint
+			if errors.As(err, &unrendered) || errors.As(err, &noEPrint) {
+				ref := fmt.Sprintf("%sv%d", rec.ID, n)
+				t.absent = append(t.absent, ref)
 				fmt.Fprintln(os.Stderr, err)
 				continue
 			}
@@ -143,9 +158,33 @@ func fetchEach(ctx context.Context, f *fetch.Fetcher, plane metadata.Plane, m *f
 				t.fetched++
 			}
 			fmt.Printf("%-22s %-8s %-12s %9d  %s\n", res.Entry.Ref(), res.Outcome, res.Entry.Licence, res.Entry.Bytes, res.Entry.Path)
+			if route == fetch.RouteSource {
+				reportMain(plane.Root, res.Entry.Path)
+			}
 		}
 	}
 	return t, nil
+}
+
+// reportMain says what the submission turned out to be.
+//
+// Printed here rather than left for ax extract because it is the one thing
+// about an e-print that cannot be seen from the outside, and a person fetching
+// a hundred papers wants to know which of them are PDF only before they start
+// the extraction rather than after. Nothing here fails the run: a submission
+// this tool cannot read is a paper for another path and not a broken download.
+func reportMain(root, rel string) {
+	bundle, err := source.Read(filepath.Join(root, filepath.FromSlash(rel)))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  %v\n", err)
+		return
+	}
+	main, err := bundle.Main()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  %v\n", err)
+		return
+	}
+	fmt.Printf("%-22s %s of %d files\n", "", main, len(bundle.Files))
 }
 
 // record reads one paper out of the metadata plane.

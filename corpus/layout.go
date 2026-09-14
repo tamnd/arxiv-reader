@@ -118,6 +118,21 @@ func RenderPath(root string, id axid.ID, version int) string {
 	return path.Join(root, "work", "html", Shard(id), fmt.Sprintf("%sv%d.html", PathID(id), version))
 }
 
+// EPrintPath is where the submitter's own files for one version are cached.
+//
+// Under work/ with the rendering and for the same reason, and these bytes are
+// the ones it matters most to keep out of the corpus: an e-print is the paper
+// as its author wrote it, the whole of it, and a repository holding one per
+// paper is a mirror of arXiv's submission store.
+//
+// The name says gzip and not tar, because arXiv serves one gzip stream and what
+// is inside it is usually a tar of the submission and sometimes a single TeX
+// file. Naming the file for the thing it turns out to contain would mean
+// deciding that before the bytes have arrived.
+func EPrintPath(root string, id axid.ID, version int) string {
+	return path.Join(root, "work", "source", Shard(id), fmt.Sprintf("%sv%d.gz", PathID(id), version))
+}
+
 // SourcesPath is the manifest recording where every fetched byte came from.
 func SourcesPath(root string) string {
 	return path.Join(root, "manifests", "sources.yaml")
