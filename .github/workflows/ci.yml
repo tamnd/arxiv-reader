@@ -244,6 +244,30 @@ jobs:
             exit 1
           fi
           ARXIV_CORPUS=/tmp/bad-corpus ax audit --plane meta 2>&1 | grep -q "metadata/2106.jsonl:1"
+      # No -fetch anywhere in CI. The committed copy of arXiv's counts is there
+      # so this runs without asking arXiv for anything.
+      - name: the harvest report counts the corpus against arXiv's own numbers
+        run: |
+          out=$(ARXIV_CORPUS=/tmp/snap-corpus ax harvest report)
+          echo "$out"
+          # One record of the three million arXiv has announced, so the useful
+          # assertion is the yardstick, not the coverage.
+          echo "$out" | grep -q "1 record of 3,1"
+          echo "$out" | grep -q "months with nothing in them"
+          grep -q "^# The harvest" /tmp/snap-corpus/reports/harvest.md
+          grep -q "^| 2021-06 | 1 |" /tmp/snap-corpus/reports/harvest.md
+      - name: an empty corpus reports every month as a gap
+        run: |
+          ARXIV_CORPUS=/tmp/empty-corpus ax harvest report -q -o /tmp/empty-harvest.md
+          grep -q "^| 2021-06 | 0 |" /tmp/empty-harvest.md
+      - name: the harvest report refuses the arguments it should refuse
+        run: |
+          for c in "harvest report -save /tmp/x.csv" "harvest report extra"; do
+            if ax $c; then
+              echo "ax $c was allowed"
+              exit 1
+            fi
+          done
       - name: the audit refuses the arguments it should refuse
         run: |
           for c in "audit --plane content" "audit --plane both" "audit -rules S99" "audit -rules" "audit -cap 0" "audit -shard 2113" "audit meta"; do
