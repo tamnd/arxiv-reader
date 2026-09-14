@@ -116,6 +116,9 @@ func TestTheCachePathKeepsTheVersion(t *testing.T) {
 		{EPrintPath("/c", id, 2), "/c/work/source/2312/2312.00752v2.gz"},
 		{EPrintPath("", id, 1), "work/source/2312/2312.00752v1.gz"},
 		{EPrintPath("/c", mustParse(t, "hep-th/9711200"), 3), "/c/work/source/9711/hep-th-9711200v3.gz"},
+		{PDFPath("/c", id, 2), "/c/work/pdf/2312/2312.00752v2.pdf"},
+		{PDFPath("", id, 1), "work/pdf/2312/2312.00752v1.pdf"},
+		{PDFPath("/c", mustParse(t, "hep-th/9711200"), 3), "/c/work/pdf/9711/hep-th-9711200v3.pdf"},
 		{SourcesPath("/c"), "/c/manifests/sources.yaml"},
 	}
 	for _, c := range cases {

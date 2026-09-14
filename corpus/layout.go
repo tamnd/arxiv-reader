@@ -142,6 +142,26 @@ func EPrintDir(root string, id axid.ID, version int) string {
 	return path.Join(root, "work", "source", Shard(id), fmt.Sprintf("%sv%d", PathID(id), version))
 }
 
+// PDFPath is where arXiv's PDF of one version is cached.
+//
+// The third thing arXiv serves per version and the only one it has for every
+// paper it has ever taken. A rendering exists from December 2023 and only for
+// TeX. An e-print exists unless the submitter withheld it. A PDF is what the
+// site shows a reader, so a paper with a PDF and nothing else is still a paper
+// this corpus can read, and that is the whole reason the native path is here.
+//
+// Under work/ with the other two, and these are the bytes it is easiest to
+// forget are arXiv's. A PDF looks like a document rather than like a cache, and
+// a corpus that committed one per paper would be a mirror of arXiv wearing a
+// git history.
+//
+// The same file serves the native path and the vision path, because they are
+// two ways of reading one PDF and not two downloads. The vision path rasterises
+// what is on this disk rather than asking arXiv for it again.
+func PDFPath(root string, id axid.ID, version int) string {
+	return path.Join(root, "work", "pdf", Shard(id), fmt.Sprintf("%sv%d.pdf", PathID(id), version))
+}
+
 // ConvertedDir is where this project's own conversion of one submission goes.
 //
 // Separate from the unpacked submission and not inside it. LaTeXML copies every

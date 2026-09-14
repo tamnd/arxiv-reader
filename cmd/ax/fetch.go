@@ -14,22 +14,25 @@ import (
 	"github.com/tamnd/arxiv-reader/corpus"
 	"github.com/tamnd/arxiv-reader/fetch"
 	"github.com/tamnd/arxiv-reader/metadata"
+	"github.com/tamnd/arxiv-reader/pdftext"
 	"github.com/tamnd/arxiv-reader/source"
 )
 
 func runFetch(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: ax fetch render <id>v<n> [...], ax fetch source <id>v<n> [...], or ax fetch verify")
+		return errors.New("usage: ax fetch render <id>v<n> [...], ax fetch source <id>v<n> [...], ax fetch native <id>v<n> [...], or ax fetch verify")
 	}
 	switch args[0] {
 	case "render":
 		return fetchDownload(fetch.RouteRender, args[1:])
 	case "source":
 		return fetchDownload(fetch.RouteSource, args[1:])
+	case "native":
+		return fetchDownload(fetch.RouteNative, args[1:])
 	case "verify":
 		return fetchVerify(args[1:])
 	default:
-		return fmt.Errorf("unknown fetch subcommand %q, which is render, source or verify", args[0])
+		return fmt.Errorf("unknown fetch subcommand %q, which is render, source, native or verify", args[0])
 	}
 }
 
@@ -41,7 +44,7 @@ func runFetch(args []string) error {
 // request, so re-running after an interruption costs only the versions that
 // were never reached.
 //
-// The two routes are one command because everything except the URL is the same
+// The three routes are one command because everything except the URL is the same
 // between them, down to the sentence printed at the end. What differs is what a
 // 404 means, and that is a fact about the route rather than about the run.
 func fetchDownload(route fetch.Route, args []string) error {
@@ -75,12 +78,26 @@ func fetchDownload(route fetch.Route, args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
+	// Asked once for the whole run rather than once per paper, so a machine
+	// without poppler gets one line about it instead of one per PDF. A missing
+	// program costs the report and not the download, because the bytes are worth
+	// having either way and this is a thing said about them.
+	var text *pdftext.Reader
+	if route == fetch.RouteNative {
+		text = &pdftext.Reader{}
+		if err := text.Available(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, "nothing here will say which of these PDFs are scans, and the downloads carry on")
+			text = nil
+		}
+	}
+
 	// The manifest is written once at the end, and also on the way out of a
 	// failure, because a run that stopped halfway has still spent the requests
 	// and a manifest that forgot them would spend them again. A run that
 	// fetched nothing writes nothing, so a refused fetch leaves no trace in the
 	// corpus at all.
-	tally, err := fetchEach(ctx, f, route, plane, &manifest, refs, *all, fetch.Order{Accept: *accept, Anyway: *anyway})
+	tally, err := fetchEach(ctx, f, route, plane, &manifest, refs, *all, text, fetch.Order{Accept: *accept, Anyway: *anyway})
 	if tally.fetched > 0 {
 		if werr := manifest.Save(path); werr != nil {
 			return werr
@@ -105,7 +122,7 @@ type tally struct {
 	absent []string
 }
 
-func fetchEach(ctx context.Context, f *fetch.Fetcher, route fetch.Route, plane metadata.Plane, m *fetch.Manifest, refs []string, all bool, o fetch.Order) (tally, error) {
+func fetchEach(ctx context.Context, f *fetch.Fetcher, route fetch.Route, plane metadata.Plane, m *fetch.Manifest, refs []string, all bool, text *pdftext.Reader, o fetch.Order) (tally, error) {
 	var t tally
 	for _, ref := range refs {
 		id, err := axid.Parse(ref)
@@ -130,9 +147,12 @@ func fetchEach(ctx context.Context, f *fetch.Fetcher, route fetch.Route, plane m
 			order := o
 			order.Record, order.Version = rec, n
 			var res fetch.Result
-			if route == fetch.RouteSource {
+			switch route {
+			case fetch.RouteSource:
 				res, err = f.EPrint(ctx, plane.Root, m, order)
-			} else {
+			case fetch.RouteNative:
+				res, err = f.PDF(ctx, plane.Root, m, order)
+			default:
 				res, err = f.Render(ctx, plane.Root, m, order)
 			}
 
@@ -141,9 +161,16 @@ func fetchEach(ctx context.Context, f *fetch.Fetcher, route fetch.Route, plane m
 			// not backfill, so most papers have a rendering of their latest
 			// version and none of their first, and a batch that stopped at
 			// the first one would never reach the papers it can do.
+			//
+			// A PDF that is still being compiled is stepped over with them. It
+			// is not an absence, because the paper has a PDF and it will be
+			// there in a few minutes, but it is the same thing to do about it:
+			// say so, and get on with the rest of the run.
 			var unrendered *fetch.NotRendered
 			var noEPrint *fetch.NoEPrint
-			if errors.As(err, &unrendered) || errors.As(err, &noEPrint) {
+			var noPDF *fetch.NoPDF
+			var building *fetch.NotBuilt
+			if errors.As(err, &unrendered) || errors.As(err, &noEPrint) || errors.As(err, &noPDF) || errors.As(err, &building) {
 				ref := fmt.Sprintf("%sv%d", rec.ID, n)
 				t.absent = append(t.absent, ref)
 				fmt.Fprintln(os.Stderr, err)
@@ -160,6 +187,9 @@ func fetchEach(ctx context.Context, f *fetch.Fetcher, route fetch.Route, plane m
 			fmt.Printf("%-22s %-8s %-12s %9d  %s\n", res.Entry.Ref(), res.Outcome, res.Entry.Licence, res.Entry.Bytes, res.Entry.Path)
 			if route == fetch.RouteSource {
 				reportMain(plane.Root, res.Entry.Path)
+			}
+			if text != nil {
+				reportText(ctx, text, plane.Root, res.Entry.Path)
 			}
 		}
 	}
@@ -185,6 +215,26 @@ func reportMain(root, rel string) {
 		return
 	}
 	fmt.Printf("%-22s %s of %d files\n", "", main, len(bundle.Files))
+}
+
+// reportText says whether the PDF that just arrived has a text layer.
+//
+// Here for the same reason reportMain is. Whether a PDF was typeset or scanned
+// cannot be seen from its size, its licence or its name, it decides which of two
+// paths the paper is on, and a person fetching a thousand of them wants to know
+// the split before they start extracting rather than after. It is a reading and
+// not a decision: nothing is written down, and the paper is routed by ax extract.
+//
+// Nothing here fails the run. A PDF pdftotext will not open is a fact about that
+// paper, the bytes are on disk either way, and a download that threw itself away
+// over a report would be the wrong trade at fifteen seconds a request.
+func reportText(ctx context.Context, r *pdftext.Reader, root, rel string) {
+	doc, err := r.Read(ctx, filepath.Join(root, filepath.FromSlash(rel)))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  %v\n", err)
+		return
+	}
+	fmt.Printf("%-22s %s\n", "", doc.Why())
 }
 
 // record reads one paper out of the metadata plane.
