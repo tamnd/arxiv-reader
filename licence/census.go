@@ -294,7 +294,7 @@ func (c *Counter) Census() Census {
 		return out.Archives[i].Archive < out.Archives[j].Archive
 	})
 
-	for _, s := range []metadata.Source{metadata.SourceKaggle, metadata.SourceHF, metadata.SourceOAI} {
+	for _, s := range metadata.Authorities {
 		if c.authorities[s] > 0 {
 			out.Authorities = append(out.Authorities, AuthorityRow{Source: s, Records: c.authorities[s]})
 		}
@@ -375,7 +375,7 @@ func (c Census) Markdown() string {
 		for _, r := range c.Authorities {
 			fmt.Fprintf(&b, "| %s | %s |\n", r.Source, prose.Thousands(r.Records))
 		}
-		b.WriteString("\nNo bulk surface carries a per version licence, so every row above is a latest version licence whichever surface it came from.\n")
+		b.WriteString("\nNo bulk surface carries a per version licence, so every row above other than the abs page is a latest version licence.\n")
 	}
 
 	b.WriteString("\n## Versions\n\n")
