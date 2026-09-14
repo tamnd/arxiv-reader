@@ -256,6 +256,51 @@ It goes beside the unpacked submission rather than inside it because LaTeXML cop
 The submission itself is unpacked from the cached bytes every time, since those are hashed in the manifest and the unpacked files are not.
 A submission that turns out to be a PDF is reported and stepped over rather than failed on, the same way a version arXiv never rendered is on the fetch side, because a batch of a hundred papers should not stop at the first author who compiled their own paper.
 
+A macro LaTeXML cannot read costs the object it was in and nothing else.
+In a bibliography entry that is a reference that prints badly, and in a section body it is a sentence of the paper that is gone, which is the whole of the reject rule.
+There are three reasons a macro goes missing and they have different answers.
+
+The first is a package the author wrote and shipped in the tarball.
+LaTeXML skips the style files a submission carries unless it is told to read them, so on a first pass every macro defined in them is undefined.
+That is what the second pass is for: `ax extract source` converts without them, and if the reject rule throws the result out it converts again with `--includestyles` and keeps whichever of the two is better.
+Better means fewer conversion errors inside the body, and a pass that stopped partway through is never the better one however few errors are in the fragment it wrote.
+It is a second pass and not the default because a .sty is a program, and LaTeXML reading one is LaTeXML running low level TeX it may have no answer for, so a pass that reads them can come out worse than a pass that skipped them.
+
+The second is a package LaTeXML does model, but models by reading the real .sty out of a TeX tree.
+TikZ is the one that matters, and on a machine with no TeX installed there is no file to read, so the binding does not load at all and every TikZ command in the paper is undefined.
+A paper full of undefined macros has one cause and three hundred symptoms, so the command names the cause once instead.
+
+```
+$ ax extract source -n 1809.03842v1
+latexmlc (LaTeXML version 0.8.8)
+converting 1809.03842v1 from manual.tex
+  Error:undefined:\usetikzlibrary The token T_CS[\usetikzlibrary] is not defined. at manual.tex; line 10 col 15
+  Error:undefined:{tikzcd} The environment {tikzcd} is not defined. at manual.tex; line 51 col 0
+  Error:undefined:\gate The token T_CS[\gate] is not defined. at manual.tex; line 52 col 25
+  and more, all of which are in work/converted/1809/1809.03842v1/paper.html.log
+converted 1809.03842v1 in 3.424s with a document LaTeXML gave up partway through
+  LaTeXML could not read 13 packages: ltxcmds, keyval, ..., tcolorbox, tikz
+  and this machine has no TeX installation, so the packages LaTeXML models by reading the real .sty, which is TikZ among others, could not load at all
+1809.03842v1 was rejected: the rendering has 296 conversion errors inside the body of the paper, so a piece of the paper is missing
+converting it again with the style files the submission ships, in case what it lost is something the author defined
+...
+1809.03842v1: reading the style files did not help, so the first conversion is the one kept
+ax: 1 of 1 conversions are too broken to use, and those papers need the native path or a person
+```
+
+That is the Quantikz tutorial, which draws every one of its figures in TikZ, and it is the worst case on purpose.
+Both passes lose the same thing, the paper is refused, and nothing with three hundred holes in it reaches the content plane.
+The fix for this one is a TeX installation on the machine doing the conversion, which is a decision about the machine and not about the paper, so the command says which of the two kinds of machine it is running on rather than guessing.
+
+The third is a macro LaTeXML has no answer for at all, and there the decision is the plain one.
+A paper that still carries an error inside its body after both passes is refused and goes to the native path or to a person.
+It is not published with holes in it and it is not published with the holes papered over, because a reader cannot see either.
+Whatever LaTeXML said is kept in a `.log` beside the document, since the line explaining why a macro was ignored is in it and nowhere else.
+
+One case the fault count cannot see is worth naming, because it looks like success.
+LaTeXML stops after a hundred errors and writes what it had, so a paper that lost its packages in the preamble arrives as a title with nothing under it and no faults in it at all.
+Counting faults reads that as a clean paper of no sections, so the status line is checked as well, and a conversion that stopped partway through is refused whatever its fault count says.
+
 The front matter records which of the two surfaces the file came from, in `path: render` or `path: source`.
 A rendering is what arXiv made of a submission and a conversion is what this project made of the same submission, and they are not always the same document, so a reader comparing two papers has nothing else to go on.
 Figures on this path are still undecided: they come out of the conversion as local files next to the document, and putting them through the figure gate is the next piece of work.

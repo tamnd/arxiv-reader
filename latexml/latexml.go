@@ -96,6 +96,16 @@ type Converter struct {
 	// Log, if set, is called with each line LaTeXML writes as it writes it. A
 	// conversion of a long paper is quiet for a minute otherwise.
 	Log func(line string)
+	// IncludeStyles makes LaTeXML read the style files a submission ships
+	// rather than skipping the ones it has no binding for.
+	//
+	// Off by default and that is deliberate. A .sty is a program, and LaTeXML
+	// reading one is LaTeXML running low level TeX it may have no answer for,
+	// which turns a paper that converts with a few undefined macros into one
+	// that does not convert at all. So it is the second pass and not the first:
+	// a conversion is tried without it, and a paper the reject rule throws out
+	// is tried again with it.
+	IncludeStyles bool
 }
 
 // Result is one conversion.
@@ -109,8 +119,15 @@ type Result struct {
 	Status int
 	// Log is everything LaTeXML said, kept because the line explaining why a
 	// macro was ignored is in it and nowhere else.
-	Log  []byte
-	Took time.Duration
+	Log []byte
+	// Missing is the packages LaTeXML could not read, in the order it met them.
+	//
+	// It is the one thing in the log worth pulling out, because a paper full of
+	// undefined macros has one cause and the errors are all symptoms of it. A
+	// package with no binding and no file to fall back on means every command it
+	// defines is undefined, which is three hundred errors from one line.
+	Missing []string
+	Took    time.Duration
 }
 
 // Available says whether LaTeXML can be run at all.
@@ -171,8 +188,8 @@ func (c *Converter) Convert(ctx context.Context, dir, main, dest string) (Result
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, c.binary(),
-		"--dest="+dest,
+	args := []string{
+		"--dest=" + dest,
 		"--format=html5",
 		// The LaTeX the author typed, kept beside every formula. It is the
 		// only form of the mathematics worth storing: the MathML next to it is
@@ -186,8 +203,13 @@ func (c *Converter) Convert(ctx context.Context, dir, main, dest string) (Result
 		// Markdown and its own pages, so LaTeXML's CSS is three files nobody
 		// reads and one more thing to keep out of git.
 		"--nodefaultresources",
-		main,
-	)
+	}
+	if c.IncludeStyles {
+		args = append(args, "--includestyles")
+	}
+	args = append(args, main)
+
+	cmd := exec.CommandContext(ctx, c.binary(), args...)
 	cmd.Dir = dir
 	// One writer for both streams and not two, which is what keeps them one
 	// log. Two writers means two pipes and two goroutines appending to the same
@@ -216,7 +238,14 @@ func (c *Converter) Convert(ctx context.Context, dir, main, dest string) (Result
 	if readErr != nil {
 		return Result{}, fmt.Errorf("latexml: converting %s reported success and wrote no document to %s%s", main, dest, tail(log.Bytes()))
 	}
-	return Result{HTML: body, Dest: dest, Status: status(log.Bytes()), Log: log.Bytes(), Took: took}, nil
+	return Result{
+		HTML:    body,
+		Dest:    dest,
+		Status:  Status(log.Bytes()),
+		Log:     log.Bytes(),
+		Missing: Missing(log.Bytes()),
+		Took:    took,
+	}, nil
 }
 
 // grace is how long a stopped conversion gets to actually stop.
@@ -234,7 +263,12 @@ func (c *Converter) binary() string {
 // errors in it exits zero, because it wrote a document.
 var reports = regexp.MustCompile(`(?m)^Status:conversion:(\d+)`)
 
-func status(log []byte) int {
+// Status reads LaTeXML's own reading of a conversion out of its log.
+//
+// Exported because a caller that kept the log of a conversion it is not running
+// again, which is what reusing a document off disk is, has the log and nothing
+// else to ask.
+func Status(log []byte) int {
 	m := reports.FindSubmatch(log)
 	if m == nil {
 		return StatusClean
@@ -244,6 +278,39 @@ func status(log []byte) int {
 		return StatusClean
 	}
 	return n
+}
+
+// absent is the line LaTeXML writes when a package is neither one it models nor
+// one it can find the real file for.
+var absent = regexp.MustCompile(`(?m)^Warning:missing_file:(\S+)`)
+
+// Missing reads the packages LaTeXML could not read out of its log, in the
+// order it met them and once each.
+func Missing(log []byte) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, m := range absent.FindAllSubmatch(log, -1) {
+		name := string(m[1])
+		if !seen[name] {
+			seen[name] = true
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// TeX says whether there is a TeX installation on this machine.
+//
+// It matters more than it looks. LaTeXML models the packages it has bindings
+// for, and several of those bindings, TikZ among them, work by reading the real
+// .sty out of a TeX tree. Without one they cannot load at all, so a paper that
+// draws its figures in TikZ arrives with every TikZ command undefined and the
+// reject rule throws it out. The difference between that and a paper that
+// converts is one install, so it is worth being able to say which of the two a
+// machine is.
+func TeX() bool {
+	_, err := exec.LookPath("kpsewhich")
+	return err == nil
 }
 
 // tail is the last of the log, for an error message to carry.
