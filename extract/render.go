@@ -36,6 +36,7 @@ func Parse(body []byte, id string, version int) (*Paper, error) {
 		p.Abstract = blocks(a)
 	}
 	p.Sections = sections(article)
+	p.Bibliography = bibliography(article)
 	p.Faults = faults(article)
 	p.Unparsed = countClass(article, "ltx_math_unparsed")
 	return p, nil
@@ -550,6 +551,41 @@ func list(n *html.Node) Block {
 		}
 	}
 	return b
+}
+
+// bibliography reads the reference list.
+//
+// The fields are not read here and the entry is not resolved here. What a block
+// holds depends on the bibliography style the author chose, resolving an entry
+// needs the metadata plane, and this package reads one HTML file and knows
+// nothing about either. So the typography comes out and ax refs build does the
+// rest, the same division tables and figures are on.
+//
+// A block's text is run through inline rather than taken flat, because a
+// reference carries the title in quotation marks, the venue in italics and an
+// arXiv id inside a link, and the markup around those is what tells them apart.
+func bibliography(article *html.Node) []Bibitem {
+	list := firstClass(article, "ltx_biblist")
+	if list == nil {
+		return nil
+	}
+	var out []Bibitem
+	for _, item := range allClass(list, "ltx_bibitem") {
+		b := Bibitem{ID: attr(item, "id")}
+		if tag := firstClass(item, "ltx_tag_bibitem"); tag != nil {
+			b.Label = tidy(text(tag))
+		}
+		for _, block := range allClass(item, "ltx_bibblock") {
+			if s := inline(block); s != "" {
+				b.Blocks = append(b.Blocks, s)
+			}
+		}
+		if b.ID == "" || len(b.Blocks) == 0 {
+			continue
+		}
+		out = append(out, b)
+	}
+	return out
 }
 
 // faults finds every conversion error and says where it was.

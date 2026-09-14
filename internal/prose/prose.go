@@ -66,6 +66,26 @@ func Bytes(n int) string {
 	return Count(n, "byte")
 }
 
+// Clip shortens a line to fit a report, ending it at a word.
+//
+// Counted in runes and not in bytes, because the lines this shortens are
+// author names and paper titles and half of them are not ASCII. Cut back to the
+// last space so the tail is a word rather than the front of one, unless there
+// is no space to cut back to, which is a line with no English in it and is
+// better shown cut mid word than not shown at all.
+func Clip(s string, n int) string {
+	s = strings.Join(strings.Fields(s), " ")
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	out := string(r[:n])
+	if i := strings.LastIndexByte(out, ' '); i > n/2 {
+		out = out[:i]
+	}
+	return strings.TrimRight(out, " ,.;:") + "..."
+}
+
 // Share is a part over a whole, and -1 when the whole is zero.
 //
 // Zero over zero is not zero percent, it is a question nobody asked, and a

@@ -43,7 +43,7 @@ var commands = []command{
 	{"extract", "render, source, native or vision, to tagged Markdown", "M3", runExtract},
 	{"figures", "the figure gate, and then crop, convert and size cap", "M3", runFigures},
 	{"tables", "keep every table twice, as Markdown and as LaTeX", "M3", runTables},
-	{"refs", "parse a bibliography and resolve it into the corpus", "M3", nil},
+	{"refs", "parse a bibliography and resolve it into the corpus", "M3", runRefs},
 	{"split", "one file per top level section, with front matter", "M3", runSplit},
 	{"tags", "assign, diff and verify the permanent identifiers", "M3", nil},
 	{"objects", "the sixteen object kinds, results and artefacts", "M6", nil},
