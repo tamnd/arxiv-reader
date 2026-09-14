@@ -32,10 +32,13 @@ import (
 // first figure did.
 func runFigures(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: ax figures <id>v<n> [...], or ax figures check <file> [...]")
+		return errors.New("usage: ax figures <id>v<n> [...], or ax figures check <file> [...], or ax figures tikz <id>v<n> [...]")
 	}
-	if args[0] == "check" {
+	switch args[0] {
+	case "check":
 		return figuresCheck(args[1:])
+	case "tikz":
+		return figuresTikZ(args[1:])
 	}
 	return figuresPaper(args)
 }

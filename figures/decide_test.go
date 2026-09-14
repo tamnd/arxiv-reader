@@ -92,6 +92,29 @@ func TestACaptionThatCreditsSomebodyElseWithholdsTheFigure(t *testing.T) {
 	}
 }
 
+// A caption read off a submission has the citations the author typed, because
+// nothing has converted it yet, and that is the caption every TikZ drawing
+// arrives with. A rule that only knew the link form would say owned about all of
+// them.
+func TestTheAuthorsOwnCiteIsACitation(t *testing.T) {
+	for name, caption := range map[string]string{
+		"cite":            `The benchmark, reproduced from \cite{smith2019}.`,
+		"citep":           `Adapted from \citep{smith2019}, with our results added.`,
+		"citet with page": `Reprinted with permission from \citet[p. 4]{lee2020}.`,
+		"nocite":          `Image courtesy of the archive \nocite{hubble}.`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			d := Decide(caption, fine(t))
+			if d.Commit {
+				t.Fatal("a drawing credited to somebody else in the author's own TeX was committed")
+			}
+			if d.Rule != "F09" || d.Suspicion != Suspected {
+				t.Fatalf("refused by %s as %s: %s", d.Rule, d.Suspicion, d.Why)
+			}
+		})
+	}
+}
+
 // The words on their own are how people write about their own work, and
 // withholding on the word alone would take a picture out of every paper that
 // used it.
@@ -100,6 +123,7 @@ func TestTheSameWordsAwayFromACitationAreOrdinaryEnglish(t *testing.T) {
 		"adapted architecture": "Figure 5: our adapted architecture, with the gate in place.",
 		"reproduced runs":      "Figure 6: accuracy reproduced across five seeds.",
 		"far from the cite":    "Figure 7: an adapted layout. The numbers are ours and the task is the standard one described at length in the section above, see [Smith et al., 2019](#bib.bibx12).",
+		"far from a tex cite":  `Figure 8: our adapted layout. The numbers are ours and the task is the standard one described at length in the section above, see \cite{smith2019}.`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			d := Decide(caption, fine(t))
