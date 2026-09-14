@@ -835,13 +835,13 @@ jobs:
       - name: a bibliography is read into fields
         run: |
           ARXIV_CORPUS=/tmp/extract-corpus ax refs build -n 2501.00001v3 | tee /tmp/refs.txt
-          grep -q "3 references" /tmp/refs.txt
-          grep -q "a title      1 of 3" /tmp/refs.txt
-          grep -q "an arXiv id  1 of 3" /tmp/refs.txt
+          grep -q "6 references" /tmp/refs.txt
+          grep -q "a title      4 of 6" /tmp/refs.txt
+          grep -q "an arXiv id  1 of 6" /tmp/refs.txt
           # An entry no title could be read out of is named rather than counted,
           # because a handful is a style and thirty is a paper to look at.
           grep -q "no title  bib.bibx1" /tmp/refs.txt
-          ARXIV_CORPUS=/tmp/extract-corpus ax refs build 2501.00001v3 2>&1 | grep -q "3 references in"
+          ARXIV_CORPUS=/tmp/extract-corpus ax refs build 2501.00001v3 2>&1 | grep -q "6 references in"
           f=/tmp/extract-corpus/manifests/refs/2501/2501.00001.yaml
           grep -q 'title: On Everything Else' $f
           grep -q 'arxiv: "2401.01234"' $f
@@ -855,9 +855,49 @@ jobs:
       - name: reading the same bibliography twice writes nothing
         run: |
           ARXIV_CORPUS=/tmp/extract-corpus ax refs build 2501.00001v3 2>&1 | grep -q "unchanged"
+      # The ladder, one step per entry. The fixture bibliography names an arXiv
+      # id in one entry, a DOI in another, neither in a third whose title and
+      # year and author the plane does have, and a fourth whose title the plane
+      # has under a different author, which is the case the guards are for.
+      - name: a bibliography resolves against the metadata plane
+        run: |
+          m=/tmp/extract-corpus/metadata
+          printf '%s\n' '{"id":"2401.01234","title":"On Everything Else","abstract":"Everything else.","authors":[{"surname":"Third","forename":"Cara"},{"surname":"Fourth","forename":"Dan"}],"categories":["cs.LG"],"versions":[{"version":1,"created":"2024-01-15T00:00:00Z","licence":"cc-by","licence_from":"abs"}],"source":"oai","harvested":"2026-09-14"}' > $m/2401.jsonl
+          printf '%s\n' '{"id":"2303.00002","title":"A Paper With A DOI And Nothing Else","abstract":"A DOI.","authors":[{"surname":"Sixth","forename":"Fay"}],"categories":["cs.LG"],"versions":[{"version":1,"created":"2023-03-02T00:00:00Z","licence":"cc-by","licence_from":"abs"}],"doi":"10.1234/NOTHING.2023-2","source":"oai","harvested":"2026-09-14"}' > $m/2303.jsonl
+          printf '%s\n' '{"id":"2202.00003","title":"Nothing in particular, revisited","abstract":"Again.","authors":[{"surname":"Eighth","forename":"Hal"},{"surname":"Ninth","forename":"Ida"}],"categories":["cs.LG"],"versions":[{"version":1,"created":"2022-02-03T00:00:00Z","licence":"cc-by","licence_from":"abs"}],"source":"oai","harvested":"2026-09-14"}' > $m/2202.jsonl
+          printf '%s\n' '{"id":"1901.00004","title":"Almost Nothing at All","abstract":"Almost.","authors":[{"surname":"Twelfth","forename":"Lee"}],"categories":["cs.LG"],"versions":[{"version":1,"created":"2019-01-04T00:00:00Z","licence":"cc-by","licence_from":"abs"}],"source":"oai","harvested":"2026-09-14"}' > $m/1901.jsonl
+          ARXIV_CORPUS=/tmp/extract-corpus ax refs resolve -n 2501.00001 | tee /tmp/resolve.txt
+          grep -q "resolved    3 of 6" /tmp/resolve.txt
+          grep -q "via arxiv   1" /tmp/resolve.txt
+          # The record spells its DOI in capitals and the entry does not, which
+          # is the usual state of affairs, so this one only passes if both sides
+          # are folded before they are compared.
+          grep -q "via doi     1" /tmp/resolve.txt
+          grep -q "via title   1" /tmp/resolve.txt
+          # The title the plane holds under another author is found and then
+          # refused, and a refusal that is never reported cannot be told from a
+          # threshold that is set wrong.
+          grep -q "near miss  1.00  bib.bibx6  1901.00004  no author of the entry is an author of the record" /tmp/resolve.txt
+          # Nothing is written by a dry run.
+          f=/tmp/extract-corpus/manifests/refs/2501/2501.00001.yaml
+          if grep -q "resolved:" $f; then
+            echo "a dry run wrote a resolution into the corpus"
+            exit 1
+          fi
+          ARXIV_CORPUS=/tmp/extract-corpus ax refs resolve 2501.00001 2>&1 | grep -q "3 references of 2501.00001 resolved"
+          grep -q 'resolved: "2401.01234"' $f
+          grep -q 'resolved: "2303.00002"' $f
+          grep -q 'resolved: "2202.00003"' $f
+          grep -q "via: title" $f
+          # The entry that resolved to nothing is still published as a
+          # bibliography line, it just does not become an edge.
+          grep -q 'text: Kim Eleventh “Almost Nothing At All”' $f
+      - name: resolving the same bibliography twice writes nothing
+        run: |
+          ARXIV_CORPUS=/tmp/extract-corpus ax refs resolve 2501.00001 2>&1 | grep -q "unchanged"
       - name: refs refuses the arguments it should refuse
         run: |
-          for c in "refs" "refs build" "refs resolve 2501.00001v3" "refs explain 2501.00001v3" "refs build not-an-arxiv-id"; do
+          for c in "refs" "refs build" "refs resolve" "refs resolve 2502.00002" "refs explain 2501.00001v3" "refs build not-an-arxiv-id" "refs resolve not-an-arxiv-id"; do
             if ARXIV_CORPUS=/tmp/extract-corpus ax $c; then
               echo "ax $c was allowed"
               exit 1
@@ -877,6 +917,14 @@ jobs:
           fi
           if [ -e /tmp/refs-corpus/manifests/refs ]; then
             echo "a refused run wrote a bibliography into the corpus"
+            exit 1
+          fi
+          # Resolving rewrites the same file, so it is gated in the same place
+          # and on the same reading of the licence.
+          rm -rf /tmp/resolve-corpus && cp -r /tmp/extract-corpus /tmp/resolve-corpus
+          sed -i 's/"licence_from":"abs"/"licence_from":"kaggle"/' /tmp/resolve-corpus/metadata/2501.jsonl
+          if ARXIV_CORPUS=/tmp/resolve-corpus ax refs resolve 2501.00001; then
+            echo "a bibliography that may not be published was resolved anyway"
             exit 1
           fi
       - name: the audit refuses the arguments it should refuse

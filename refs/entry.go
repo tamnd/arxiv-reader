@@ -41,9 +41,27 @@ type Entry struct {
 	ArXiv string `yaml:"arxiv,omitempty"`
 	DOI   string `yaml:"doi,omitempty"`
 	URL   string `yaml:"url,omitempty"`
+	// Resolved is the arXiv id this entry was matched to, when the metadata
+	// plane had it. An entry that resolves to nothing keeps this empty and is
+	// published as a bibliography line all the same, because a reference to a
+	// textbook resolving to nothing is the right answer.
+	Resolved string `yaml:"resolved,omitempty"`
+	// Via is which step of the ladder found it, so arxiv, doi or title. It is
+	// written down because the three are not worth the same: two of them match
+	// an identifier and the third one matches prose.
+	Via string `yaml:"via,omitempty"`
 	// Text is the whole entry as the paper printed it, which is what is
 	// published and what a person checks the fields against.
 	Text string `yaml:"text"`
+}
+
+// Confidence is how much an edge built on this entry is worth, and empty when
+// the entry resolved to nothing.
+func (e Entry) Confidence() string {
+	if e.Resolved == "" {
+		return ""
+	}
+	return Confidence(e.Via)
 }
 
 // Read turns the rendering's bibliography into entries.

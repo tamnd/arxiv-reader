@@ -351,6 +351,39 @@ There is one file per paper rather than one per month, unlike figures: a bibliog
 
 A bibliography entry is a line of the paper, so the licence gate runs here too, at the point the manifest is about to be written.
 
+`ax refs resolve` matches those entries against the metadata plane.
+
+```
+$ ax refs resolve -n 2501.00001
+2501.00001v3  6 references
+  resolved    3 of 6
+  via arxiv   1
+  via doi     1
+  via title   1
+  near miss  1.00  bib.bibx6  1901.00004  no author of the entry is an author of the record
+```
+
+That run is the test fixture and not a real paper, because the metadata plane is the only thing a bibliography can resolve against and nobody has filled it yet.
+What a real bibliography resolves at is a number this README will carry once the plane holds the snapshot, and quoting one before then would be quoting a guess.
+
+The ladder stops at the first step that hits.
+An arXiv id printed in the entry, then a DOI, then the title with the year within one and at least one author in common, then nothing.
+Nothing is a fine outcome: a reference to a textbook resolves to nothing, and the entry is still published as a bibliography line, it just does not become an edge.
+
+The title step is the one that needs guards, and it has two.
+The similarity has to clear 0.92, which is high on purpose, because two different papers by the same group in the same year agree on far more than half of their characters and a loose threshold here does not produce a few wrong edges, it produces a systematically wrong graph in exactly the neighbourhoods somebody would want to read.
+Then the year has to be within one, because a paper is cited by its preprint year as often as by its proceedings year, and one author surname has to appear on both sides.
+
+An edge built on an identifier is recorded as certain and an edge built on a title is recorded as medium, because the third step is a reading of prose and the first two are not.
+Two papers that match one entry equally well resolve to neither, because a coin toss between them is an edge that is wrong half the time and says nothing about which half.
+
+The near misses are the half of the report worth reading.
+A resolution rate on its own cannot tell a threshold that is doing its job from one that is set wrong, and the entries that cleared the title and then failed on the year or the author are where that shows.
+
+Every paper named in one run is resolved by a single pass over the plane.
+The plane holds three million records and a bibliography holds a hundred entries, so the entries are what goes into a map and the plane is streamed past them, which keeps the memory proportional to the bibliography and makes a run over fifty papers cost the same pass as a run over one.
+Resolution is cleared and redone from scratch each time, because the plane grows and an entry that resolved to nothing last month is a question worth asking again.
+
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
 
