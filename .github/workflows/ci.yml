@@ -299,6 +299,31 @@ jobs:
               exit 1
             fi
           done
+      # Every one of these stops at the argument check, which is the point.
+      # ax licence resolve reads the website, and a job that reads the website
+      # on every push is a job that gets this project blocked.
+      - name: the licence resolver refuses the arguments it should refuse
+        run: |
+          if ax licence resolve; then
+            echo "a resolve with nothing to resolve was allowed"
+            exit 1
+          fi
+          if ARXIV_CORPUS=/tmp/empty-corpus ax licence resolve 2203.09431; then
+            echo "a bare id was accepted, and reading the latest version learns nothing"
+            exit 1
+          fi
+          if ARXIV_CORPUS=/tmp/empty-corpus ax licence resolve -all 2203.09431; then
+            echo "-all was accepted for a paper the plane has never heard of"
+            exit 1
+          fi
+          if ARXIV_CORPUS=/tmp/empty-corpus ax licence resolve -pace 1s 2203.09431v1; then
+            echo "a pace faster than the one arXiv asks for was accepted"
+            exit 1
+          fi
+          if ARXIV_CORPUS=/tmp/empty-corpus ax licence resolve not-an-arxiv-id; then
+            echo "a reference that is not one was accepted"
+            exit 1
+          fi
       - name: the audit refuses the arguments it should refuse
         run: |
           for c in "audit --plane content" "audit --plane both" "audit -rules S99" "audit -rules" "audit -cap 0" "audit -shard 2113" "audit meta"; do

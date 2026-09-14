@@ -33,9 +33,24 @@ Of 6,000 papers counted, 2,863 may be translated and 3,185 may be republished in
 
 Those two numbers are upper bounds and the report says so in its first sentence.
 Every surface that serves arXiv metadata in bulk carries one licence per paper rather than one per version, and the one it carries is the latest version's.
-A sample of forty multi-version papers taken in September 2026 found five whose v1 licence differs from their latest, and four of those five had a latest version more permissive than the first, which is the direction that costs something.
+Here is what that looks like on one paper.
+
+```
+$ ax licence resolve -all 2203.09431
+2203.09431v1           arxiv-1.0    record
+2203.09431v2           arxiv-1.0    record
+2203.09431v3           arxiv-1.0    record
+2203.09431v4           arxiv-1.0    record
+2203.09431v5           cc-by-sa     share-alike
+```
+
+The mirror says cc-by-sa, once, for the paper.
+Four of its five versions were never offered under it, and translating any of those four on the strength of the mirror would be republishing something arXiv was given no right to let us republish.
+A sample of forty multi-version papers taken in September 2026 found five whose v1 licence differs from their latest, and four of those five ran in this direction.
 Roughly two fifths of arXiv has more than one version, so the overstatement is on the order of five percent of the corpus.
-Resolving it properly is one page per version, which is over five million pages at arXiv's pace, so `ax licence resolve` runs per paper when a paper is selected rather than over the whole archive.
+
+Resolving it properly is one page per version, which is over five million pages at the fifteen seconds arXiv asks for on the website, so `ax licence resolve` runs per paper when a paper is selected rather than over the whole archive.
+`-write` puts what it read back on the record, with the abs page named as the authority, which is the only authority the content plane will accept.
 
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.

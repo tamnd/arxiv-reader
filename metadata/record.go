@@ -25,9 +25,10 @@ import (
 // Source is the surface a record or a licence came from.
 //
 // It is kept because the surfaces disagree about what they can tell us, and the
-// disagreement matters later. The Kaggle snapshot has one licence field per
-// paper; OAI-PMH has one per version. A corpus that forgets which of the two it
-// read is a corpus that cannot answer the only question the licence gate asks.
+// disagreement matters later. Every bulk surface has one licence field per
+// paper, which is the latest version's, and only the abs page has one per
+// version. A corpus that forgets which of the two it read is a corpus that
+// cannot answer the only question the licence gate asks.
 type Source string
 
 const (
@@ -38,16 +39,47 @@ const (
 	// Kaggle is unreachable or behind a login it will not give up.
 	SourceHF Source = "hf"
 	// SourceOAI is arXiv's own OAI-PMH endpoint, which is the catch up and
-	// thereafter, and the only surface with a per version licence.
+	// thereafter.
+	//
+	// It was written here that this was the one surface carrying a per version
+	// licence. That was wrong and it was checked on 2026-09-14: arXivRaw
+	// returns exactly one license element, a sibling of title, and its version
+	// elements carry only a date and a size. It is a paper level licence like
+	// every other bulk surface, and it is the latest version's.
 	SourceOAI Source = "oai"
+	// SourceAbs is the abs page on the website, which is the only surface that
+	// states a licence for a version rather than for a paper.
+	//
+	// It is read one page at a time at arXiv's pace for the website, so it is
+	// what runs when a paper is selected and never over the corpus.
+	SourceAbs Source = "abs"
 )
 
-// Sources is every source, in the order a harvest would use them.
+// Sources is every surface a whole record can be read from, in the order a
+// harvest would use them.
+//
+// The abs page is not among them. It states a licence for one version and
+// nothing else about the paper, so a record claiming to have been harvested
+// from it is a record claiming something that cannot have happened.
 var Sources = []Source{SourceKaggle, SourceHF, SourceOAI}
 
-// Valid reports whether s is a source this project reads.
+// Authorities is every surface that can be named as the authority for a
+// licence, which is the three above and the abs page.
+var Authorities = []Source{SourceKaggle, SourceHF, SourceOAI, SourceAbs}
+
+// Valid reports whether s is a surface a whole record is read from.
 func (s Source) Valid() bool {
 	for _, known := range Sources {
+		if s == known {
+			return true
+		}
+	}
+	return false
+}
+
+// ValidAuthority reports whether s can be named as the authority for a licence.
+func (s Source) ValidAuthority() bool {
+	for _, known := range Authorities {
 		if s == known {
 			return true
 		}
@@ -326,6 +358,9 @@ func (r Record) Validate() error {
 		}
 		if v.Licence != "" && v.LicenceFrom == "" {
 			return fmt.Errorf("%s: v%d has a licence and no authority for it", r.ID, v.Version)
+		}
+		if v.LicenceFrom != "" && !v.LicenceFrom.ValidAuthority() {
+			return fmt.Errorf("%s: v%d names %q as the authority for its licence, which is not a surface we read", r.ID, v.Version, v.LicenceFrom)
 		}
 		if v.Licence != "" {
 			if _, err := corpus.ParseLicence(string(v.Licence)); err != nil {

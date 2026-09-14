@@ -161,7 +161,9 @@ func runLicence(args []string) error {
 		return explain(l)
 	case "census":
 		return licenceCensus(args[1:])
-	case "show", "recheck", "crosscheck", "resolve":
+	case "resolve":
+		return licenceResolve(args[1:])
+	case "show", "recheck", "crosscheck":
 		return fmt.Errorf("licence %s arrives in milestone M2 and is not written yet", args[0])
 	default:
 		return fmt.Errorf("unknown licence subcommand %q", args[0])
