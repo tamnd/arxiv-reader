@@ -936,6 +936,23 @@ jobs:
             echo "a directory of pictures that is not there was accepted"
             exit 1
           fi
+          if ax figures tikz; then
+            echo "a compile with no paper to compile was allowed"
+            exit 1
+          fi
+          # This runner has no TeX, so the message is checked as well as the exit
+          # status: an argument that is wrong has to be reported as the argument
+          # and not as the machine.
+          out=$(ARXIV_CORPUS=/tmp/extract-corpus ax figures tikz 2501.00001 2>&1 || true)
+          echo "$out" | grep -q "names no version"
+          if ARXIV_CORPUS=/tmp/extract-corpus ax figures tikz 2501.00001; then
+            echo "a drawing was asked for without saying which version of the paper it is in"
+            exit 1
+          fi
+          if ARXIV_CORPUS=/tmp/extract-corpus ax figures tikz -from /tmp/does-not-exist 2501.00001v3; then
+            echo "a submission directory that is not there was accepted"
+            exit 1
+          fi
       # The committing half, with -from standing in for the website because CI
       # does not talk to arXiv. The two pictures are the two answers: one is
       # committed and one is refused by rule F09 on the caption alone.
@@ -994,6 +1011,190 @@ jobs:
           # The caption, the number and the tag are published either way, which
           # is the whole reason the page is worth publishing without the picture.
           grep -q '\*\*Figure 3\*\* {#fig-3 .figure}' $d/02_results.md
+      # The one picture this project makes itself. A drawing described in TikZ is
+      # compiled from the author's own description of it, which is why it is the
+      # best figure the pipeline produces, and it needs a TeX installation, which
+      # is the one dependency this project cannot vendor. So TeX here is two
+      # scripts that behave the way latex and dvisvgm behave, and what that leaves
+      # under test is everything this project wrote: the drawings it finds, the
+      # document it builds, the flags it passes, the shaping of the SVG and the
+      # gate over what came back.
+      - name: a submission's own drawings are found without compiling anything
+        run: |
+          mkdir -p /tmp/tikz-corpus/work/source/2501 /tmp/tikz-corpus/manifests /tmp/tikz-corpus/metadata /tmp/drawn/sections
+          cp /tmp/extract-corpus/metadata/2501.jsonl /tmp/tikz-corpus/metadata/2501.jsonl
+          cat > /tmp/drawn/ms.tex <<'TEX'
+          \documentclass{article}
+          \usepackage{tikz}
+          \usetikzlibrary{arrows.meta}
+          \newcommand{\myblue}{blue!40}
+          \begin{document}
+          \section{One}
+          \begin{figure}
+          \begin{tikzpicture}
+            \draw[\myblue] (0,0) -- (1,1);
+          \end{tikzpicture}
+          \caption{The \emph{first} drawing.}
+          \label{fig:one}
+          \end{figure}
+          \input{sections/one}
+          \end{document}
+          TEX
+          cat > /tmp/drawn/sections/one.tex <<'TEX'
+          A section with a drawing of its own.
+          \begin{figure}
+          \begin{tikzpicture}\draw (0,0) circle (1);\end{tikzpicture}
+          \caption{The second drawing, reproduced from \cite{smith2019}.}
+          \end{figure}
+          % \begin{tikzpicture}\draw (0,0);\end{tikzpicture}
+          TEX
+          tar -czf /tmp/tikz-corpus/work/source/2501/2501.00001v3.gz -C /tmp/drawn ms.tex sections/one.tex
+          sum=$(sha256sum /tmp/tikz-corpus/work/source/2501/2501.00001v3.gz | cut -d' ' -f1)
+          cat > /tmp/tikz-corpus/manifests/sources.yaml <<YAML
+          sources:
+            - id: "2501.00001"
+              version: 3
+              route: source
+              url: https://arxiv.org/e-print/2501.00001v3
+              path: work/source/2501/2501.00001v3.gz
+              sha256: $sum
+              bytes: 1
+              fetched: 2026-09-14T00:00:00Z
+              licence: cc-by
+              licence_from: abs
+          YAML
+          # A dry run asks nothing of TeX, which is the point of it: knowing which
+          # drawings a paper has is worth having on a machine that cannot compile
+          # them, and this runner is one.
+          out=$(ARXIV_CORPUS=/tmp/tikz-corpus ax figures tikz -n 2501.00001v3 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "2 drawings of its own"
+          echo "$out" | grep -q "ms.tex line 8.*fig:one"
+          # The drawing in the included file, which a run that read the main
+          # document alone would never have seen.
+          echo "$out" | grep -q "sections/one.tex line 3.*no label"
+          # The author's commented out third drawing is not in the paper, so it is
+          # not in the corpus either.
+          if echo "$out" | grep -q "line 6"; then
+            echo "a drawing the author commented out was going to be compiled"
+            exit 1
+          fi
+      - name: a machine with no TeX says how to get one
+        run: |
+          out=$(ARXIV_CORPUS=/tmp/tikz-corpus ax figures tikz -latex ax-no-such-latex 2501.00001v3 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "is not on the PATH"
+          echo "$out" | grep -q "mactex-no-gui"
+          echo "$out" | grep -q "texlive-pictures"
+      - name: a drawing is compiled, shaped and committed
+        run: |
+          cat > /tmp/stub-latex <<'SH'
+          #!/bin/sh
+          for a in "$@"; do case "$a" in *.tex) t="$a";; esac; done
+          grep -q 'documentclass\[tikz,border=2pt\]{standalone}' "$t" || { echo "the document does not crop the page to the drawing" >&2; exit 3; }
+          grep -q 'usepackage{tikz}' "$t" || { echo "the author's own preamble is not in the document" >&2; exit 3; }
+          grep -q 'usetikzlibrary{arrows.meta}' "$t" || { echo "the author's own libraries are not in the document" >&2; exit 3; }
+          test -f ms.tex || { echo "TeX was not run inside the submission" >&2; exit 3; }
+          case "$*" in *-no-shell-escape*) ;; *) echo "a file a stranger uploaded was compiled with shell escape on" >&2; exit 3;; esac
+          echo "This is a stub, and not TeX"
+          cp "$t" "${t%.tex}.dvi"
+          SH
+          chmod +x /tmp/stub-latex
+          cat > /tmp/stub-dvisvgm <<'SH'
+          #!/bin/sh
+          for a in "$@"; do case "$a" in --output=*) o="${a#--output=}";; *.dvi) d="$a";; esac; done
+          test -f "$d" || { echo "dvisvgm was given no dvi" >&2; exit 3; }
+          case "$*" in *--font-format=woff2*) ;; *) echo "the labels would have come out as paths" >&2; exit 3;; esac
+          # Real dvisvgm writes the size in points, a viewBox in user units and
+          # the placement of the drawing as a transform on the first group, which
+          # are the three things the shaping has to deal with. The description
+          # varies with the document so that two drawings are two files.
+          printf '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="288pt" height="216pt" viewBox="0 0 288 216">\n<g transform="translate(10,20) scale(2)">\n<desc>%s</desc>\n<path d="M0 0 L10 10"/>\n</g>\n</svg>\n' "$(grep -c . "$d") lines of $(basename "$d")" > "$o"
+          SH
+          chmod +x /tmp/stub-dvisvgm
+          out=$(ARXIV_CORPUS=/tmp/tikz-corpus ax figures tikz -q -latex /tmp/stub-latex -dvisvgm /tmp/stub-dvisvgm 2501.00001v3 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "2 drawings, 1 committed, 1 withheld, 0 already decided, 0 TeX would not draw"
+          svg=/tmp/tikz-corpus/figures/2501/2501.00001/tikz-ms-1.svg
+          test -f $svg
+          # The whole reason the shaping exists. A width and a height pin the
+          # picture to one size and a transform on a group is what a Kobo gets
+          # wrong, so the drawing scales by its viewBox and by nothing else.
+          grep -q 'viewBox="-5 -10 144 108"' $svg
+          if grep -q 'width=' $svg; then
+            echo "the committed drawing still states a size"
+            exit 1
+          fi
+          if grep -q 'transform=' $svg; then
+            echo "the committed drawing still scales by a transform"
+            exit 1
+          fi
+          # The XML declaration is the author's file and comes back byte for byte.
+          head -1 $svg | grep -q '<?xml version="1.0" encoding="UTF-8"?>'
+          # Nothing the compile wrote is left in the submission, because the
+          # submission is the author's files and the compile ran inside them.
+          if ls /tmp/tikz-corpus/work/source/2501/2501.00001v3/ax-tikz-* 2>/dev/null; then
+            echo "the compile left its own files in the submission"
+            exit 1
+          fi
+          m=/tmp/tikz-corpus/manifests/figures/2501.yaml
+          # A drawing is a few lines in the middle of a file and not a file, so
+          # the file and the line are what name it.
+          grep -q "source: tikz:ms.tex:8" $m
+          grep -q "file: /figures/2501/2501.00001/tikz-ms-1.svg" $m
+          # Measured as it was compiled and committed as it will be published.
+          # dvisvgm states the size in points, which is what rule F06 reads, and
+          # the shaping takes that off, so the page fraction comes from the one
+          # and the coordinates from the other.
+          grep -q "page_from: svg" $m
+          grep -q "width: 144" $m
+          # The second drawing credits somebody else in the author's own TeX. A
+          # caption off a submission has not been converted yet, so the rule has
+          # to know a \cite as well as a link into the bibliography.
+          grep -q "source: tikz:sections/one.tex:3" $m
+          grep -q "rule: F09" $m
+          grep -q "third_party: suspected" $m
+          if [ -e /tmp/tikz-corpus/figures/2501/2501.00001/tikz-sections-one-1.svg ]; then
+            echo "the bytes of a drawing rule F09 refused are in the corpus"
+            exit 1
+          fi
+      - name: compiling twice costs nothing and writes nothing
+        run: |
+          before=$(sha256sum /tmp/tikz-corpus/manifests/figures/2501.yaml)
+          out=$(ARXIV_CORPUS=/tmp/tikz-corpus ax figures tikz -q -latex /tmp/stub-latex -dvisvgm /tmp/stub-dvisvgm 2501.00001v3 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "0 committed, 0 withheld, 2 already decided"
+          if [ "$before" != "$(sha256sum /tmp/tikz-corpus/manifests/figures/2501.yaml)" ]; then
+            echo "a run that decided nothing rewrote the manifest"
+            exit 1
+          fi
+          ARXIV_CORPUS=/tmp/tikz-corpus ax figures tikz -q -recheck -latex /tmp/stub-latex -dvisvgm /tmp/stub-dvisvgm 2501.00001v3
+          if [ "$before" != "$(sha256sum /tmp/tikz-corpus/manifests/figures/2501.yaml)" ]; then
+            echo "a recheck that decided the same things wrote a different manifest"
+            exit 1
+          fi
+      # One drawing TeX will not compile costs the corpus that drawing. Every
+      # drawing failing is an installation that cannot build the paper, and
+      # reporting that as a paper full of bad pictures would send somebody
+      # looking at the pictures.
+      - name: a drawing TeX will not compile says why
+        run: |
+          cat > /tmp/stub-broken <<'SH'
+          #!/bin/sh
+          echo "! Undefined control sequence."
+          echo "l.7 \\myblue"
+          exit 1
+          SH
+          chmod +x /tmp/stub-broken
+          out=$(ARXIV_CORPUS=/tmp/tikz-corpus ax figures tikz -q -recheck -latex /tmp/stub-broken -dvisvgm /tmp/stub-dvisvgm 2501.00001v3 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "Undefined control sequence"
+          echo "$out" | grep -q "2 TeX would not draw"
+          echo "$out" | grep -q "none of them compiled"
+          if ARXIV_CORPUS=/tmp/tikz-corpus ax figures tikz -q -recheck -latex /tmp/stub-broken -dvisvgm /tmp/stub-dvisvgm 2501.00001v3; then
+            echo "a paper where nothing compiled exited zero"
+            exit 1
+          fi
       # A table is kept twice and rules F11 and F12 are the check that the two
       # copies say the same thing. The numbers are the part that matters: a
       # table is where a paper's measured results live.

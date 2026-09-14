@@ -38,7 +38,14 @@ var (
 	// bib while the rendering's own anchors are still in place and ref once
 	// ax refs has resolved them, and both are matched so this does not change
 	// its mind halfway through the pipeline.
-	citation = regexp.MustCompile(`\]\(#(?:bib|ref)[^)]*\)`)
+	//
+	// The third form is the author's own \cite, and it is here because of the
+	// TikZ path. A drawing compiled from a submission carries the caption as the
+	// author typed it, so nothing has turned the citations into links yet, and a
+	// rule that only knew the link would have gone quiet on exactly the pictures
+	// this project makes itself. \citep, \citet and the rest of the natbib family
+	// are the same word with a letter on the end.
+	citation = regexp.MustCompile(`\]\(#(?:bib|ref)[^)]*\)|\\(?:no)?cite[a-zA-Z]*\s*(?:\[[^\]]*\]\s*)*\{[^}]*\}`)
 	// The copyright symbol, the word, and the (c) that a caption written in a
 	// terminal uses instead of the symbol.
 	claimed = regexp.MustCompile(`(?i)(\x{00a9}|\bcopyright\b|\(c\)\s*[12][0-9]{3})`)

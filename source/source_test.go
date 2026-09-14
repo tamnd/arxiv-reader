@@ -132,6 +132,18 @@ func TestOpenRefusesAnEntryThatPointsOutsideTheSubmission(t *testing.T) {
 	}
 }
 
+// A backslash is a character in a file name here and a separator elsewhere, so a
+// name carrying one is two different paths depending on where the corpus is
+// unpacked. None of these reads as anything but an ordinary relative name to a
+// path check written by hand on this machine.
+func TestOpenRefusesAnEntryThatMeansSomethingElseOnAnotherMachine(t *testing.T) {
+	for _, name := range []string{`C:\ms.tex`, `..\ms.tex`, `a\..\..\b.tex`} {
+		if _, err := Open(tarball(t, text(name, body))); err == nil {
+			t.Errorf("%q was read as a file of the submission", name)
+		}
+	}
+}
+
 func TestMainTakesTheREADMEsWordInEitherFormat(t *testing.T) {
 	for what, readme := range map[string]File{
 		"json": text("00README.json", `{"sources":[{"filename":"second.tex","usage":"toplevelfile"}]}`),

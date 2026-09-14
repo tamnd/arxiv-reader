@@ -375,6 +375,63 @@ A recheck that finds the same bytes keeps the time they were first read, so a re
 `-from <dir>` reads the pictures out of a directory instead of off the website.
 That is for somebody who already has the source tarball unpacked, and it is what CI uses, because CI does not talk to arXiv and a committing path nothing exercises is a committing path nobody has run.
 
+`ax figures tikz` is the one picture this project makes itself.
+Every figure above started as something arXiv had already turned into pixels, and a drawing described in TikZ is a program the author wrote, so compiling it here gives a vector picture with real text in it that a screen reader can read and a translator could in principle translate.
+It reads the submission rather than the rendering, which is why it is a subcommand and not a flag: they are two different files about the same paper.
+
+```
+$ ax figures tikz -n 2501.00001v3
+2501.00001v3               2 drawings of its own
+  ms.tex line 8            fig:one   The \emph{first} drawing.
+  sections/one.tex line 3  no label  The second drawing, reproduced from \cite{smith2019}.
+```
+
+Every TeX file in the submission and not only the main one, because an author with fifty figures keeps them in fifty files and inputs them.
+The preamble comes from the main document either way, and it goes into the compiled document whole rather than cut down to the lines that look like they matter, because a drawing uses the author's own macros and colours and libraries and a preamble trimmed by eye is one that compiles nine pictures out of ten and leaves the tenth undefined for a reason nobody can see.
+A drawing the author commented out is not a drawing: people leave the version they did not use in the file, and compiling one would put a figure in the corpus that is not in the paper.
+
+`-n` asks nothing of TeX, which is the point of it.
+Knowing which drawings a paper has is worth having on a machine that cannot compile them, and the machine this was written on is one.
+
+Without `-n` each drawing becomes its own document, `\documentclass[tikz,border=2pt]{standalone}` so the page is cropped to the picture, and that goes through `latex` and then `dvisvgm`.
+The DVI route and not the PDF one, because dvisvgm reads a DVI's text as text and `--font-format=woff2` keeps it as text in the SVG, and a drawing whose labels are paths is a drawing no screen reader can read, which is most of the reason this path is worth having.
+It runs in the submission's own directory, since a drawing reads the author's macro files and includes the author's images and both are written relative to the paper, and everything it writes is named for the hash of the document and swept afterwards, so the author's files are left as they were found.
+Shell escape is off and says so on the command line, because a tikzpicture can ask TeX to run a program and this compiles a file a stranger uploaded to arXiv.
+One picture gets two minutes, which is generous for a drawing and short next to the five a whole paper's conversion gets, and a drawing with a loop in it is stopped and falls back to the rendering's version.
+
+What comes back is shaped before it is committed.
+The root loses its width and height and keeps a viewBox, and a scaling transform on the top level group is folded into the viewBox rather than left where it is.
+09-publish.md asks for that and names the reason: SVG is a core media type in EPUB and is safe everywhere with one known trap, which is that scaling a picture by a transform on a group breaks on some Kobo devices.
+The two say the same thing and only one of them works on the reader somebody actually owns.
+A rotation or a skew is refused rather than folded, because those change the shape of the frame rather than its size and folding one would mean writing a viewBox that is not a rectangle.
+
+The picture is measured as it was compiled and committed as it will be published.
+dvisvgm states the size in points, which is the size the drawing would print at and is what rule F06 reads, and the shaping takes that off, so the physical size comes from the one and the coordinates and the bytes from the other.
+Then it goes through the same gate as every other figure.
+A drawing is the author's own by construction, which answers who owns it and answers nothing about the licence of the version it is in.
+
+The gate needed one repair to work here at all.
+`F09` reads the four credit words next to a citation, and a citation was a link into the bibliography, which is what a caption looks like once something has converted it.
+A caption read off a submission still has `\cite{smith2019}` in it, so the rule was quietly saying owned about every drawing this path produces.
+It now knows the author's own `\cite` as well as the link, which is the same rule reading a third form of the same thing.
+
+One drawing TeX will not compile costs the corpus that drawing and not the paper, because the rendering's version of the figure is already there and this path is the better copy of a picture and never the only one.
+Every drawing failing is an installation that cannot build the paper, and that is reported as one thing rather than as a paper full of bad pictures.
+
+TeX is the one dependency this project cannot vendor, so a machine without one says how to get one.
+
+```
+$ ax figures tikz 2501.00001v3
+ax: tikz: latex is not on the PATH, and compiling a drawing from the author's own description needs a TeX installation here rather than at arXiv, so install one with brew install --cask mactex-no-gui or apt install texlive-pictures texlive-latex-extra dvisvgm
+```
+
+There is no TeX on the machine this was written on and none on the CI runner, so what runs there is two scripts that behave the way `latex` and `dvisvgm` behave, the same arrangement `latexml` already has.
+That leaves everything this project wrote under test, which is the drawings it finds, the document it builds, the flags it passes, the shaping of the SVG and the gate over what came back, and it leaves the compile itself checked by nothing but the day somebody runs it with a real TeX.
+
+Two things this does not do yet.
+The caption in the manifest is the author's TeX rather than prose, because nothing has converted it at the point the drawing is found, and the body of the paper takes its caption from the conversion.
+And a drawing written with the `\tikz` shorthand instead of the environment is not found, which is why a paper that loads TikZ and yields no drawings says so rather than saying it draws nothing.
+
 `ax tables` keeps every table twice, once as Markdown and once as the markup it was reconstructed from.
 
 ```
