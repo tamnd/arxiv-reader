@@ -481,6 +481,44 @@ Matching it to whatever replaced it is the four pass matcher in 03-tags.md secti
 Guessing in the meantime is exactly the failure this whole mechanism exists to prevent.
 A reference that breaks is visible and a reference silently pointed at the wrong theorem is not.
 
+`ax audit -plane content` is where all of that gets checked rather than trusted.
+
+```
+$ ax audit -plane content -q
+rule  state  checked  findings
+T01   pass   26
+T02   pass   26
+T03   pass   26
+T04   pass   2
+T05   pass   26
+T06   pass   2
+T07   pass   2
+T08   pass   24
+T09   pass   26
+T10   pass   26
+T11   pass   26
+T13   pass   26
+
+26 files over 2 papers, nothing found
+```
+
+Group T is the one that says a content file is a content file: it parses, its fields are known and typed, its recorded hash matches the body under it, its sections run from 0 with no gaps, its headings skip no level, and it has a front matter file with an abstract in it.
+The three that catch what a bad extraction actually leaves behind are the last ones.
+`T10` is the page furniture: a running head, a page number on a line of its own, and arXiv's own identifier, which it prints down the left margin of every PDF it serves and which comes back off that page as a column of one character per line.
+`T11` is HTML a converter gave up on, which matters most on the render path, because a table left as `<table>` markup passes every other group in the audit and is unreadable.
+`T13` is a word the page broke in half at a hyphen, which is soft, because sometimes a hyphen is a hyphen.
+
+The checked column is the point of the whole thing.
+A rule with no findings and nothing checked has not passed, it has not run, and the two are different states in the report and not the same green tick.
+`T04`, `T06` and `T07` are about a paper rather than a file, which is why they say 2 where the rest say 26.
+`T08` says 24 because an abstract is as long as its author made it and is not a section that came out too short.
+
+Mathematics and code are masked out of a body before any of these read it, delimiters and all, with every line kept exactly where it was so a finding still points at a line somebody can open.
+Without it `$a<b>c$` is an HTML tag, a listing that shows a table is raw markup, and a shell session with a number on a line is a page number.
+
+`T12`, which is a Markdown link left in a body, is not here.
+It arrives with group R, because on the render path a link to `#bib.bib28` is a link `ax refs` has not resolved yet, and telling that apart from a leak means reading the bibliography.
+
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
 

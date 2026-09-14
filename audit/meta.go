@@ -256,7 +256,7 @@ func (m Meta) Run(shards []string) (Report, error) {
 		}
 	}
 
-	report.Results = c.results()
+	report.Results = c.results(MetaRules)
 	return report, nil
 }
 
@@ -308,9 +308,12 @@ func (c *collector) add(f Finding) {
 	}
 }
 
-func (c *collector) results() []Result {
-	out := make([]Result, 0, len(MetaRules))
-	for _, rule := range MetaRules {
+// results is one Result per rule that was asked for, in the order the rules
+// were declared. The list comes in rather than being read off MetaRules,
+// because each plane has its own and they must not report each other's.
+func (c *collector) results(rules []Rule) []Result {
+	out := make([]Result, 0, len(rules))
+	for _, rule := range rules {
 		if !c.wanted(rule.ID) {
 			continue
 		}

@@ -24,7 +24,7 @@ func (r Report) Text() string {
 	}
 	tw.Flush()
 
-	fmt.Fprintf(&b, "\n%s over %s, %s\n", plural(r.Records, "record"), plural(r.Shards, "month"), summary(r))
+	fmt.Fprintf(&b, "\n%s over %s, %s\n", plural(r.Records, r.unit()), plural(r.Shards, r.scope()), summary(r))
 
 	for _, res := range r.Results {
 		if res.Total == 0 {
@@ -46,7 +46,7 @@ func (r Report) Text() string {
 func (r Report) Markdown() string {
 	var b strings.Builder
 	b.WriteString("# The audit\n\n")
-	fmt.Fprintf(&b, "%s over %s of the %s plane, %s.\n\n", plural(r.Records, "record"), plural(r.Shards, "month"), r.Plane, summary(r))
+	fmt.Fprintf(&b, "%s over %s of the %s plane, %s.\n\n", plural(r.Records, r.unit()), plural(r.Shards, r.scope()), r.Plane, summary(r))
 
 	b.WriteString("| Group | Rules | Pass | Fail | Not run | N/A | Findings |\n")
 	b.WriteString("| --- | ---: | ---: | ---: | ---: | ---: | ---: |\n")

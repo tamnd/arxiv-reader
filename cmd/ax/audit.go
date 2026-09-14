@@ -9,21 +9,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tamnd/arxiv-cli/pkg/axid"
 	"github.com/tamnd/arxiv-reader/audit"
+	"github.com/tamnd/arxiv-reader/corpus"
 	"github.com/tamnd/arxiv-reader/metadata"
 )
 
 // runAudit runs the numbered rules and exits non-zero if a hard one found
 // something.
 //
-// Only the metadata plane so far. The content plane rules read content files
-// and there is no content plane until M3, so --plane content says so rather
-// than reporting a clean run over nothing, which is the failure the whole
-// three state design exists to avoid.
+// One plane per run. The two read different files, cost different amounts and
+// have different rule sets, and a flag that quietly ran both would make the
+// cheap one wait for the expensive one on every push.
 func runAudit(args []string) error {
 	fs := flag.NewFlagSet("ax audit", flag.ContinueOnError)
 	plane := fs.String("plane", "meta", "which half to read, meta or content")
 	shard := fs.String("shard", "", "one month, so 2106")
+	lang := fs.String("lang", "en", "which language of the content plane to read")
 	rules := fs.String("rules", "", "a comma separated list of rule ids, so S14,S20")
 	hard := fs.Bool("hard", false, "only the rules that fail a build")
 	report := fs.String("report", "", "write the markdown report here as well")
@@ -38,48 +40,27 @@ func runAudit(args []string) error {
 	if *limit < 1 {
 		return errors.New("-cap has to be at least 1")
 	}
+	var known []audit.Rule
 	switch *plane {
 	case "meta":
+		known = audit.MetaRules
 	case "content":
-		return errors.New("the content plane arrives in milestone M3, and the rules that read it arrive with it")
+		known = audit.ContentRules
 	default:
 		return fmt.Errorf("%q is not a plane, want meta or content", *plane)
 	}
 
-	only, err := chooseRules(*rules, *hard)
+	only, err := chooseRules(*rules, *hard, *plane, known)
 	if err != nil {
 		return err
 	}
 
-	plane2 := metadata.Plane{Root: corpusRoot()}
-	shards, err := plane2.Shards()
-	if err != nil {
-		return err
+	var result audit.Report
+	if *plane == "content" {
+		result, err = auditContent(*lang, *shard, *limit, only, *quiet)
+	} else {
+		result, err = auditMeta(*shard, *limit, only, *quiet)
 	}
-	if *shard != "" {
-		if !metadata.ValidShard(*shard) {
-			return fmt.Errorf("%q is not a month, want four digits like 2106", *shard)
-		}
-		shards = keepShard(shards, *shard)
-		if len(shards) == 0 {
-			return fmt.Errorf("the plane at %s has no %s", plane2.Dir(), *shard)
-		}
-	}
-
-	m := audit.Meta{Plane: plane2, Now: time.Now, Cap: *limit, Only: only}
-	if !*quiet && len(shards) > 1 {
-		done := 0
-		m.Log = func(shard string, records int) {
-			done++
-			// Every fiftieth month, because there are about four hundred of
-			// them and a line each is four hundred lines of nothing.
-			if done%50 == 0 || done == len(shards) {
-				fmt.Fprintf(os.Stderr, "%d of %d months\n", done, len(shards))
-			}
-		}
-	}
-
-	result, err := m.Run(shards)
 	if err != nil {
 		return err
 	}
@@ -103,11 +84,71 @@ func runAudit(args []string) error {
 	return nil
 }
 
+// auditMeta reads the metadata plane.
+func auditMeta(shard string, limit int, only []string, quiet bool) (audit.Report, error) {
+	plane := metadata.Plane{Root: corpusRoot()}
+	shards, err := plane.Shards()
+	if err != nil {
+		return audit.Report{}, err
+	}
+	if shard != "" {
+		if !metadata.ValidShard(shard) {
+			return audit.Report{}, fmt.Errorf("%q is not a month, want four digits like 2106", shard)
+		}
+		shards = keepShard(shards, shard)
+		if len(shards) == 0 {
+			return audit.Report{}, fmt.Errorf("the plane at %s has no %s", plane.Dir(), shard)
+		}
+	}
+
+	m := audit.Meta{Plane: plane, Now: time.Now, Cap: limit, Only: only}
+	if !quiet && len(shards) > 1 {
+		done := 0
+		m.Log = func(shard string, records int) {
+			done++
+			// Every fiftieth month, because there are about four hundred of
+			// them and a line each is four hundred lines of nothing.
+			if done%50 == 0 || done == len(shards) {
+				fmt.Fprintf(os.Stderr, "%d of %d months\n", done, len(shards))
+			}
+		}
+	}
+	return m.Run(shards)
+}
+
+// auditContent reads one language of the content plane.
+func auditContent(lang, shard string, limit int, only []string, quiet bool) (audit.Report, error) {
+	c := audit.Content{Root: corpusRoot(), Lang: lang, Cap: limit, Only: only}
+	papers, err := c.Papers()
+	if err != nil {
+		return audit.Report{}, err
+	}
+	if shard != "" {
+		if !metadata.ValidShard(shard) {
+			return audit.Report{}, fmt.Errorf("%q is not a month, want four digits like 2106", shard)
+		}
+		papers = keepMonth(papers, shard)
+		if len(papers) == 0 {
+			return audit.Report{}, fmt.Errorf("no paper has been extracted into content/%s from %s", lang, shard)
+		}
+	}
+	if !quiet && len(papers) > 1 {
+		done := 0
+		c.Log = func(paper string, files int) {
+			done++
+			if done%50 == 0 || done == len(papers) {
+				fmt.Fprintf(os.Stderr, "%d of %d papers\n", done, len(papers))
+			}
+		}
+	}
+	return c.Run(papers)
+}
+
 // chooseRules turns -rules and -hard into the list to run.
-func chooseRules(rules string, hard bool) ([]string, error) {
-	known := map[string]audit.Rule{}
-	for _, r := range audit.MetaRules {
-		known[strings.ToUpper(r.ID)] = r
+func chooseRules(rules string, hard bool, plane string, known []audit.Rule) ([]string, error) {
+	byID := map[string]audit.Rule{}
+	for _, r := range known {
+		byID[strings.ToUpper(r.ID)] = r
 	}
 
 	var only []string
@@ -117,8 +158,8 @@ func chooseRules(rules string, hard bool) ([]string, error) {
 			if name == "" {
 				continue
 			}
-			if _, ok := known[name]; !ok {
-				return nil, fmt.Errorf("%s is not a rule this tool runs over the metadata plane", name)
+			if _, ok := byID[name]; !ok {
+				return nil, fmt.Errorf("%s is not a rule this tool runs over the %s plane", name, plane)
 			}
 			only = append(only, name)
 		}
@@ -129,12 +170,8 @@ func chooseRules(rules string, hard bool) ([]string, error) {
 	if !hard {
 		return only, nil
 	}
-	// Every metadata plane rule is hard today, so -hard is a filter that
-	// currently removes nothing. It is wired up anyway, because the soft rules
-	// arrive with the content plane and a flag that starts working silently is
-	// a flag nobody trusts.
 	var out []string
-	for _, r := range audit.MetaRules {
+	for _, r := range known {
 		if !r.Hard {
 			continue
 		}
@@ -165,4 +202,16 @@ func keepShard(shards []string, want string) []string {
 		}
 	}
 	return nil
+}
+
+// keepMonth is the same filter over papers, which carry their month in their
+// identifier rather than in a file name.
+func keepMonth(papers []axid.ID, want string) []axid.ID {
+	var out []axid.ID
+	for _, id := range papers {
+		if corpus.Shard(id) == want {
+			out = append(out, id)
+		}
+	}
+	return out
 }

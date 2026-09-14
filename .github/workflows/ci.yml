@@ -1083,10 +1083,70 @@ jobs:
               exit 1
             fi
           done
+      # Group T over the paper the steps above built, fetched, rendered, split,
+      # figured, tabled, referenced and tagged. Every rule has to say pass and
+      # not "not run": a rule with nothing to look at has not passed anything,
+      # and telling those two apart is what the four states are for.
+      - name: the content plane audit is clean over the paper the tools just built
+        run: |
+          ARXIV_CORPUS=/tmp/extract-corpus ax audit -plane content -q | tee /tmp/audit-content.txt
+          grep -q "3 files over 1 paper, nothing found" /tmp/audit-content.txt
+          test "$(grep -cE '^T[0-9]+ +pass ' /tmp/audit-content.txt)" = 12
+          if grep -q "not run" /tmp/audit-content.txt; then
+            echo "a content rule had nothing to look at"
+            exit 1
+          fi
+      # And the same twelve rules over nothing at all, which has to read as not
+      # run rather than as a clean corpus. A green audit over an empty plane is
+      # the single easiest way for this project to lie to itself.
+      - name: an empty content plane runs nothing rather than passing everything
+        run: |
+          rm -rf /tmp/empty-corpus && mkdir -p /tmp/empty-corpus
+          ARXIV_CORPUS=/tmp/empty-corpus ax audit -plane content -q | tee /tmp/audit-empty.txt
+          grep -q "0 files over 0 papers, nothing to check" /tmp/audit-empty.txt
+          test "$(grep -cE '^T[0-9]+ +not run ' /tmp/audit-empty.txt)" = 12
+      # Each rule fired by breaking the one thing it is about. A rule that has
+      # only ever been watched passing is a rule nobody has tested.
+      - name: a content file that is wrong fails the rule that is about it
+        run: |
+          intro=/tmp/broken-corpus/content/en/2501/2501.00001/01_introduction.md
+          copy() { rm -rf /tmp/broken-corpus && cp -r /tmp/extract-corpus /tmp/broken-corpus; }
+          # Appending to a body moves it away from its recorded hash, which is
+          # T03's finding and not the one under test, so the cases that append
+          # restamp it the way a person correcting a file by hand would.
+          restamp() { ARXIV_CORPUS=/tmp/broken-corpus ax split -accept 2501.00001 > /dev/null; }
+          fails() {
+            if ARXIV_CORPUS=/tmp/broken-corpus ax audit -plane content -q > /tmp/broken.txt 2>&1; then
+              echo "the audit passed a corpus broken for $1"
+              cat /tmp/broken.txt
+              exit 1
+            fi
+            if ! grep -qE "^$1 +fail " /tmp/broken.txt; then
+              echo "$1 did not fire"
+              cat /tmp/broken.txt
+              exit 1
+            fi
+          }
+          copy && echo "no front matter here at all" > $intro && fails T01
+          copy && sed -i 's/^kind: section$/kind: section\nsection_kind: appendix/' $intro && fails T02
+          copy && echo "A sentence somebody added by hand." >> $intro && fails T03
+          copy && sed -i 's/^section: 1$/section: 5/' $intro && fails T04
+          copy && printf '\n##### Five levels down\n\nSomething under it.\n' >> $intro && restamp && fails T05
+          copy && rm /tmp/broken-corpus/content/en/2501/2501.00001/00_front.md && fails T06
+          copy && printf '\narXiv:2501.00001v3 [math.NT] 2 Jan 2025\n' >> $intro && restamp && fails T10
+          copy && printf '\n<table><tr><td>1.0</td></tr></table>\n' >> $intro && restamp && fails T11
       - name: the audit refuses the arguments it should refuse
         run: |
-          for c in "audit --plane content" "audit --plane both" "audit -rules S99" "audit -rules" "audit -cap 0" "audit -shard 2113" "audit meta"; do
+          for c in "audit --plane both" "audit -rules S99" "audit -rules" "audit -cap 0" "audit -shard 2113" "audit meta"; do
             if ax $c; then
+              echo "ax $c was allowed"
+              exit 1
+            fi
+          done
+          # A rule belongs to one plane, and asking for a metadata rule over the
+          # content plane is a question with no answer rather than an empty one.
+          for c in "audit -plane content -rules S14" "audit -plane meta -rules T05" "audit -plane content -shard 2113"; do
+            if ARXIV_CORPUS=/tmp/extract-corpus ax $c; then
               echo "ax $c was allowed"
               exit 1
             fi
