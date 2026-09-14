@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">
+    <responseDate>2026-09-14T10:49:50Z</responseDate>
+    <request verb="ListRecords" metadataPrefix="arXivRaw" from="2024-03-05" until="2024-03-05">http://oaipmh.arxiv.org/oai</request>
+    <ListRecords>
+                    <record>
+                <header>
+        <identifier>oai:arXiv.org:math/9602216</identifier>
+        <datestamp>2024-03-05</datestamp>
+            <setSpec>math:math:LO</setSpec>
+    </header>
+
+            <metadata>
+                        <arXivRaw xmlns="http://arxiv.org/OAI/arXivRaw/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://arxiv.org/OAI/arXivRaw/ https://oaipmh.arxiv.org/OAI/arXivRaw.xsd">
+        <id>math/9602216</id>
+        <submitter>Saharon Shelah</submitter>
+            <version version="v1">
+                <date>Thu, 15 Feb 1996 00:00:00 GMT</date>
+                <size>34kb</size>
+            </version>
+            <version version="v2">
+                <date>Thu, 18 May 2023 13:38:36 GMT</date>
+                <size>52kb</size>
+            </version>
+            <version version="v3">
+                <date>Sun, 03 Mar 2024 11:58:08 GMT</date>
+                <size>88kb</size>
+            </version>
+        <title>Categoricity and amalgamation for AEC and $ \kappa $ measurable</title>
+        <authors>Oren Kolman, Saharon Shelah</authors>
+        <categories>math.LO</categories>
+            <comments>We now use the framework of AECs rather than models of a fixed theory</comments>
+            <proxy>Saharon Shelah</proxy>
+            <report-no>Shelah [Sh:E102], was previously Shelah [Sh:362]</report-no>
+            <msc-class>Primary 03C48. Secondary: 03C45, 03C55, 03C75, 03E05, 03E55</msc-class>
+            <journal-ref>[Sh:362]: Fund. Math. 151 (1996), 209--240</journal-ref>
+            <license>http://creativecommons.org/licenses/by/4.0/</license>
+            <abstract>In the original version of this paper, we assume a theory $T$ that the logic $\mathbb L_{\kappa, \aleph_{0}}$ is categorical in a cardinal $\lambda &gt; \kappa$, and $\kappa$ is a measurable cardinal. There we prove that the class of model of $T$ of cardinality $&lt;\lambda$ (but $\geq |T|+\kappa$) has the amalgamation property; this is a step toward understanding the character of such classes of models.
+  In this revised version we replaced the class of models of $T$ by $\mathfrak k$, an AEC (abstract elementary class) which has LS-number ${&lt;} \, \kappa,$ or at least which behave nicely for ultrapowers by $D$, a normal ultra-filter on $\kappa$.
+  Presently sub-section \S1A deals with $T \subseteq \mathbb L_{\kappa^{+}, \aleph_{0}}$ (and so does a large part of the introduction and little in the rest of \S1), but otherwise, all is done in the context of AEC.</abstract>
+    </arXivRaw>
+
+            </metadata>
+        </record>
+                    <record>
+                <header>
+        <identifier>oai:arXiv.org:1907.01743</identifier>
+        <datestamp>2024-03-05</datestamp>
+            <setSpec>eess:eess:IV</setSpec>
+            <setSpec>cs:cs:AI</setSpec>
+            <setSpec>cs:cs:CV</setSpec>
+            <setSpec>cs:cs:LG</setSpec>
+    </header>
+
+            <metadata>
+                        <arXivRaw xmlns="http://arxiv.org/OAI/arXivRaw/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://arxiv.org/OAI/arXivRaw/ https://oaipmh.arxiv.org/OAI/arXivRaw.xsd">
+        <id>1907.01743</id>
+        <submitter>Haoran Dou</submitter>
+            <version version="v1">
+                <date>Wed, 03 Jul 2019 05:21:52 GMT</date>
+                <size>5911kb</size>
+                    <source_type>D</source_type>
+            </version>
+            <version version="v2">
+                <date>Sun, 03 Mar 2024 11:57:48 GMT</date>
+                <size>5731kb</size>
+                    <source_type>D</source_type>
+            </version>
+        <title>Deep Attentive Features for Prostate Segmentation in 3D Transrectal Ultrasound</title>
+        <authors>Yi Wang, Haoran Dou, Xiaowei Hu, Lei Zhu, Xin Yang, Ming Xu, Jing Qin, Pheng-Ann Heng, Tianfu Wang, and Dong Ni</authors>
+        <categories>eess.IV cs.AI cs.CV cs.LG</categories>
+            <comments>11 pages, 10 figures, 2 tables. Accepted by IEEE transactions on Medical Imaging</comments>
+            <doi>10.1109/TMI.2019.2913184</doi>
+            <license>http://creativecommons.org/licenses/by/4.0/</license>
+            <abstract>Automatic prostate segmentation in transrectal ultrasound (TRUS) images is of essential importance for image-guided prostate interventions and treatment planning. However, developing such automatic solutions remains very challenging due to the missing/ambiguous boundary and inhomogeneous intensity distribution of the prostate in TRUS, as well as the large variability in prostate shapes. This paper develops a novel 3D deep neural network equipped with attention modules for better prostate segmentation in TRUS by fully exploiting the complementary information encoded in different layers of the convolutional neural network (CNN). Our attention module utilizes the attention mechanism to selectively leverage the multilevel features integrated from different layers to refine the features at each individual layer, suppressing the non-prostate noise at shallow layers of the CNN and increasing more prostate details into features at deep layers. Experimental results on challenging 3D TRUS volumes show that our method attains satisfactory segmentation performance. The proposed attention mechanism is a general strategy to aggregate multi-level deep features and has the potential to be used for other medical image segmentation tasks. The code is publicly available at https://github.com/wulalago/DAF3D.</abstract>
+    </arXivRaw>
+
+            </metadata>
+        </record>
+                    <record>
+                <header>
+        <identifier>oai:arXiv.org:1711.03463</identifier>
+        <datestamp>2024-03-05</datestamp>
+            <setSpec>physics:math-ph</setSpec>
+            <setSpec>math:math:MP</setSpec>
+    </header>
+
+            <metadata>
+                        <arXivRaw xmlns="http://arxiv.org/OAI/arXivRaw/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://arxiv.org/OAI/arXivRaw/ https://oaipmh.arxiv.org/OAI/arXivRaw.xsd">
+        <id>1711.03463</id>
+        <submitter>Bao Shou</submitter>
+            <version version="v1">
+                <date>Thu, 09 Nov 2017 16:35:17 GMT</date>
+                <size>602kb</size>
+            </version>
+            <version version="v2">
+                <date>Sun, 01 Sep 2019 11:08:26 GMT</date>
+                <size>630kb</size>
+            </version>
+            <version version="v3">
+                <date>Sun, 05 Dec 2021 11:29:23 GMT</date>
+                <size>745kb</size>
+            </version>
+        <title>Rigid Surface Operator and Symbol Invariant of Partitions</title>
+        <authors>Chuanzhong Li, Bao Shou</authors>
+        <categories>math-ph math.MP</categories>
+            <comments>27 pages, 30 figures and 6 tables, typo corrected, english improved. arXiv admin note: text overlap with arXiv:1708.07388</comments>
+            <journal-ref>Commun. Math. Phys. (2024) 405:70</journal-ref>
+            <doi>10.1007/s00220-024-04940-9</doi>
+            <license>http://creativecommons.org/publicdomain/zero/1.0/</license>
+            <abstract>The symbol is used to describe the Springer correspondence for the classical groups by Lusztig. We refine the explanation that the $S$-duality maps of the rigid surface operators are symbol preserving maps. And we find that the maps $X_S$ and $Y_S$ used in the construction of $S$-duality maps are essentially the same. We clear up cause of the mismatch problem of the total number of the rigid surface operators between the $B_n$ and $C_n$ theories. And we construct all the $B_n/C_n$ rigid surface operators which can not have a dual. A classification of the problematic surface operators is made.</abstract>
+    </arXivRaw>
+
+            </metadata>
+        </record>
+        <resumptionToken expirationDate='2026-09-15T00:00:00Z'>verb%3DListRecords%26metadataPrefix%3DarXivRaw%26from%3D2024-03-05%26until%3D2024-03-05%26skip%3D3</resumptionToken>
+    </ListRecords>
+</OAI-PMH>

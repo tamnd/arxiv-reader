@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">
+    <responseDate>2026-09-14T10:49:50Z</responseDate>
+    <request verb="ListRecords" metadataPrefix="arXiv">http://oaipmh.arxiv.org/oai</request>
+    <ListRecords>
+                <record>
+                <header>
+        <identifier>oai:arXiv.org:math/9602216</identifier>
+        <datestamp>2024-03-05</datestamp>
+            <setSpec>math:math:LO</setSpec>
+    </header>
+
+            <metadata>
+                        <arXiv xmlns="http://arxiv.org/OAI/arXiv/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://arxiv.org/OAI/arXiv/ https://oaipmh.arxiv.org/OAI/arXiv.xsd">
+        <id>math/9602216</id>
+        <created>2024-03-03</created>
+            <updated>2024-03-05</updated>
+        <authors>
+                <author>
+                    <keyname>Kolman</keyname>
+                        <forenames>Oren</forenames>
+                </author>
+                <author>
+                    <keyname>Shelah</keyname>
+                        <forenames>Saharon</forenames>
+                </author>
+        </authors>
+        <title>Categoricity and amalgamation for AEC and $ κ$ measurable</title>
+            <categories>math.LO</categories>
+            <comments>We now use the framework of AECs rather than models of a fixed theory</comments>
+            <proxy>Saharon Shelah</proxy>
+            <report-no>Shelah [Sh:E102], was previously Shelah [Sh:362]</report-no>
+            <msc-class>Primary 03C48. Secondary: 03C45, 03C55, 03C75, 03E05, 03E55</msc-class>
+            <journal-ref>[Sh:362]: Fund. Math. 151 (1996), 209--240</journal-ref>
+            <license>http://creativecommons.org/licenses/by/4.0/</license>
+            <abstract>In the original version of this paper, we assume a theory $T$ that the logic $\mathbb L_{κ, \aleph_{0}}$ is categorical in a cardinal $λ&gt; κ$, and $κ$ is a measurable cardinal. There we prove that the class of model of $T$ of cardinality $&lt;λ$ (but $\geq |T|+κ$) has the amalgamation property; this is a step toward understanding the character of such classes of models.
+  In this revised version we replaced the class of models of $T$ by $\mathfrak k$, an AEC (abstract elementary class) which has LS-number ${&lt;} \, κ,$ or at least which behave nicely for ultrapowers by $D$, a normal ultra-filter on $κ$.
+  Presently sub-section \S1A deals with $T \subseteq \mathbb L_{κ^{+}, \aleph_{0}}$ (and so does a large part of the introduction and little in the rest of \S1), but otherwise, all is done in the context of AEC.</abstract>
+    </arXiv>
+
+            </metadata>
+        </record>
+    </ListRecords>
+</OAI-PMH>

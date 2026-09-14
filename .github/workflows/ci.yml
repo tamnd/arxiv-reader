@@ -133,7 +133,28 @@ jobs:
             echo "translate exited zero without doing anything"
             exit 1
           fi
+          if ax harvest kaggle; then
+            echo "harvest kaggle exited zero without harvesting anything"
+            exit 1
+          fi
+      # These reach no further than the argument check, which is the point. CI
+      # does not talk to arXiv: a job that harvests on every push is a job that
+      # gets this project blocked.
+      - name: a harvest refuses the arguments it should refuse
+        run: |
           if ax harvest oai; then
-            echo "harvest oai exited zero without harvesting anything"
+            echo "an unbounded harvest was allowed, and that asks arXiv for the whole archive"
+            exit 1
+          fi
+          if ax harvest oai -from 2024-03-05T00:00:00Z -until 2024-03-05; then
+            echo "a timestamp was accepted where a date belongs"
+            exit 1
+          fi
+          if ax harvest oai -format oai_dc -limit 1; then
+            echo "a metadata format arXiv does not serve was accepted"
+            exit 1
+          fi
+          if ax harvest oai -from 2024-03-06 -until 2024-03-05; then
+            echo "a backwards date range was accepted"
             exit 1
           fi
