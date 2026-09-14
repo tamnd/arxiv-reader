@@ -122,6 +122,7 @@ Every piece of mathematics in arXiv's rendering carries an `alttext` attribute h
 Figures keep their captions, their numbers and their files, including the SVGs that arrive as an `object` rather than an `img`.
 Tables keep their cells, their headings, their alignment and their spans.
 Theorems keep whatever the author called them, so a paper full of claims and remarks reads as one rather than as a column of the word theorem.
+The bibliography keeps the anchor every citation in the paper points at, so a link in the text and an entry in the reference list stay connected.
 `-outline` prints the whole document, heading by heading and block by block.
 
 Reading and writing are separate commands because the reject rule sits between them.
@@ -293,6 +294,62 @@ A table is where a paper's measured results live, and a second representation th
 The two files are read into cells and compared cell by cell rather than compared as text, because they lay the same table out differently by design, and mathematics is compared exactly as it stands on both sides.
 
 The Markdown written here is the same text the extractor puts inside the section the table belongs to, from the same emitter, so the two cannot say different things about the same table.
+
+`ax refs build` reads a paper's bibliography into fields.
+
+```
+$ ax refs build -n 2312.00752v2 2404.19756v5
+2312.00752v2   116 references
+  a DOI        2 of 116
+  a title      116 of 116
+  a year       116 of 116
+  an arXiv id  26 of 116
+  an author    116 of 116
+2404.19756v5   118 references
+  a title      115 of 118
+  a year       118 of 118
+  an arXiv id  22 of 118
+  an author    118 of 118
+  no title  bib.bib44  Aojun Lu, Tao Feng, Hangjie Yuan, Xiaotian Song, and Yanan Sun. Revisiting...
+  no title  bib.bib46  Sergei Gukov, James Halverson, Ciprian Manolescu, and Fabian Ruehle. Searching...
+  no title  bib.bib108  L. H. Kauffman, N. E. Russkikh, and I. A. Taimanov. Rectangular knot diagrams...
+```
+
+The parsing is by pattern and never by a model.
+A bibliography is the most regular prose in a paper, because a style file laid it out and the same style file laid out every other entry in the same list.
+A model asked to read a hundred entries per paper across three million papers would cost more than the rest of this pipeline put together, and would be wrong in prose, which is the hardest kind of wrong to find later.
+
+Those two papers are the two styles the patterns have to survive.
+Mamba is an author-year style that puts the title in quotation marks, and KAN is a numeric style that does not quote it and relies on the order of the blocks instead.
+The three KAN entries with no title are entries printed as an author line and then everything else, where half of the second block is the title and half of it is the year.
+Guessing where the split falls would invent a field, so nothing guesses, and the entry is published with the line the paper printed and no title.
+
+```
+$ cat manifests/refs/2312/2312.00752.yaml
+paper: "2312.00752"
+version: 2
+entries:
+    - id: bib.bibx1
+      label: Arjovsky et al. (2016)
+      authors:
+        - Martin Arjovsky
+        - Amar Shah
+        - Yoshua Bengio
+      title: Unitary Evolution Recurrent Neural Networks
+      venue: In The International Conference on Machine Learning (ICML), 2016, pp. 1120–1128
+      year: 2016
+      text: Martin Arjovsky, Amar Shah and Yoshua Bengio “Unitary Evolution Recurrent Neural Networks” In *The International Conference on Machine Learning (ICML)*, 2016, pp. 1120–1128
+```
+
+`text` is the line the paper printed and it is what gets published.
+The fields are a reading of a bibliography style and any of them can be empty, so an empty field is a field the style did not make available rather than an error.
+That entry prints 1120 and 1128 after the year it actually states, which is why a year is a four digit number in the range a paper can cite and not any four digits.
+
+The manifest is keyed by version as well as by paper, because a paper adds references between versions constantly and a bibliography read from v1 does not describe v3.
+The entries keep the order the paper prints them in and are not sorted, because that order is the numbering in a numeric style.
+There is one file per paper rather than one per month, unlike figures: a bibliography runs to a hundred entries and a month runs to twenty thousand papers, so a month of references would be a two million line file that every extraction in that month rewrites.
+
+A bibliography entry is a line of the paper, so the licence gate runs here too, at the point the manifest is about to be written.
 
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.

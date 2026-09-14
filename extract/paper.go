@@ -201,7 +201,32 @@ type Paper struct {
 	// not parse into MathML. The alttext is still there and still correct, so
 	// this is a note and not a fault.
 	Unparsed int
+	// Bibliography is the reference list, in the order the paper prints it.
+	Bibliography []Bibitem
 }
+
+// Bibitem is one entry of the reference list as the rendering carries it.
+//
+// Read into the model rather than parsed here, because what a bibliography
+// block means depends on the style the author used and that is ax refs build's
+// problem. This is the typography: the anchor everything in the paper points
+// at, the label the paper prints, and the blocks in the order they are printed.
+type Bibitem struct {
+	// ID is LaTeXML's anchor, "bib.bibx106", which is what every citation in
+	// the paper links to and is how an entry is found again.
+	ID string
+	// Label is the refnum the paper prints, so "Vaswani et al. (2017)" in an
+	// author-year style and "[106]" in a numeric one.
+	Label string
+	// Blocks are the printed lines of the entry, as Markdown, in order. A
+	// BibTeX style puts the authors in the first, the title in the second and
+	// the venue in the rest, and an author who wrote the entry by hand puts
+	// the whole thing in one.
+	Blocks []string
+}
+
+// Text is the whole entry as one line, which is how it is published.
+func (b Bibitem) Text() string { return strings.Join(b.Blocks, " ") }
 
 // FaultLimit is how many conversion errors a rendering may carry outside a
 // section body before it is rejected.

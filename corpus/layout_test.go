@@ -79,6 +79,7 @@ func TestPaths(t *testing.T) {
 		{ContentDir("/c", "vi", id), "/c/content/vi/2106/2106.09685"},
 		{FiguresDir("/c", id), "/c/figures/2106/2106.09685"},
 		{TagsPath("/c", id), "/c/tags/2106/2106.09685.tags"},
+		{RefsPath("/c", id), "/c/manifests/refs/2106/2106.09685.yaml"},
 		{MetadataPath("/c", Shard(id)), "/c/metadata/2106.jsonl"},
 		{GraphPath("/c", Shard(id)), "/c/graph/2106.jsonl"},
 	}

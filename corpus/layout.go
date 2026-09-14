@@ -127,6 +127,17 @@ func FigureFile(id axid.ID, name string) string {
 	return "/" + path.Join("figures", Shard(id), PathID(id), name)
 }
 
+// RefsPath is one paper's parsed bibliography.
+//
+// One file per paper, under a shard directory, and not one file per month the
+// way figures are. A bibliography runs to a hundred entries and a month runs to
+// twenty thousand papers, so a month of references is a two million line file
+// that every extraction in that month rewrites. Figures get away with it
+// because a manifest entry is one picture and most papers have a handful.
+func RefsPath(root string, id axid.ID) string {
+	return path.Join(root, "manifests", "refs", Shard(id), PathID(id)+".yaml")
+}
+
 // GraphPath is the edge file for one month.
 //
 // Sharded by the subject's paper, so extracting one paper writes one file.

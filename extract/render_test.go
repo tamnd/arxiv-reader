@@ -402,6 +402,39 @@ func TestTheBibliographyIsNotASection(t *testing.T) {
 	}
 }
 
+// The typography is read here and the fields are read by refs. What this owes
+// that package is the anchor every citation in the paper points at, the label
+// the paper prints, and the blocks in the order they were printed.
+func TestTheBibliographyIsRead(t *testing.T) {
+	p := parse(t, "rendering.html")
+	if len(p.Bibliography) != 3 {
+		t.Fatalf("got %d entries, want 3: %+v", len(p.Bibliography), p.Bibliography)
+	}
+	b := p.Bibliography[0]
+	if b.ID != "bib.bibx1" {
+		t.Errorf("the anchor is %q, and that is what a citation links to", b.ID)
+	}
+	if b.Label != "Nobody (1999)" {
+		t.Errorf("the label is %q", b.Label)
+	}
+	if b.Text() != "N. Nobody. On nothing. 1999." {
+		t.Errorf("the entry reads %q", b.Text())
+	}
+}
+
+func TestAFaultInTheBodyIsStillAnEntry(t *testing.T) {
+	p := parse(t, "rendering.html")
+	if len(p.Bibliography) != 3 {
+		t.Fatalf("got %d entries, want 3", len(p.Bibliography))
+	}
+	// The second entry is the one with the undefined macro in it. It is printed
+	// badly and it is still a reference the paper made, so it is kept and the
+	// fault is recorded separately.
+	if b := p.Bibliography[1]; !strings.Contains(b.Text(), "On something") {
+		t.Errorf("the entry reads %q", b.Text())
+	}
+}
+
 func TestAFaultInTheBibliographyIsForgiven(t *testing.T) {
 	p := parse(t, "rendering.html")
 	if len(p.Faults) != 1 {

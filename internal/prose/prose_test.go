@@ -79,6 +79,28 @@ func TestCount(t *testing.T) {
 // Zero over zero is the case the negative return exists for, and a report that
 // reads it as zero percent says the corpus holds none of something when what it
 // holds is nothing at all.
+func TestClip(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{
+		{"short enough", "short enough"},
+		{"a bibliography entry that runs on well past the width a report has for it", "a bibliography entry that runs on well past the..."},
+		{"Aojun Lu, Tao Feng, Hangjie Yuan, Xiaotian Song, and Yanan Sun", "Aojun Lu, Tao Feng, Hangjie Yuan, Xiaotian Song..."},
+		{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa..."},
+		{"", ""},
+	} {
+		if got := Clip(tc.in, 49); got != tc.want {
+			t.Errorf("Clip(%q) is %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+// Counted in runes, because half the author names in a bibliography are not
+// ASCII and a byte count would cut one in the middle of a letter.
+func TestClipCountsLetters(t *testing.T) {
+	if got := Clip("Žiga Avsec and Agnieszka Grabska-Barwinska", 10); got != "Žiga Avsec..." {
+		t.Errorf("got %q", got)
+	}
+}
+
 func TestShare(t *testing.T) {
 	for _, tc := range []struct {
 		part, whole int
