@@ -133,8 +133,8 @@ jobs:
             echo "translate exited zero without doing anything"
             exit 1
           fi
-          if ax audit --plane meta; then
-            echo "audit exited zero without auditing anything"
+          if ax report coverage; then
+            echo "report exited zero without reporting anything"
             exit 1
           fi
       # These reach no further than the argument check, which is the point. CI
@@ -210,3 +210,45 @@ jobs:
           ARXIV_CORPUS=/tmp/hf-corpus ax harvest hf /tmp/snapshot.json
           grep -q '"source":"hf"' /tmp/hf-corpus/metadata/2106.jsonl
           grep -q '"source":"kaggle"' /tmp/snap-corpus/metadata/2106.jsonl
+      # An empty plane is the case the four states exist for. A rule that says
+      # pass here is a rule that will say pass for the rest of the project
+      # without ever having looked at anything.
+      - name: an empty plane audits as not run rather than pass
+        run: |
+          out=$(ARXIV_CORPUS=/tmp/empty-corpus ax audit --plane meta)
+          echo "$out"
+          echo "$out" | grep -q "not run"
+          echo "$out" | grep -q "0 records over 0 months, nothing to check"
+          if echo "$out" | grep -q "pass"; then
+            echo "a rule passed over an empty plane"
+            exit 1
+          fi
+      - name: a clean plane passes every rule, having checked something
+        run: |
+          out=$(ARXIV_CORPUS=/tmp/snap-corpus ax audit --plane meta -report /tmp/audit.md)
+          echo "$out"
+          echo "$out" | grep -q "1 record over 1 month, nothing found"
+          if echo "$out" | grep -q "not run"; then
+            echo "a rule had nothing to look at in a plane with a record in it"
+            exit 1
+          fi
+          grep -q "| Sources |" /tmp/audit.md
+      # The exit code is the whole point of the command in CI. A findings list
+      # nobody reads and a green build is worse than no audit at all.
+      - name: a broken record fails the build
+        run: |
+          mkdir -p /tmp/bad-corpus/metadata
+          sed 's/"source":"kaggle"/"source":"arxiv.org"/' /tmp/snap-corpus/metadata/2106.jsonl > /tmp/bad-corpus/metadata/2106.jsonl
+          if ARXIV_CORPUS=/tmp/bad-corpus ax audit --plane meta; then
+            echo "a record read from nowhere passed the audit"
+            exit 1
+          fi
+          ARXIV_CORPUS=/tmp/bad-corpus ax audit --plane meta 2>&1 | grep -q "metadata/2106.jsonl:1"
+      - name: the audit refuses the arguments it should refuse
+        run: |
+          for c in "audit --plane content" "audit --plane both" "audit -rules S99" "audit -rules" "audit -cap 0" "audit -shard 2113" "audit meta"; do
+            if ax $c; then
+              echo "ax $c was allowed"
+              exit 1
+            fi
+          done
