@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -130,22 +131,80 @@ func (d Document) Bytes() ([]byte, error) {
 }
 
 // ParseDocument reads a content file back.
+//
+// A field this tool does not know is ignored rather than refused, which is what
+// a reader should do: a corpus written by a later version of this tool is still
+// readable by an earlier one. The audit is the one caller that does want to
+// hear about such a field, and it calls FrontProblems for it.
 func ParseDocument(b []byte) (Document, error) {
+	head, body, err := split(b)
+	if err != nil {
+		return Document{}, err
+	}
+	var d Document
+	if err := yaml.Unmarshal([]byte(head), &d.Front); err != nil {
+		return Document{}, fmt.Errorf("extract: the front matter is not YAML: %w", err)
+	}
+	d.Body = body
+	return d, nil
+}
+
+// FrontProblems is everything wrong with a file's front matter, one sentence
+// each.
+//
+// One sentence each and not one error, because yaml.v3 reports a block of them
+// with newlines between, and a finding in the audit is a line. The error return
+// is for a file that has no front matter to read, which is rule T01's business
+// and not this one's.
+func FrontProblems(b []byte) ([]string, error) {
+	head, _, err := split(b)
+	if err != nil {
+		return nil, err
+	}
+	dec := yaml.NewDecoder(strings.NewReader(head))
+	dec.KnownFields(true)
+	var front Front
+	err = dec.Decode(&front)
+	// Front matter with nothing in it decodes to EOF rather than to an empty
+	// Front. There is nothing wrong with its fields, because it has none, and
+	// the rules that care about a file claiming to be no paper catch it.
+	if err == nil || err == io.EOF {
+		return nil, nil
+	}
+	var te *yaml.TypeError
+	if errors.As(err, &te) {
+		out := make([]string, 0, len(te.Errors))
+		for _, e := range te.Errors {
+			out = append(out, plainYAML(e))
+		}
+		return out, nil
+	}
+	return []string{plainYAML(err.Error())}, nil
+}
+
+// split cuts a content file into its front matter and its body.
+func split(b []byte) (head, body string, err error) {
 	s := string(b)
 	if !strings.HasPrefix(s, fence) {
-		return Document{}, errors.New("extract: the file does not open with front matter")
+		return "", "", errors.New("extract: the file does not open with front matter")
 	}
 	rest := s[len(fence):]
 	end := strings.Index(rest, "\n"+fence)
 	if end < 0 {
-		return Document{}, errors.New("extract: the front matter is never closed")
+		return "", "", errors.New("extract: the front matter is never closed")
 	}
-	var d Document
-	if err := yaml.Unmarshal([]byte(rest[:end+1]), &d.Front); err != nil {
-		return Document{}, fmt.Errorf("extract: the front matter is not YAML: %w", err)
-	}
-	d.Body = strings.TrimPrefix(rest[end+1+len(fence):], "\n")
-	return d, nil
+	return rest[:end+1], strings.TrimPrefix(rest[end+1+len(fence):], "\n"), nil
+}
+
+// plainYAML takes the Go type name out of a YAML complaint.
+//
+// The reader of an audit report is looking at a corpus and not at this package,
+// and "not found in type extract.Front" tells them to go and read Go source to
+// find out what their file did wrong.
+func plainYAML(s string) string {
+	s = strings.TrimPrefix(s, "yaml: ")
+	s = strings.ReplaceAll(s, "in type extract.Front", "in the front matter")
+	return strings.TrimSpace(s)
 }
 
 // Hash is the content hash of a body.

@@ -43,6 +43,9 @@ type Group string
 const (
 	// GroupSources is S, the group that makes a public repository defensible.
 	GroupSources Group = "S"
+	// GroupStructure is T, the group that says a content file is a content
+	// file.
+	GroupStructure Group = "T"
 )
 
 // Name is what the scoreboard calls the group.
@@ -50,6 +53,8 @@ func (g Group) Name() string {
 	switch g {
 	case GroupSources:
 		return "Sources"
+	case GroupStructure:
+		return "Structure"
 	}
 	return string(g)
 }
@@ -77,7 +82,13 @@ type Rule struct {
 type Finding struct {
 	// Rule is the rule's ID.
 	Rule string
-	// Shard is the month file, and Line is the one based line in it. Line is
+	// File is the finding's file, relative to the corpus root.
+	//
+	// Empty on the metadata plane, where the file is the month's JSONL and
+	// Shard already names it. The content plane has a file per section and no
+	// such convention, so it says the path.
+	File string
+	// Shard is the month, and Line is the one based line in the file. Line is
 	// zero for a finding that is not about a particular line.
 	Shard string
 	Line  int
@@ -89,13 +100,17 @@ type Finding struct {
 
 // Where is the finding's place, in the form an editor will jump to.
 func (f Finding) Where() string {
-	if f.Shard == "" {
-		return ""
+	file := f.File
+	if file == "" {
+		if f.Shard == "" {
+			return ""
+		}
+		file = fmt.Sprintf("metadata/%s.jsonl", f.Shard)
 	}
 	if f.Line == 0 {
-		return fmt.Sprintf("metadata/%s.jsonl", f.Shard)
+		return file
 	}
-	return fmt.Sprintf("metadata/%s.jsonl:%d", f.Shard, f.Line)
+	return fmt.Sprintf("%s:%d", file, f.Line)
 }
 
 func (f Finding) String() string {
@@ -147,8 +162,28 @@ type Report struct {
 	Plane string
 	// Records and Shards are what it read.
 	Records, Shards int
+	// Unit and Scope are the words for what those two count.
+	//
+	// The metadata plane counts records over months and the content plane
+	// counts files over papers. Empty means the metadata plane's words, which
+	// are the ones the report was written with.
+	Unit, Scope string
 	// Results is one per rule, in rule order.
 	Results []Result
+}
+
+func (r Report) unit() string {
+	if r.Unit == "" {
+		return "record"
+	}
+	return r.Unit
+}
+
+func (r Report) scope() string {
+	if r.Scope == "" {
+		return "month"
+	}
+	return r.Scope
 }
 
 // Failed reports whether a hard rule found something, which is the build's
@@ -211,6 +246,9 @@ type groupTally struct {
 // the order the file is in.
 func sortFindings(f []Finding) {
 	sort.SliceStable(f, func(i, j int) bool {
+		if f[i].File != f[j].File {
+			return f[i].File < f[j].File
+		}
 		if f[i].Shard != f[j].Shard {
 			return f[i].Shard < f[j].Shard
 		}
