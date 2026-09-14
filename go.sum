@@ -1,0 +1,4 @@
+github.com/tamnd/arxiv-cli v0.2.0 h1:YYzVMZRsioNALNnbvVCOW1GAl4tfYQ64iVQ5b3MMtjA=
+github.com/tamnd/arxiv-cli v0.2.0/go.mod h1:trUEDaSPUhOBR6UNC5pPo5F0nHbCJhmaJYbdrspPQ54=
+golang.org/x/text v0.39.0 h1:UbZz4pLOvn600D6Oh6GGEI6VAmndrEBLv8/6BEXzyus=
+golang.org/x/text v0.39.0/go.mod h1:3UwRclnC2g0TU9x8PZiyfOajCd1zaUNHF9cvqcQZ+ZM=

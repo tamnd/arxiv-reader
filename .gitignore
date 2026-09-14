@@ -1,0 +1,10 @@
+# Build output.
+bin/
+dist/
+
+# Queues, caches and scratch space. Nothing under work/ is committed, in this
+# repository or in the corpus.
+work/
+
+coverage.out
+.DS_Store

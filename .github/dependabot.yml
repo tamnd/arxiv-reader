@@ -1,0 +1,36 @@
+version: 2
+
+updates:
+  # Actions are pinned to a commit SHA with the tag in a comment, which is the
+  # only pin a workflow cannot be moved out from under. Dependabot understands
+  # that form and moves both the SHA and the comment together.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "type: ci"
+      - "dependencies"
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+    labels:
+      - "type: chore"
+      - "dependencies"
+    groups:
+      # One pull request for the whole set rather than one per module. The
+      # dependency list here is short and reviewing five one line bumps
+      # separately is five times the ceremony for the same decision.
+      go:
+        patterns:
+          - "*"
