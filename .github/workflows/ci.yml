@@ -350,7 +350,7 @@ jobs:
             echo "a fetch with no subcommand was allowed"
             exit 1
           fi
-          for c in "fetch render" "fetch render -pace 1s 2312.00752v2" "fetch render not-an-arxiv-id" "fetch source" "fetch source -pace 1s 2312.00752v2" "fetch source not-an-arxiv-id" "fetch verify extra" "fetch sideways"; do
+          for c in "fetch render" "fetch render -pace 1s 2312.00752v2" "fetch render not-an-arxiv-id" "fetch source" "fetch source -pace 1s 2312.00752v2" "fetch source not-an-arxiv-id" "fetch native" "fetch native -pace 1s 2312.00752v2" "fetch native not-an-arxiv-id" "fetch verify extra" "fetch sideways"; do
             if ARXIV_CORPUS=/tmp/empty-corpus ax $c; then
               echo "ax $c was allowed"
               exit 1
@@ -392,6 +392,40 @@ jobs:
           fi
           if [ -e /tmp/snap-corpus/work ]; then
             echo "a refused fetch wrote into the corpus"
+            exit 1
+          fi
+      # The native route is the last resort, which makes it the one most likely
+      # to be reached for when the other two have refused, so a gate that held on
+      # the first two and not on the third would be no gate at all.
+      - name: the licence gate refuses the native route as well
+        run: |
+          out=$(ARXIV_CORPUS=/tmp/snap-corpus ax fetch native 2106.09685v1 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "ax licence resolve"
+          if ARXIV_CORPUS=/tmp/snap-corpus ax fetch native 2106.09685v1; then
+            echo "the native route fetched past the licence gate"
+            exit 1
+          fi
+          if [ -e /tmp/snap-corpus/work ]; then
+            echo "a refused fetch wrote into the corpus"
+            exit 1
+          fi
+      # ax fetch native says which of the PDFs it downloaded are scans, which
+      # takes pdftotext, and a machine without it still has to be able to fetch.
+      # The PATH is cut down to the one directory ax itself is in, which is the
+      # only way to be sure poppler is not on it whatever the runner ships.
+      - name: a fetch of a PDF on a machine without poppler says so once and carries on
+        run: |
+          axdir=$(dirname "$(command -v ax)")
+          out=$(PATH="$axdir" ARXIV_CORPUS=/tmp/snap-corpus ax fetch native 2106.09685v1 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "pdftotext is not on the PATH"
+          echo "$out" | grep -q "install poppler"
+          echo "$out" | grep -q "which of these PDFs are scans"
+          # One line for the run and not one per paper, which is the whole reason
+          # the question is asked before the loop rather than inside it.
+          if [ "$(echo "$out" | grep -c "is not on the PATH")" != "1" ]; then
+            echo "the missing program was reported more than once"
             exit 1
           fi
       - name: the manifest verifies against the disk

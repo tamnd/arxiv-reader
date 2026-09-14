@@ -64,12 +64,14 @@ func TestThePaceIsTheSameAsTheLicenceResolverPace(t *testing.T) {
 }
 
 func TestParseRoute(t *testing.T) {
-	for _, want := range []Route{RouteRender, RouteSource} {
+	for _, want := range []Route{RouteRender, RouteSource, RouteNative} {
 		if got, err := ParseRoute(string(want)); err != nil || got != want {
 			t.Fatalf("got %q, %v", got, err)
 		}
 	}
-	for _, s := range []string{"native", "vision", ""} {
+	// The vision path reads the PDF the native route fetched, so it is not a
+	// route of its own and there is no fourth file to ask arXiv for.
+	for _, s := range []string{"vision", ""} {
 		if _, err := ParseRoute(s); err == nil {
 			t.Fatalf("%q parsed as a route that can be fetched", s)
 		}

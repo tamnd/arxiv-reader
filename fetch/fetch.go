@@ -47,9 +47,16 @@ type Route string
 const RouteRender Route = "render"
 
 // RouteSource is the submitter's own files, which is one gzip stream holding
-// either a tar of the submission or a single TeX file. The native and vision
-// paths fetch a PDF and they arrive with the milestones that read it.
+// either a tar of the submission or a single TeX file.
 const RouteSource Route = "source"
+
+// RouteNative is arXiv's PDF, read for its own text layer.
+//
+// The vision path reads the same file and does not have a route of its own,
+// because a route names bytes that were fetched and there is one PDF per
+// version whichever way it gets read. Which path a paper ended up on is
+// recorded in its front matter, where a reader can see it.
+const RouteNative Route = "native"
 
 // ParseRoute reads a route name.
 func ParseRoute(s string) (Route, error) {
@@ -58,8 +65,10 @@ func ParseRoute(s string) (Route, error) {
 		return RouteRender, nil
 	case RouteSource:
 		return RouteSource, nil
+	case RouteNative:
+		return RouteNative, nil
 	}
-	return "", fmt.Errorf("fetch: %q is not a route that can be fetched yet, which is %s or %s", s, RouteRender, RouteSource)
+	return "", fmt.Errorf("fetch: %q is not a route that can be fetched, which is %s, %s or %s", s, RouteRender, RouteSource, RouteNative)
 }
 
 // HTMLBase is where arXiv serves its own rendering of a paper.
@@ -73,6 +82,19 @@ const HTMLBase = "https://arxiv.org/html/"
 // here decides what is inside it. The source package does that, after the bytes
 // have arrived.
 const EPrintBase = "https://arxiv.org/e-print/"
+
+// PDFBase is where arXiv serves the PDF of a paper.
+//
+// A third surface and a third field on the fetcher, for the same reason the
+// e-print is: they are one host in production and three servers in a test, and
+// a base that was assumed rather than configured is a test that cannot be
+// written.
+//
+// What comes back for a very recent submission is sometimes not a PDF at all
+// but an HTML page saying the PDF is still being built, which arrives with a
+// 200 and reads as a few kilobytes of markup. That is checked for after the
+// bytes arrive rather than guessed at from the status.
+const PDFBase = "https://arxiv.org/pdf/"
 
 // Pace is the gap to leave between requests to the website.
 //
@@ -98,6 +120,13 @@ const maxBody = 16 << 20
 // resolution and arXiv's own limit on one is fifty megabytes. A submission over
 // the limit does not exist, so anything over this is not a submission.
 const maxEPrint = 64 << 20
+
+// maxPDF caps a PDF at sixty four megabytes.
+//
+// The same number as the e-print and for the same reason. arXiv compiles the
+// PDF out of the submission, so a PDF larger than the largest submission that
+// can be made is not a PDF arXiv produced.
+const maxPDF = 64 << 20
 
 // Gate decides whether a version's bytes may be fetched into the corpus.
 //
@@ -215,6 +244,9 @@ type Fetcher struct {
 	// two are separate surfaces. They are the same host in production and they
 	// are not the same host in a test, where one server has to answer both.
 	SourceBase string
+	// PDFBase defaults to the package constant, and is separate for the same
+	// reason SourceBase is.
+	PDFBase string
 	// HTTP defaults to a client with a two minute timeout. A rendering is
 	// several times the size of an abs page.
 	HTTP *http.Client
@@ -277,6 +309,11 @@ type surface struct {
 	// big fails with.
 	what    string
 	missing func(ref, status string) error
+	// check, if set, is asked whether the bytes that arrived are the thing that
+	// was asked for. Only the PDF surface sets it, because it is the only one
+	// that answers something else with a 200, and a check that ran on all three
+	// would be a guess about the other two.
+	check func(ref string, body []byte) error
 }
 
 func (f *Fetcher) artefact(ctx context.Context, root string, m *Manifest, o Order, s surface) (Result, error) {
@@ -331,6 +368,11 @@ func (f *Fetcher) artefact(ctx context.Context, root string, m *Manifest, o Orde
 	body, err := f.do(ctx, request{url: entry.URL, ref: ref, cap: s.cap, what: s.what, missing: s.missing})
 	if err != nil {
 		return Result{}, err
+	}
+	if s.check != nil {
+		if err := s.check(ref, body); err != nil {
+			return Result{}, err
+		}
 	}
 	entry.SHA256 = Digest(body)
 	entry.Bytes = int64(len(body))

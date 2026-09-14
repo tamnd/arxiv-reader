@@ -8,7 +8,8 @@ It is not called `arxiv` because [tamnd/arxiv-cli](https://github.com/tamnd/arxi
 
 ## Status
 
-M4, which is the source path: the papers arXiv never rendered, which is everything announced before December 2023.
+M5, which is the first thousand papers in English, and the part of it that is written is the native path's half of the fetch.
+M4 before it was the source path: the papers arXiv never rendered, which is everything announced before December 2023.
 M3 before it was one paper end to end down the render path, and the seed paper is Mamba.
 M2 before that was the licence census: counting what the corpus is permitted to do with what it holds.
 M1 before that was the metadata plane: the harvest, the writer, the rules that check it and the report that sets it against arXiv's own numbers.
@@ -127,6 +128,45 @@ Then the files that hold both a preamble and a body, which answers most submissi
 Then the include graph, which removes the chapter files of a paper whose sections each compile alone.
 Then the names people give a main file, which is a convention and is treated as one.
 A submission that gets through all four with two candidates left is usually two papers in one upload, and the answer to that is somebody naming the file rather than this tool picking.
+
+The third surface is the PDF, and it is the only one arXiv has for every paper it has ever taken.
+A rendering exists from December 2023 onward and only where there is TeX, an e-print exists unless the submitter withheld it, and a PDF is what the site shows a reader.
+That is the whole reason the native path is worth having: a paper with a PDF and nothing else is still a paper this corpus can read.
+
+```
+$ ax fetch native 1710.05832v1 2006.10256v1
+fetching 1710.05832v1
+1710.05832v1           fetched  cc-by          1599186  work/pdf/1710/1710.05832v1.pdf
+                       holds text on 18 of its 18 pages, which is a PDF that was typeset rather than scanned
+fetching 2006.10256v1
+2006.10256v1           fetched  cc-by          1437715  work/pdf/2006/2006.10256v1.pdf
+                       holds text on 19 of its 19 pages, which is a PDF that was typeset rather than scanned
+2 fetched, 0 cached, 0 arXiv does not serve, 2 sources in manifests/sources.yaml
+```
+
+The second line under each paper is `pdftotext -layout` run over the bytes that just landed, and it is there for the same reason the main file of a tarball is reported at fetch time.
+Whether a PDF was typeset or scanned cannot be seen from its size or its name, it decides which of two paths the paper is on, and somebody fetching a thousand of them wants the split before the extraction starts rather than after.
+A page counts as typeset when it holds four hundred characters that are not spaces, which is ten times what arXiv's own margin stamp comes to, and a paper counts as born digital when three fifths of its pages do.
+The share is not all of them on purpose, because a paper whose figures are full page images has pages holding nothing but a caption and a paper with a plate section at the back has a run of them, and neither is a scan.
+Nothing is written down by that reading and nothing is routed by it: it is a sentence printed for a person, and the path a paper ends up on is recorded by `ax extract` in its front matter.
+
+The reading takes poppler, and a machine without it still fetches.
+The question is asked once for the run rather than once per paper, so what a machine with no `pdftotext` gets is one line saying how to install it, one line saying what is lost, and then the downloads.
+
+One thing this turned up is worth writing down, because it is a cost and not a feature.
+
+```
+$ ax fetch verify
+1710.05832v1  native  ok  0fcadae9d35e
+1710.05832v1  source  ok  0fcadae9d35e
+2006.10256v1  native  ok  c6705a2bad0a
+3 sources, 3 ok, 0 missing, 0 changed
+```
+
+The LIGO paper's e-print and its PDF are the same bytes, hash for hash, because its submission was a PDF and arXiv serves that file back unchanged.
+So a PDF only paper fetched on both routes costs two requests and two copies on disk for one file, and the manifest is the thing that makes it visible rather than the thing that prevents it.
+Both entries are honest, each recording the surface its bytes came off, and neither is the one to delete.
+What fixes it is path selection deciding that a paper whose e-print is already a PDF does not need a second download, and that arrives with the selection command rather than here.
 
 Choosing the sample papers for this path meant reading licences first, and what that reading found is worth writing down.
 Of eight famous machine learning preprints checked in September 2026, being Attention Is All You Need, ResNet, GANs, VAEs, GPT-3, ViT, BERT and DDPM, all eight are under arXiv's own nonexclusive licence, so this corpus may hold their metadata, their structure and their tags and none of their text.
