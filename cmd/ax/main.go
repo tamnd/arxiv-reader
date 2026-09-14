@@ -38,7 +38,7 @@ var commands = []command{
 	{"id", "parse an arXiv reference and print what it resolves to", "M0", runID},
 	{"licence", "the licence gate: census, show, explain, recheck", "M0", runLicence},
 	{"harvest", "fill the metadata plane from Kaggle, Hugging Face and OAI-PMH", "M1", runHarvest},
-	{"fetch", "download what a paper needs for the path it is on", "M3", nil},
+	{"fetch", "download what a paper needs for the path it is on", "M3", runFetch},
 	{"select", "choose what enters the content plane, and say why", "M5", nil},
 	{"extract", "render, source, native or vision, to tagged Markdown", "M3", nil},
 	{"figures", "crop, convert and size cap the figures", "M3", nil},

@@ -64,6 +64,26 @@ func MetadataPath(root, shard string) string {
 	return path.Join(root, "metadata", shard+".jsonl")
 }
 
+// RenderPath is where arXiv's own HTML rendering of one version is cached.
+//
+// Under work/, which is gitignored here and in the corpus. These are arXiv's
+// bytes and not this project's: a rendering runs to a few hundred kilobytes and
+// a corpus that committed one per paper would be a mirror of arXiv rather than
+// a reading of it. What gets committed is the manifest entry saying where the
+// bytes came from and what they hashed to, which is enough to fetch them again
+// and know they are the same bytes.
+//
+// An empty root gives the path relative to the corpus, which is the form the
+// manifest records.
+func RenderPath(root string, id axid.ID, version int) string {
+	return path.Join(root, "work", "html", Shard(id), fmt.Sprintf("%sv%d.html", PathID(id), version))
+}
+
+// SourcesPath is the manifest recording where every fetched byte came from.
+func SourcesPath(root string) string {
+	return path.Join(root, "manifests", "sources.yaml")
+}
+
 // GraphPath is the edge file for one month.
 //
 // Sharded by the subject's paper, so extracting one paper writes one file.
