@@ -71,11 +71,22 @@ type Cell struct {
 	// Span is the number of columns the cell covers, and it is 1 for almost
 	// all of them.
 	Span int
+	// Down is the number of rows the cell covers, and it is 1 for almost all of
+	// them. Markdown cannot express it at all, which is the whole reason a
+	// table is kept a second time as markup.
+	Down int
 }
 
 // Row is one table row.
+//
+// Above and Below are the horizontal rules. They are read because a booktabs
+// table says what its header is by drawing a line under it and nothing else,
+// so a representation that drops the rules loses the structure rather than the
+// decoration.
 type Row struct {
 	Cells []Cell
+	Above bool
+	Below bool
 }
 
 // Block is one thing in a section, in reading order.

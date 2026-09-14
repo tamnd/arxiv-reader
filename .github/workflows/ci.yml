@@ -757,6 +757,78 @@ jobs:
           # The caption, the number and the tag are published either way, which
           # is the whole reason the page is worth publishing without the picture.
           grep -q '\*\*Figure 3\*\* {#fig-3 .figure}' $d/02_results.md
+      # A table is kept twice and rules F11 and F12 are the check that the two
+      # copies say the same thing. The numbers are the part that matters: a
+      # table is where a paper's measured results live.
+      - name: a table is written twice and the two agree
+        run: |
+          ARXIV_CORPUS=/tmp/extract-corpus ax tables -n 2501.00001v3 | tee /tmp/tables.txt
+          grep -q "2 tables" /tmp/tables.txt
+          grep -q "t01" /tmp/tables.txt
+          ARXIV_CORPUS=/tmp/extract-corpus ax tables 2501.00001v3 2>&1 | tee /tmp/write-tables.txt
+          grep -q "4 written, 0 unchanged, 0 removed" /tmp/write-tables.txt
+          dir=/tmp/extract-corpus/tables/2501/2501.00001
+          test -f $dir/t01.md && test -f $dir/t01.tex
+          # The span is the reason there are two files at all. Markdown writes
+          # an empty cell where the second column of the header would be and
+          # the markup says what the header actually covers.
+          grep -q 'multicolumn{2}' $dir/t01.tex
+          grep -q '| Model | Accuracy |  |' $dir/t01.md
+          # The file says it is a reconstruction. A t01.tex that does not say so
+          # is a file somebody will eventually quote as the author's source.
+          head -1 $dir/t01.tex | grep -q "rebuilt from arXiv's own rendering"
+          ARXIV_CORPUS=/tmp/extract-corpus ax tables check 2501.00001 | tee /tmp/check-tables.txt
+          test "$(grep -c 'F11 F12' /tmp/check-tables.txt)" = 2
+      - name: writing the same tables twice writes nothing
+        run: |
+          ARXIV_CORPUS=/tmp/extract-corpus ax tables 2501.00001v3 2>&1 | grep -q "0 written, 4 unchanged"
+      # The measurement is the whole point of the second representation, so a
+      # number that differs between the two files has to fail rather than be
+      # reported and passed over.
+      - name: a number that differs fails F12
+        run: |
+          dir=/tmp/extract-corpus/tables/2501/2501.00001
+          cp $dir/t01.tex /tmp/t01.tex.keep
+          sed -i 's/0\.1/0.2/' $dir/t01.tex
+          if ARXIV_CORPUS=/tmp/extract-corpus ax tables check 2501.00001; then
+            echo "two representations holding different numbers were allowed"
+            exit 1
+          fi
+          # F11 is the other half: a table is kept twice or it is not kept.
+          rm $dir/t01.tex
+          if ARXIV_CORPUS=/tmp/extract-corpus ax tables check 2501.00001; then
+            echo "a table kept once was allowed"
+            exit 1
+          fi
+          cp /tmp/t01.tex.keep $dir/t01.tex
+          ARXIV_CORPUS=/tmp/extract-corpus ax tables check 2501.00001
+      - name: tables refuses the arguments it should refuse
+        run: |
+          if ax tables; then
+            echo "ax tables with nothing to write was allowed"
+            exit 1
+          fi
+          for c in "tables not-an-arxiv-id" "tables check 2501.00001"; do
+            if ARXIV_CORPUS=/tmp/empty-corpus ax $c; then
+              echo "ax $c was allowed"
+              exit 1
+            fi
+          done
+      # The same gate, at the same point, for the same reason: both files are
+      # the paper's content and a licence belongs to a version.
+      - name: the gate refuses to write a table it may not publish
+        run: |
+          rm -rf /tmp/gate-corpus && cp -r /tmp/extract-corpus /tmp/gate-corpus
+          rm -rf /tmp/gate-corpus/tables
+          sed -i 's/"licence_from":"abs"/"licence_from":"kaggle"/' /tmp/gate-corpus/metadata/2501.jsonl
+          if ARXIV_CORPUS=/tmp/gate-corpus ax tables 2501.00001v3; then
+            echo "a licence read from a bulk surface was published as a licence for a version"
+            exit 1
+          fi
+          if [ -e /tmp/gate-corpus/tables ]; then
+            echo "a refused run wrote a table into the corpus"
+            exit 1
+          fi
       - name: the audit refuses the arguments it should refuse
         run: |
           for c in "audit --plane content" "audit --plane both" "audit -rules S99" "audit -rules" "audit -cap 0" "audit -shard 2113" "audit meta"; do

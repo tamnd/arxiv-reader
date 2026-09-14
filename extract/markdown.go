@@ -241,7 +241,7 @@ func (w *body) float(b Block, id string) {
 		w.picture(img)
 	}
 	if len(b.Rows) > 0 {
-		w.para(table(b.Rows))
+		w.para(Table(b.Rows))
 	}
 	if b.Text != "" {
 		w.listingBody(b)
@@ -394,15 +394,13 @@ func title(s string) string {
 // on. A cell spanning three columns is written once and followed by two empty
 // cells, which keeps the columns lined up and loses the fact that they were one
 // cell.
-func table(rows []Row) string {
-	width := 0
-	for _, r := range rows {
-		n := 0
-		for _, c := range r.Cells {
-			n += max(c.Span, 1)
-		}
-		width = max(width, n)
-	}
+// Table writes a table as Markdown.
+//
+// Exported because ax tables writes this same text to tables/<id>/tNN.md while
+// the extractor writes it into the section it belongs to, and the two have to
+// be the same bytes. One emitter is how that stays true.
+func Table(rows []Row) string {
+	width := tableWidth(rows)
 	if width == 0 {
 		return ""
 	}

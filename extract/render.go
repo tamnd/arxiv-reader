@@ -443,7 +443,7 @@ func tabular(t *html.Node, b Block) Block {
 			if c.Type != html.ElementNode || !hasClass(c, "ltx_td") {
 				continue
 			}
-			cell := Cell{Text: inline(c), Header: hasClass(c, "ltx_th"), Span: 1}
+			cell := Cell{Text: inline(c), Header: hasClass(c, "ltx_th"), Span: 1, Down: 1}
 			switch {
 			case hasClass(c, "ltx_align_right"):
 				cell.Align = "right"
@@ -452,19 +452,18 @@ func tabular(t *html.Node, b Block) Block {
 			case hasClass(c, "ltx_align_left"):
 				cell.Align = "left"
 			}
-			if s := attr(c, "colspan"); s != "" {
-				n := 0
-				for _, r := range s {
-					if r < '0' || r > '9' {
-						n = 0
-						break
-					}
-					n = n*10 + int(r-'0')
-				}
-				if n > 0 {
-					cell.Span = n
-				}
+			if n := number(attr(c, "colspan")); n > 0 {
+				cell.Span = n
 			}
+			if n := number(attr(c, "rowspan")); n > 0 {
+				cell.Down = n
+			}
+			// The rules are per cell in the rendering and per row in a tabular,
+			// and a rule drawn under some of a row's columns is drawn under the
+			// row. LaTeXML writes ltx_border_tt for a double rule, and one line
+			// is as much as either representation is going to carry.
+			row.Above = row.Above || hasClass(c, "ltx_border_t") || hasClass(c, "ltx_border_tt")
+			row.Below = row.Below || hasClass(c, "ltx_border_b") || hasClass(c, "ltx_border_bb")
 			row.Cells = append(row.Cells, cell)
 		}
 		if len(row.Cells) > 0 {
@@ -472,6 +471,25 @@ func tabular(t *html.Node, b Block) Block {
 		}
 	}
 	return b
+}
+
+// number reads a small positive integer out of an attribute.
+//
+// Anything that is not one is zero, which the callers read as the attribute
+// saying nothing. A colspan of "2 " or of "two" is a rendering this does not
+// understand, and guessing at it would put a cell in the wrong column.
+func number(s string) int {
+	if s == "" {
+		return 0
+	}
+	n := 0
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return 0
+		}
+		n = n*10 + int(r-'0')
+	}
+	return n
 }
 
 func listing(n *html.Node) Block {
