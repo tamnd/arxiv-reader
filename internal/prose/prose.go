@@ -51,6 +51,21 @@ func Count(n int, what string) string {
 	return fmt.Sprintf("%s %ss", Thousands(n), what)
 }
 
+// Bytes is a file size in the units a person reads sizes in.
+//
+// Powers of 1024 and labelled KB and MB, which is what every file manager on
+// every desktop prints and is what the size cap in the spec is written in. The
+// decimal units are more correct and nobody outside a disk vendor uses them.
+func Bytes(n int) string {
+	switch {
+	case n >= 1<<20:
+		return fmt.Sprintf("%.1f MB", float64(n)/(1<<20))
+	case n >= 1<<10:
+		return fmt.Sprintf("%.0f KB", float64(n)/(1<<10))
+	}
+	return Count(n, "byte")
+}
+
 // Share is a part over a whole, and -1 when the whole is zero.
 //
 // Zero over zero is not zero percent, it is a question nobody asked, and a

@@ -185,6 +185,38 @@ A file marked edited stays that way, because somebody decided about it and a has
 The licence gate runs again here and not only at fetch time.
 Fetching and extracting are separate runs and the licence can be re-resolved between them, so the check belongs at the point something is about to be published as well as at the point it was downloaded.
 
+Figures have their own gate, because a `cc-by` article licenses what the authors own and not the plot they reprinted from somebody else's paper with permission.
+There is no metadata for that and there never will be, so `ax figures` reads the signals that are actually in the source.
+
+```
+$ ax figures -n 2501.00001v3
+2501.00001v3  2 figures with a picture in it
+  Figure 1    owned      2501.00001v3/nothing.svg
+  Figure 3    suspected  the caption says "reproduced" within 60 characters of a citation
+1 figure withheld by rule F09, and the caption, the number and the tag are published anyway
+```
+
+Reproduced, adapted, reprinted and courtesy are ordinary English and they turn up in captions constantly, in "our adapted architecture" and "reproduced across five seeds".
+Next to a citation the same word is an author saying where the picture came from, so the proximity is the rule and not a refinement of it.
+A figure the corpus only suspects is treated exactly like one it has confirmed, because the cost of being wrong one way is a missing picture and the cost of being wrong the other way is republishing somebody's work under a licence they never granted.
+A withheld figure is not a hole: the caption is published, the figure keeps its number and its tag, the prose that references it still resolves, and the page says the image is withheld and links to it on arXiv.
+
+`ax figures check` runs the same gate over files somebody already has.
+
+```
+$ ax figures check figures/testdata/page.png
+figures/testdata/page.png  png               1275 by 1650  17 KB
+  page                     100.0% of a page  at 8.50 by 11.00 inches, from pHYs
+  verdict                  withhold          F06: it covers 100 per cent of a page at the 8.50 by 11.00 inches the file states, and the cap is 75 per cent
+```
+
+Rule F06 is what separates a corpus from a mirror of copyrighted PDFs: a picture that covers a whole page is a page, and a page of somebody else's paper is not a figure whatever the caption under it says.
+The physical size is read out of the file, which is the `pHYs` chunk of a PNG, the JFIF density of a JPEG and the `width` and `height` of an SVG when they carry a unit.
+A file that states no resolution is not judged by this rule and the report says so, because a resolution cannot be guessed from a pixel count: at 150 dots per inch every high resolution figure measures as a page and at 300 every page scan measures as a figure, so the two wrong answers are wrong in opposite directions and neither beats admitting the file said nothing.
+
+The headers are read by hand rather than by decoding the picture.
+A figure is judged on its size and its shape, decoding the whole raster to find that out costs about as much as everything else in this pipeline put together, and there are three million papers.
+
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
 

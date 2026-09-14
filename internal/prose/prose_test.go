@@ -38,6 +38,28 @@ func TestPercent(t *testing.T) {
 	}
 }
 
+func TestBytes(t *testing.T) {
+	for _, tc := range []struct {
+		n    int
+		want string
+	}{
+		{0, "0 bytes"},
+		{1, "1 byte"},
+		{999, "999 bytes"},
+		{1024, "1 KB"},
+		// The size cap in the spec is five hundred kilobytes, so it has to
+		// print as that and not as 512000 or as 0.5 MB.
+		{500 << 10, "500 KB"},
+		{(500 << 10) + 1, "500 KB"},
+		{1 << 20, "1.0 MB"},
+		{3 << 20, "3.0 MB"},
+	} {
+		if got := Bytes(tc.n); got != tc.want {
+			t.Errorf("Bytes(%d) is %q, want %q", tc.n, got, tc.want)
+		}
+	}
+}
+
 func TestCount(t *testing.T) {
 	for _, tc := range []struct {
 		n    int
