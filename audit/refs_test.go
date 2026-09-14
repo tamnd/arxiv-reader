@@ -228,6 +228,10 @@ func TestTheRulesThatNeedThePlaneDoNotRunWithoutIt(t *testing.T) {
 		switch id {
 		case "R01", "R04":
 			want = NotRun
+		case "G08":
+			// This fixture has no history, which is a different absence with
+			// the same answer.
+			want = NotRun
 		case "S04":
 			want = Fail
 		}

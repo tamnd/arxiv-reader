@@ -304,3 +304,113 @@ func TestTheLineOfAnObjectIsItsOwn(t *testing.T) {
 		t.Errorf("an object that is not there is on line %d", got)
 	}
 }
+
+// A tombstone is what a reader gets instead of the object they asked for, and
+// the version is the one thing it has to say.
+func TestATombstoneThatDoesNotSayWhenIsReported(t *testing.T) {
+	for _, c := range []struct{ name, line, want string }{
+		{"no version at all", `ZZZZ,eq-7,,"it went"`, `says ""`},
+		{"a version that is not one", `ZZZZ,eq-7,gone:later,"it went"`, `says "gone:later"`},
+		{"the version without the word", `ZZZZ,eq-7,v3,"it went"`, `says "v3"`},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			root := paper(t, front(), section(1, "One", prose(8)))
+			appendLines(t, root, c.line)
+			if f := fires(t, root, "G07"); !strings.Contains(f.What, c.want) {
+				t.Errorf("the finding reads %q", f.What)
+			}
+		})
+	}
+}
+
+// The ordinary tombstone, and the thing about it that used to read as a fault:
+// the identifier it keeps is the one the next version of the paper hands to
+// whatever was renumbered into its place.
+func TestATombstoneAndTheLiveEntryThatTookItsIdentifierAreBothFine(t *testing.T) {
+	root := paper(t, front(), section(1, "One", prose(8)))
+	live := reg(t, root).Entries[0]
+	appendLines(t, root, fmt.Sprintf(`ZZZZ,%s,gone:v3,"removed when section 4 was rewritten"`, live.Local))
+	got := audited(t, root)
+	for _, id := range []string{"G04", "G05", "G07"} {
+		if got[id].Total != 0 {
+			t.Errorf("%s found %v", id, got[id].Findings)
+		}
+	}
+}
+
+// G08, and the reason it reads the repository. The line is gone from the file,
+// so nothing the corpus holds can tell you it was ever there.
+func TestATagTakenOutOfARegisterIsReported(t *testing.T) {
+	root := paper(t, front(), section(1, "One", theorem+prose(8)))
+	// An object that went in an earlier version, so the body does not carry it
+	// and this is a test about the register and not about the copy.
+	appendLines(t, root, `ZZZZ,eq-7,gone:v2,"removed when section 4 was rewritten"`)
+	committed(t, root)
+	drop(t, root, "ZZZZ")
+	f := fires(t, root, "G08")
+	if !strings.Contains(f.What, "had ZZZZ on eq-7") {
+		t.Errorf("the finding reads %q", f.What)
+	}
+	if !strings.Contains(f.What, "wants a revert") {
+		t.Errorf("the finding does not say what to do about it: %q", f.What)
+	}
+	if f.Where() != "tags/2501/2501.00001.tags" {
+		t.Errorf("the finding is at %q", f.Where())
+	}
+	// And the same removal once it is history rather than a working tree.
+	commit(t, root)
+	if got := audited(t, root)["G08"].Total; got != 1 {
+		t.Errorf("a committed removal was reported %d times", got)
+	}
+}
+
+// Carrying a register onto a new version rewrites the identifier on a line, and
+// a rule that read that as a removal would fire on every paper that has ever
+// been revised.
+func TestATagThatOnlyMovedIsNotReported(t *testing.T) {
+	root := paper(t, front(), section(1, "One", theorem+prose(8)))
+	committed(t, root)
+	moved := reg(t, root).ByLocal()["thm-1"]
+	b, err := os.ReadFile(registerPath(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := strings.Replace(string(b), string(moved)+",thm-1", string(moved)+",thm-2", 1)
+	if err := os.WriteFile(registerPath(root), []byte(out), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	commit(t, root)
+	if got := audited(t, root)["G08"].Total; got != 0 {
+		t.Errorf("G08 found %v", got)
+	}
+}
+
+// A corpus nobody has committed has no history, and a rule about what used to
+// be in a file has nothing to read. Saying it passed would be saying every tag
+// ever handed out is still there.
+func TestAPaperWithNoHistoryLeavesTheHistoryRuleNotRun(t *testing.T) {
+	root := paper(t, front(), section(1, "One", prose(8)))
+	if got := audited(t, root)["G08"]; got.State() != NotRun {
+		t.Errorf("G08 is %s over a corpus with no history", got.State())
+	}
+}
+
+// drop takes one tag's line out of the register, which is the edit the rule
+// exists to catch and the one nothing else in the corpus records.
+func drop(t *testing.T, root string, tag tags.Tag) {
+	t.Helper()
+	b, err := os.ReadFile(registerPath(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for _, line := range strings.Split(string(b), "\n") {
+		if strings.HasPrefix(line, string(tag)+",") {
+			continue
+		}
+		out = append(out, line)
+	}
+	if err := os.WriteFile(registerPath(root), []byte(strings.Join(out, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
