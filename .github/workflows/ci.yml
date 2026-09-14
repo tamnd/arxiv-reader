@@ -340,6 +340,83 @@ jobs:
               exit 1
             fi
           done
+      # ax fetch reads the website at fifteen seconds a page, so none of this
+      # reaches the network. The gate is what keeps it there: every one of these
+      # is refused before a request is made, which is the behaviour worth
+      # testing anyway.
+      - name: the fetch refuses the arguments it should refuse
+        run: |
+          if ax fetch; then
+            echo "a fetch with no subcommand was allowed"
+            exit 1
+          fi
+          for c in "fetch render" "fetch render -pace 1s 2312.00752v2" "fetch render not-an-arxiv-id" "fetch verify extra" "fetch sideways"; do
+            if ARXIV_CORPUS=/tmp/empty-corpus ax $c; then
+              echo "ax $c was allowed"
+              exit 1
+            fi
+          done
+          if ARXIV_CORPUS=/tmp/empty-corpus ax fetch render 2312.00752v2; then
+            echo "a fetch of a paper the plane has never heard of was allowed"
+            exit 1
+          fi
+      # The snapshot corpus holds one cc-by paper whose licence came from
+      # Kaggle, which states one licence for the whole paper. That is exactly
+      # the case the gate exists for, and it has to be refused even though the
+      # licence it names is the permissive one.
+      - name: the licence gate refuses a paper level licence
+        run: |
+          out=$(ARXIV_CORPUS=/tmp/snap-corpus ax fetch render 2106.09685v1 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "kaggle"
+          echo "$out" | grep -q "ax licence resolve"
+          if ARXIV_CORPUS=/tmp/snap-corpus ax fetch render 2106.09685v1; then
+            echo "a licence read from a bulk surface was accepted as a licence for a version"
+            exit 1
+          fi
+          if [ -e /tmp/snap-corpus/work ] || [ -e /tmp/snap-corpus/manifests ]; then
+            echo "a refused fetch wrote into the corpus"
+            exit 1
+          fi
+      - name: the manifest verifies against the disk
+        run: |
+          mkdir -p /tmp/fetch-corpus/work/html/2312 /tmp/fetch-corpus/manifests
+          echo "a rendering" > /tmp/fetch-corpus/work/html/2312/2312.00752v2.html
+          sum=$(sha256sum /tmp/fetch-corpus/work/html/2312/2312.00752v2.html | cut -d' ' -f1)
+          cat > /tmp/fetch-corpus/manifests/sources.yaml <<YAML
+          sources:
+            - id: "2312.00752"
+              version: 2
+              route: render
+              url: https://arxiv.org/html/2312.00752v2
+              path: work/html/2312/2312.00752v2.html
+              sha256: $sum
+              bytes: 12
+              fetched: 2026-09-14T00:00:00Z
+              licence: cc-by
+              licence_from: abs
+          YAML
+          ARXIV_CORPUS=/tmp/fetch-corpus ax fetch verify 2>&1 | tee /tmp/verify.txt
+          grep -q "1 ok" /tmp/verify.txt
+          # A changed file is the whole reason the manifest holds hashes, and it
+          # has to be a non-zero exit rather than a line in a log.
+          echo "somebody edited this" > /tmp/fetch-corpus/work/html/2312/2312.00752v2.html
+          if ARXIV_CORPUS=/tmp/fetch-corpus ax fetch verify; then
+            echo "a file that no longer hashes to the manifest exited zero"
+            exit 1
+          fi
+          # A missing file is the ordinary state of a fresh clone, because
+          # work/ is not committed, so it is reported and not failed.
+          rm /tmp/fetch-corpus/work/html/2312/2312.00752v2.html
+          ARXIV_CORPUS=/tmp/fetch-corpus ax fetch verify 2>&1 | grep -q "1 missing"
+      - name: a manifest entry that records nothing is refused
+        run: |
+          mkdir -p /tmp/bad-manifest/manifests
+          printf 'sources:\n  - id: "2312.00752"\n    version: 2\n' > /tmp/bad-manifest/manifests/sources.yaml
+          if ARXIV_CORPUS=/tmp/bad-manifest ax fetch verify; then
+            echo "an entry with no hash was read as a manifest entry"
+            exit 1
+          fi
       - name: the audit refuses the arguments it should refuse
         run: |
           for c in "audit --plane content" "audit --plane both" "audit -rules S99" "audit -rules" "audit -cap 0" "audit -shard 2113" "audit meta"; do

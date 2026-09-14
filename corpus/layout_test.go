@@ -100,3 +100,34 @@ func TestPathsDropTheVersion(t *testing.T) {
 		t.Fatalf("a versioned reference produced a different path: %q vs %q", with, without)
 	}
 }
+
+// The cache path keeps the version, which is the one place in the layout that
+// does. A rendering is of a version: v1 and v2 of the same paper are two
+// different documents and caching one over the other would mean extracting the
+// wrong one and never finding out.
+func TestTheCachePathKeepsTheVersion(t *testing.T) {
+	id := mustParse(t, "2312.00752v2")
+	cases := []struct{ got, want string }{
+		{RenderPath("/c", id, 2), "/c/work/html/2312/2312.00752v2.html"},
+		{RenderPath("/c", id, 1), "/c/work/html/2312/2312.00752v1.html"},
+		{RenderPath("", id, 2), "work/html/2312/2312.00752v2.html"},
+		{RenderPath("/c", mustParse(t, "hep-th/9711200"), 3), "/c/work/html/9711/hep-th-9711200v3.html"},
+		{SourcesPath("/c"), "/c/manifests/sources.yaml"},
+	}
+	for _, c := range cases {
+		if c.got != c.want {
+			t.Errorf("got %q, want %q", c.got, c.want)
+		}
+	}
+}
+
+// The version in the path comes from the argument and never from the parsed
+// reference. A reference that named no version would otherwise cache itself as
+// v0, which is not a version of anything.
+func TestTheCachePathTakesTheVersionFromTheCaller(t *testing.T) {
+	bare := RenderPath("/c", mustParse(t, "2312.00752"), 2)
+	versioned := RenderPath("/c", mustParse(t, "2312.00752v1"), 2)
+	if bare != versioned {
+		t.Fatalf("the reference decided the version: %q vs %q", bare, versioned)
+	}
+}

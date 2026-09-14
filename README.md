@@ -8,8 +8,9 @@ It is not called `arxiv` because [tamnd/arxiv-cli](https://github.com/tamnd/arxi
 
 ## Status
 
-M2, which is the licence census: counting what the corpus is permitted to do with what it holds.
-M1 before it was the metadata plane: the harvest, the writer, the rules that check it and the report that sets it against arXiv's own numbers.
+M3, which is one paper end to end down the render path, and the seed paper is Mamba.
+M2 before it was the licence census: counting what the corpus is permitted to do with what it holds.
+M1 before that was the metadata plane: the harvest, the writer, the rules that check it and the report that sets it against arXiv's own numbers.
 M0 before that was the module, the licence gate and the command set.
 Every other command names the milestone it arrives in and exits non-zero rather than pretending to succeed.
 The plan is in the issues, one per milestone.
@@ -72,6 +73,34 @@ Their identifiers carry no version either, so both sides are reading one paper l
 The disagreements are the whole of the signal.
 The one that costs something is where their reading permits republishing the English and ours does not, because they have already published it.
 The 1,179 absent are a gap in the harvest and not a licence question: that run was against a plane of 9,242 records, and a paper they hold that this corpus has never heard of says the harvest is short rather than that anybody read a licence wrong.
+
+All of that is counting, and `ax fetch` is the first command that acts on the count.
+
+```
+$ ax fetch render -all 2312.00752
+fetching 2312.00752v1
+fetch: arXiv has no HTML rendering of 2312.00752v1 (404 Not Found), which is normal before December 2023 and for submissions with no TeX source, so this paper is on the source path
+fetching 2312.00752v2
+2312.00752v2           fetched  cc-by           668209  work/html/2312/2312.00752v2.html
+1 fetched, 0 cached, 1 with no rendering, 1 sources in manifests/sources.yaml
+```
+
+The licence gate runs before the request and not after it.
+A version nobody has read a licence for is refused, a version whose licence came from Kaggle or Hugging Face or OAI-PMH is refused because those state one licence for the whole paper, and a version under arXiv's default licence is refused because none of its content may be republished.
+All three refusals happen before anything is asked for, which is the point: a refusal that arrives after fifteen seconds and a download has already spent the thing it was meant to save.
+
+What gets committed is the manifest and not the bytes.
+
+```
+$ ax fetch verify
+2312.00752v2  render  ok  db9c91f06ddc
+1 sources, 1 ok, 0 missing, 0 changed
+```
+
+A rendering is a few hundred kilobytes and a corpus that committed one per paper would be a mirror of arXiv rather than a reading of it, so `work/` is gitignored and `manifests/sources.yaml` records the URL, the hash, the size, the hour and the licence that was in force.
+That makes a fetch idempotent and hash checked, in that order.
+A file already on disk whose hash matches is returned without a request, which is what makes re-running an interrupted batch cheap.
+A file whose hash does not match is a finding and never an overwrite, because a source that moved under a paper the corpus has already extracted is exactly the event the manifest exists to catch.
 
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
