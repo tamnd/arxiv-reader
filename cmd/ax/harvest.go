@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"text/tabwriter"
@@ -33,11 +34,13 @@ func corpusRoot() string {
 
 func runHarvest(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: ax harvest <kaggle|hf|oai|status>")
+		return errors.New("usage: ax harvest <kaggle|hf|oai|status|report>")
 	}
 	switch args[0] {
 	case "status":
 		return harvestStatus(args[1:])
+	case "report":
+		return harvestReport(args[1:])
 	case "oai":
 		return harvestOAI(args[1:])
 	case "kaggle":
@@ -501,4 +504,92 @@ func harvestStatus(args []string) error {
 	}
 	fmt.Fprintf(tw, "%d months\t%d\t\n", len(shards), sum)
 	return tw.Flush()
+}
+
+// harvestReport writes reports/harvest.md, which is the corpus's count per
+// month set against arXiv's own.
+//
+// This is the only number in the project that arXiv produced rather than this
+// tool, and that is what makes it worth having. A harvest that stopped early
+// cannot tell from the inside: a month it never read and a month with nothing
+// in it are the same empty file. Comparing against a count from outside is the
+// only way the difference shows up.
+func harvestReport(args []string) error {
+	fs := flag.NewFlagSet("ax harvest report", flag.ContinueOnError)
+	fetch := fs.Bool("fetch", false, "read arXiv's counts live instead of the committed copy")
+	save := fs.String("save", "", "write the counts read with -fetch to this file, for committing")
+	out := fs.String("o", "", "where to write the report, and the default is reports/harvest.md in the corpus")
+	quiet := fs.Bool("q", false, "write the file and print nothing")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if len(fs.Args()) != 0 {
+		return fmt.Errorf("ax harvest report takes no arguments, so drop %s", fs.Args()[0])
+	}
+	if *save != "" && !*fetch {
+		return errors.New("-save writes what -fetch read, so it needs -fetch")
+	}
+
+	published, source, err := publishedCounts(*fetch, *save)
+	if err != nil {
+		return err
+	}
+
+	plane := metadata.Plane{Root: corpusRoot()}
+	shards, err := plane.Shards()
+	if err != nil {
+		return err
+	}
+	held := make(map[string]int, len(shards))
+	for _, shard := range shards {
+		n, err := plane.Count(shard)
+		if err != nil {
+			return err
+		}
+		held[shard] = n
+	}
+
+	coverage := harvest.Compare(held, published)
+	coverage.Generated = time.Now()
+	coverage.Source = source
+
+	path := *out
+	if path == "" {
+		path = filepath.Join(plane.Root, "reports", "harvest.md")
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(path, []byte(coverage.Markdown()), 0o644); err != nil {
+		return err
+	}
+	if !*quiet {
+		fmt.Print(coverage.Text())
+		fmt.Fprintf(os.Stderr, "written to %s\n", path)
+	}
+	return nil
+}
+
+// publishedCounts is arXiv's side of the comparison, and says where it came
+// from so the report can record it.
+func publishedCounts(fetch bool, save string) ([]harvest.Published, string, error) {
+	if !fetch {
+		stats, err := harvest.PublishedStats()
+		return stats, "arXiv's published monthly submissions, from the copy committed with this tool", err
+	}
+	agent := fmt.Sprintf("arxiv-reader/%s (+https://github.com/tamnd/arxiv-reader)", Version)
+	stats, body, err := harvest.FetchStats(context.Background(), nil, agent)
+	if err != nil {
+		return nil, "", err
+	}
+	if save != "" {
+		if err := os.MkdirAll(filepath.Dir(save), 0o755); err != nil {
+			return nil, "", err
+		}
+		if err := os.WriteFile(save, []byte(body), 0o644); err != nil {
+			return nil, "", err
+		}
+		fmt.Fprintf(os.Stderr, "%d months written to %s\n", len(stats), save)
+	}
+	return stats, "arXiv's published monthly submissions, read live from " + harvest.StatsURL, nil
 }

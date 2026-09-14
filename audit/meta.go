@@ -339,18 +339,11 @@ var categoryPattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z-]*(\.[a-zA-Z][a-zA-Z-
 // is the 2000s, and this stops working in 2091, by which time the identifier
 // scheme will have changed twice more.
 func monthOf(shard string) (time.Time, error) {
-	if !metadata.ValidShard(shard) {
-		return time.Time{}, fmt.Errorf("audit: %q is not a month", shard)
+	m, err := metadata.ShardMonth(shard)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("audit: %w", err)
 	}
-	var yy, mm int
-	if _, err := fmt.Sscanf(shard, "%02d%02d", &yy, &mm); err != nil {
-		return time.Time{}, fmt.Errorf("audit: %q is not a month: %w", shard, err)
-	}
-	year := 2000 + yy
-	if yy >= 91 {
-		year = 1900 + yy
-	}
-	return time.Date(year, time.Month(mm), 1, 0, 0, 0, 0, time.UTC), nil
+	return m, nil
 }
 
 func day(t time.Time) string { return t.UTC().Format("2006-01-02") }

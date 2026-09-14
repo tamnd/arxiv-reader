@@ -8,9 +8,22 @@ It is not called `arxiv` because [tamnd/arxiv-cli](https://github.com/tamnd/arxi
 
 ## Status
 
-M0, which is the module, the licence gate and the command set.
+M1, which is the metadata plane: the harvest, the writer, the rules that check it and the report that sets it against arXiv's own numbers.
+M0 before it was the module, the licence gate and the command set.
 Every other command names the milestone it arrives in and exits non-zero rather than pretending to succeed.
 The plan is in the issues, one per milestone.
+
+```
+$ ax harvest hf -rows -limit 5000
+$ ax audit --plane meta
+5000 records over 126 months, nothing found
+$ ax harvest report
+5,000 records of 3,163,381 records announced, 0.2%
+126 months held, 423 months announced
+```
+
+The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
+Whichever it was read from, the record says so, and the audit is what holds that to be true.
 
 ```
 $ ax licence explain cc-by-nc-nd

@@ -69,6 +69,54 @@ func TestShardsAreChronological(t *testing.T) {
 	}
 }
 
+// December is the case worth writing down. The month is counted from zero so
+// that the remainder is the month, and counting it from one instead puts every
+// December in the January of the following year.
+func TestShardMonth(t *testing.T) {
+	for _, tc := range []struct{ shard, want string }{
+		{"9108", "1991-08-01"},
+		{"9112", "1991-12-01"},
+		{"9912", "1999-12-01"},
+		{"0001", "2000-01-01"},
+		{"0704", "2007-04-01"},
+		{"2106", "2021-06-01"},
+		{"2112", "2021-12-01"},
+	} {
+		got, err := ShardMonth(tc.shard)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.shard, err)
+		}
+		if got.Format("2006-01-02") != tc.want {
+			t.Errorf("%s is %s, want %s", tc.shard, got.Format("2006-01-02"), tc.want)
+		}
+	}
+	for _, bad := range []string{"2113", "2100", "210", "21066", "june"} {
+		if _, err := ShardMonth(bad); err == nil {
+			t.Errorf("%q was accepted as a month", bad)
+		}
+	}
+}
+
+// The order the shards sort in and the month they name have to come from the
+// same rule, or the 1990s end up in one place in the file listing and another
+// in the report.
+func TestShardMonthAgreesWithTheShardOrder(t *testing.T) {
+	shards := []string{"9107", "9112", "9912", "0001", "0704", "2106", "2112"}
+	for i := 1; i < len(shards); i++ {
+		before, err := ShardMonth(shards[i-1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		after, err := ShardMonth(shards[i])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !before.Before(after) {
+			t.Errorf("%s is not before %s", shards[i-1], shards[i])
+		}
+	}
+}
+
 func TestShardsOfAnEmptyCorpus(t *testing.T) {
 	shards, err := Plane{Root: t.TempDir()}.Shards()
 	if err != nil {

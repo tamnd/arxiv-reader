@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
 // Plane is the metadata plane on disk, rooted at a corpus directory.
@@ -86,7 +87,22 @@ func shardOrder(shard string) int {
 	if yy >= 91 {
 		year = 1900 + yy
 	}
-	return year*12 + mm
+	// Months counted from zero rather than from one, so that the remainder is
+	// the month and December does not divide into the following year.
+	return year*12 + mm - 1
+}
+
+// ShardMonth is the first day of the month a shard names.
+//
+// The century rule is shardOrder's and lives in one place on purpose, because
+// it is the kind of rule that gets rewritten slightly differently every time it
+// is needed and then disagrees with itself somewhere in the 1990s.
+func ShardMonth(shard string) (time.Time, error) {
+	if !ValidShard(shard) {
+		return time.Time{}, fmt.Errorf("%q is not a YYMM shard", shard)
+	}
+	order := shardOrder(shard)
+	return time.Date(order/12, time.Month(order%12+1), 1, 0, 0, 0, 0, time.UTC), nil
 }
 
 // Scan reads one month and calls fn for each record in file order.
