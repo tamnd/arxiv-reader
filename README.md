@@ -233,6 +233,7 @@ converted 2006.10256v1 in 17.549s with errors, and whether they matter is the re
   headings    24
   blocks      3 figure, 4 listing, 93 paragraph, 1 quote
   unparsed    0
+  labels      3
   faults      none
 ```
 
@@ -300,6 +301,21 @@ Whatever LaTeXML said is kept in a `.log` beside the document, since the line ex
 One case the fault count cannot see is worth naming, because it looks like success.
 LaTeXML stops after a hundred errors and writes what it had, so a paper that lost its packages in the preamble arrives as a title with nothing under it and no faults in it at all.
 Counting faults reads that as a clean paper of no sections, so the status line is checked as well, and a conversion that stopped partway through is refused whatever its fault count says.
+
+The `labels` line is the source path's other reason to exist, and it is what makes a tag survive a revision.
+
+Numbering does not survive one.
+An author who inserts a section renumbers every theorem after it without touching a character of them, so matching last year's Theorem 3 to this year's Theorem 4 by number matches the wrong theorem.
+What does survive is the name the author gave it, because relabelling is manual and renumbering is automatic, so `\label{thm:main}` is still `thm:main` in v7 and it is the first thing `ax tags diff` asks about.
+
+That name is not on the page.
+LaTeXML resolves every `\label` into the number the paper prints while it converts, and the name reaches neither arXiv's rendering nor the HTML this project makes, which was worth checking before building anything on it.
+It is in the XML LaTeXML writes before it paginates, as `labels="LABEL:thm:main"`, and the `xml:id` there is the same string as the `id` on the page.
+So the source path runs LaTeXML's two programs one at a time rather than letting `latexmlc` run both, keeps the XML beside the document, and reads the names back onto the objects by anchor.
+The page that comes out is the same page, since it is the same post processor doing the same work with the same flags.
+
+The label is then written with the object, as `**Theorem 1** {#thm-1 .statement env=theorem label=thm:main}`, and a section that is a whole file carries it in `label:` in the front matter beside its `local_id`.
+A paper read off the render path has none, and that is not a fault: it means the tag matcher works from kind, number and content for that paper instead, which is what the later passes are for.
 
 The front matter records which of the two surfaces the file came from, in `path: render` or `path: source`.
 A rendering is what arXiv made of a submission and a conversion is what this project made of the same submission, and they are not always the same document, so a reader comparing two papers has nothing else to go on.

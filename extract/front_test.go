@@ -108,7 +108,7 @@ func TestEveryFieldIsWritten(t *testing.T) {
 		"paper:", "version:", "title:", "authors:", "submitted:", "announced:",
 		"primary_category:", "categories:", "msc_class:", "acm_class:", "doi:",
 		"journal_ref:", "access:", "licence:", "licence_of_source:", "licence_from:",
-		"section:", "section_title:", "kind:", "lang:", "tag:", "local_id:", "path:",
+		"section:", "section_title:", "kind:", "lang:", "tag:", "local_id:", "label:", "path:",
 		"source_url:", "source_sha256:", "source_pages:", "extraction_model:",
 		"prompt_sha256:", "objects:", "equations:", "figures:", "tables:",
 		"statements:", "code_blocks:", "content_sha256:", "edited:",

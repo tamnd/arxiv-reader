@@ -66,6 +66,13 @@ type Front struct {
 	// the printed number, which is the kind of rule that works until the first
 	// appendix.
 	LocalID string `yaml:"local_id"`
+	// Label is the name the author gave this section in \label, so sec:intro.
+	//
+	// Here for the same reason LocalID is. Every other object carries its label
+	// in the attribute block on the line it starts, and a section that is a
+	// whole file has no such line. It is empty for a paper read off the render
+	// path, where the author's labels are not available at all.
+	Label string `yaml:"label"`
 
 	Path string `yaml:"path"`
 	// SourceURL is where the bytes this was read from came from.

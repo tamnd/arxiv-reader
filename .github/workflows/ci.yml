@@ -660,30 +660,51 @@ jobs:
               licence: cc-by
               licence_from: abs
           YAML
+          # LaTeXML is two programs and this project runs them one at a time, so
+          # the stub is two programs as well. The conversion writes the XML,
+          # which is where the author's labels are, and writes the page the post
+          # processor would have made from it; the post processor checks it was
+          # handed the XML and leaves that page alone.
           cat > /tmp/stub-latexmlc <<SH
           #!/bin/sh
           case "\$1" in --VERSION) echo "a stub converter, and not LaTeXML"; exit 0;; esac
           for a in "\$@"; do case "\$a" in --dest=*) out="\${a#--dest=}";; esac; done
           test -f ms.tex || { echo "the converter was not run inside the submission" >&2; exit 3; }
           echo "Status:conversion:0"
-          cat "$PWD/extract/testdata/rendering.html" > "\$out"
+          printf '<document><section xml:id="S1" labels="LABEL:sec:intro"/><figure xml:id="S1.F1" labels="LABEL:fig:plot"/></document>' > "\$out"
+          cat "$PWD/extract/testdata/rendering.html" > "\${out%.xml}.html"
           SH
           chmod +x /tmp/stub-latexmlc
-          ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -latexmlc /tmp/stub-latexmlc 2501.00001v3 | tee /tmp/source.txt
+          cat > /tmp/stub-latexmlpost <<SH
+          #!/bin/sh
+          for a in "\$@"; do case "\$a" in --dest=*) out="\${a#--dest=}";; --*) ;; *) in="\$a";; esac; done
+          test -f "\$in" || { echo "the post processor was not given the conversion's XML" >&2; exit 3; }
+          test -f "\$out" || { echo "the stub conversion wrote no page" >&2; exit 3; }
+          SH
+          chmod +x /tmp/stub-latexmlpost
+          ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -latexmlc /tmp/stub-latexmlc -latexmlpost /tmp/stub-latexmlpost 2501.00001v3 | tee /tmp/source.txt
           grep -q "A Paper About Nothing" /tmp/source.txt
           grep -q "faults      1, 0 of them inside the body" /tmp/source.txt
+          # The author's own names, read out of the XML and matched back on by
+          # the anchor, which is the same string in both documents.
+          grep -q "labels      2" /tmp/source.txt
           # The submission is unpacked under work/ and the conversion is kept
           # beside it rather than inside it, because LaTeXML copies a paper's
           # pictures next to the document it writes.
           test -f /tmp/source-corpus/work/source/2501/2501.00001v3/sections/one.tex
           test -f /tmp/source-corpus/work/converted/2501/2501.00001v3/paper.html
           test -f /tmp/source-corpus/work/converted/2501/2501.00001v3/paper.html.log
+          # The XML is kept as well, because the labels are in it and in nothing
+          # else, and a paper looked at a second time is read back off disk.
+          test -f /tmp/source-corpus/work/converted/2501/2501.00001v3/paper.xml
       - name: the same submission is not converted twice
         run: |
-          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -latexmlc /tmp/stub-latexmlc 2501.00001v3 2>&1)
+          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -latexmlc /tmp/stub-latexmlc -latexmlpost /tmp/stub-latexmlpost 2501.00001v3 2>&1)
           echo "$out"
           echo "$out" | grep -q "was converted already"
-          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -again -latexmlc /tmp/stub-latexmlc 2501.00001v3 2>&1)
+          # And the labels come back with it, off the XML beside the page.
+          echo "$out" | grep -q "labels      2"
+          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -again -latexmlc /tmp/stub-latexmlc -latexmlpost /tmp/stub-latexmlpost 2501.00001v3 2>&1)
           echo "$out"
           echo "$out" | grep -q "converting 2501.00001v3 from ms.tex"
       # The one field of the front matter that says how the file below it was
@@ -693,8 +714,14 @@ jobs:
       - name: a paper read from the source path says so in its front matter
         run: |
           cp /tmp/extract-corpus/metadata/2501.jsonl /tmp/source-corpus/metadata/2501.jsonl
-          ARXIV_CORPUS=/tmp/source-corpus ax extract source -latexmlc /tmp/stub-latexmlc 2501.00001v3 | grep -q "3 written"
+          ARXIV_CORPUS=/tmp/source-corpus ax extract source -latexmlc /tmp/stub-latexmlc -latexmlpost /tmp/stub-latexmlpost 2501.00001v3 | grep -q "3 written"
           grep -q "^path: source" /tmp/source-corpus/content/en/2501/2501.00001/01_introduction.md
+          # A section that is a whole file has no line in the body for an
+          # attribute block, so its label goes in the front matter with its
+          # identifier. The figure inside it carries its own on the line it
+          # starts.
+          grep -q "^label: sec:intro" /tmp/source-corpus/content/en/2501/2501.00001/01_introduction.md
+          grep -q "label=fig:plot" /tmp/source-corpus/content/en/2501/2501.00001/01_introduction.md
       - name: a submission that is a PDF is a fact about the paper and not a failure
         run: |
           rm -rf /tmp/pdf-corpus && mkdir -p /tmp/pdf-corpus/work/source/2501 /tmp/pdf-corpus/manifests
@@ -713,7 +740,7 @@ jobs:
               licence: cc-by
               licence_from: abs
           YAML
-          out=$(ARXIV_CORPUS=/tmp/pdf-corpus ax extract source -n -latexmlc /tmp/stub-latexmlc 2501.00002v1 2>&1)
+          out=$(ARXIV_CORPUS=/tmp/pdf-corpus ax extract source -n -latexmlc /tmp/stub-latexmlc -latexmlpost /tmp/stub-latexmlpost 2501.00002v1 2>&1)
           echo "$out"
           echo "$out" | grep -q "native path"
           echo "$out" | grep -q "1 of 1 submissions are a PDF"
@@ -729,6 +756,12 @@ jobs:
           echo "$out"
           echo "$out" | grep -q "brew install latexml"
           echo "$out" | grep -q "apt install latexml"
+          # Both programs are asked for, and the one named is the one missing.
+          # A paper converted and then left as XML because the second program is
+          # not there is minutes of work to arrive at a message about the first.
+          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -latexmlc /tmp/stub-latexmlc -latexmlpost latexmlpost-that-is-not-installed 2501.00001v3 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "latexmlpost-that-is-not-installed is not on the PATH"
       # The second pass, and the reason there is one. LaTeXML skips the style
       # files a submission ships unless it is told to read them, and a paper
       # rejected for an undefined macro has usually lost one the author defined
@@ -742,18 +775,19 @@ jobs:
           case "\$1" in --VERSION) echo "a stub converter, and not LaTeXML"; exit 0;; esac
           for a in "\$@"; do case "\$a" in --dest=*) out="\${a#--dest=}";; esac; done
           echo "Warning:missing_file:authormacros Can't find package authormacros" >&2
+          printf '<document/>' > "\$out"
           for a in "\$@"; do
             if [ "\$a" = "--includestyles" ]; then
               echo "Status:conversion:0" >&2
-              cat "$PWD/extract/testdata/rendering.html" > "\$out"
+              cat "$PWD/extract/testdata/rendering.html" > "\${out%.xml}.html"
               exit 0
             fi
           done
           echo "Status:conversion:2" >&2
-          cat "$PWD/extract/testdata/faulty.html" > "\$out"
+          cat "$PWD/extract/testdata/faulty.html" > "\${out%.xml}.html"
           SH
           chmod +x /tmp/stub-styles
-          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -again -latexmlc /tmp/stub-styles 2501.00001v3 2>&1)
+          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -again -latexmlc /tmp/stub-styles -latexmlpost /tmp/stub-latexmlpost 2501.00001v3 2>&1)
           echo "$out"
           # The package it could not read is named once, which is the useful line
           # in a log that then says the same thing about every macro in it.
@@ -775,14 +809,22 @@ jobs:
           case "\$1" in --VERSION) echo "a stub converter, and not LaTeXML"; exit 0;; esac
           for a in "\$@"; do case "\$a" in --dest=*) out="\${a#--dest=}";; esac; done
           echo "Status:conversion:2" >&2
-          cat "$PWD/extract/testdata/faulty.html" > "\$out"
+          printf '<document pass="\$*"/>' > "\$out"
+          cat "$PWD/extract/testdata/faulty.html" > "\${out%.xml}.html"
           SH
           chmod +x /tmp/stub-noworse
-          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -again -latexmlc /tmp/stub-noworse 2501.00001v3 2>&1 || true)
+          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -again -latexmlc /tmp/stub-noworse -latexmlpost /tmp/stub-latexmlpost 2501.00001v3 2>&1 || true)
           echo "$out"
           echo "$out" | grep -q "reading the style files did not help"
           echo "$out" | grep -q "1 of 1 conversions are too broken to use"
           grep -q nothingmacro /tmp/source-corpus/work/converted/2501/2501.00001v3/paper.html
+          # The page of one pass beside the XML of the other would be a set of
+          # labels pointing at anchors that are not there, so both files of the
+          # conversion that was kept are the ones on disk.
+          if grep -q -- "--includestyles" /tmp/source-corpus/work/converted/2501/2501.00001v3/paper.xml; then
+            echo "the page of the first pass was left beside the XML of the second"
+            exit 1
+          fi
       # LaTeXML gives up after a hundred errors and writes what it had, which for
       # a paper that lost its packages in the preamble is a title with nothing
       # under it. That document carries no faults, because the errors happened
@@ -796,17 +838,18 @@ jobs:
           for a in "$@"; do case "$a" in --dest=*) out="${a#--dest=}";; esac; done
           echo "Fatal:too_many_errors:100 Too many errors; aborting" >&2
           echo "Status:conversion:3" >&2
-          printf '<!DOCTYPE html>\n<html><body><article class="ltx_document"><h1 class="ltx_title ltx_title_document">A Paper About Nothing</h1></article></body></html>\n' > "$out"
+          printf '<document/>' > "$out"
+          printf '<!DOCTYPE html>\n<html><body><article class="ltx_document"><h1 class="ltx_title ltx_title_document">A Paper About Nothing</h1></article></body></html>\n' > "${out%.xml}.html"
           SH
           chmod +x /tmp/stub-fatal
-          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -again -latexmlc /tmp/stub-fatal 2501.00001v3 2>&1 || true)
+          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -again -latexmlc /tmp/stub-fatal -latexmlpost /tmp/stub-latexmlpost 2501.00001v3 2>&1 || true)
           echo "$out"
           echo "$out" | grep -q "faults      none"
           echo "$out" | grep -q "LaTeXML stopped partway through"
           echo "$out" | grep -q "1 of 1 conversions are too broken to use"
           # And a document read back off disk rather than converted again keeps
           # that verdict, because the status is read out of the log beside it.
-          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -latexmlc /tmp/stub-fatal 2501.00001v3 2>&1 || true)
+          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -latexmlc /tmp/stub-fatal -latexmlpost /tmp/stub-latexmlpost 2501.00001v3 2>&1 || true)
           echo "$out"
           echo "$out" | grep -q "was converted already"
           echo "$out" | grep -q "LaTeXML stopped partway through"

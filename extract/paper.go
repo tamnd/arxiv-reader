@@ -103,6 +103,11 @@ type Block struct {
 	// Tag is the printed number, so "4" for equation 4 and "1" for figure 1.
 	// Empty for an unnumbered block.
 	Tag string
+	// Label is the name the author gave this in \label, so "thm:main", and it
+	// is empty when the author named nothing or when the paper came off the
+	// render path. It is the one name in a paper that a revision does not
+	// change, which is why ax tags diff asks for it first.
+	Label string
 	// Env is the environment name for a theorem, so theorem, lemma,
 	// definition, remark, proposition or corollary.
 	Env string
@@ -143,6 +148,9 @@ type Section struct {
 	Level int
 	// Tag is the printed number, "3.1", empty for an unnumbered heading.
 	Tag string
+	// Label is the name the author gave this heading in \label, so "sec:intro",
+	// empty when there was none or when the paper came off the render path.
+	Label string
 	// Title is the heading with its number taken off, because the number is
 	// already in Tag and repeating it is how a corpus ends up with headings
 	// like "3.1 3.1 Selection".
