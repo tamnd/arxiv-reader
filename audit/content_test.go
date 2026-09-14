@@ -1,19 +1,24 @@
 package audit
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/tamnd/arxiv-reader/extract"
+	"github.com/tamnd/arxiv-reader/tags"
 )
 
 // paper writes a corpus with one paper in it and hands back the root.
 //
 // Every file goes through extract.Document.Bytes, so the content hash is the
 // one the writer would have written and T03 is testing the rule rather than the
-// fixture.
+// fixture. The paper is tagged on the way out for the same reason: a paper in
+// the corpus has been through ax tags assign, and a fixture that has not is a
+// fixture the G rules would all have something to say about. A test that wants
+// a register with something wrong in it breaks this one afterwards.
 func paper(t *testing.T, docs ...extract.Document) string {
 	t.Helper()
 	root := t.TempDir()
@@ -21,9 +26,28 @@ func paper(t *testing.T, docs ...extract.Document) string {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	var objects []tags.Object
 	for i, d := range docs {
-		d.Front.Paper = "2501.00001"
+		if d.Front.LocalID != "" && d.Front.Kind != "front" {
+			objects = append(objects, tags.Object{File: fileNames[i], Local: d.Front.LocalID, Class: d.Front.Kind})
+		}
+		objects = append(objects, tags.Objects(fileNames[i], d.Body)...)
+	}
+	var plan tags.Plan
+	if len(objects) > 0 {
+		var err error
+		plan, err = tags.Assign(fixture, objects, tags.Register{})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i, d := range docs {
+		d.Front.Paper = fixture
 		d.Front.Lang = "en"
+		if tag, ok := plan.Assigned[d.Front.LocalID]; ok {
+			d.Front.Tag = string(tag)
+		}
+		d.Body, _ = tags.Retag(d.Body, plan.Assigned)
 		b, err := d.Bytes()
 		if err != nil {
 			t.Fatal(err)
@@ -33,8 +57,14 @@ func paper(t *testing.T, docs ...extract.Document) string {
 			t.Fatal(err)
 		}
 	}
+	if _, err := plan.Register.Save(registerPath(root)); err != nil {
+		t.Fatal(err)
+	}
 	return root
 }
+
+// fixture is the paper every test in this package builds.
+const fixture = "2501.00001"
 
 var fileNames = []string{"00_front.md", "01_one.md", "02_two.md", "03_three.md"}
 
@@ -47,7 +77,7 @@ func front() extract.Document {
 
 func section(n int, title, body string) extract.Document {
 	return extract.Document{
-		Front: extract.Front{Section: n, SectionTitle: title, Kind: "section"},
+		Front: extract.Front{Section: n, SectionTitle: title, Kind: "section", LocalID: fmt.Sprintf("s%d", n)},
 		Body:  body,
 	}
 }
@@ -96,11 +126,11 @@ func fires(t *testing.T, root, rule string) Finding {
 	return res.Findings[0]
 }
 
-func TestACleanPaperPassesEveryStructureRule(t *testing.T) {
+func TestACleanPaperPassesEveryRule(t *testing.T) {
 	root := paper(t,
 		front(),
 		section(1, "One", "## A subsection\n\n"+prose(8)+"\n\n### Deeper\n\n"+prose(8)),
-		section(2, "Two", prose(12)),
+		section(2, "Two", theorem+prose(12)),
 	)
 	for id, res := range audited(t, root) {
 		if res.State() != Pass {
