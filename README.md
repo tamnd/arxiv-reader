@@ -8,8 +8,9 @@ It is not called `arxiv` because [tamnd/arxiv-cli](https://github.com/tamnd/arxi
 
 ## Status
 
-M3, which is one paper end to end down the render path, and the seed paper is Mamba.
-M2 before it was the licence census: counting what the corpus is permitted to do with what it holds.
+M4, which is the source path: the papers arXiv never rendered, which is everything announced before December 2023.
+M3 before it was one paper end to end down the render path, and the seed paper is Mamba.
+M2 before that was the licence census: counting what the corpus is permitted to do with what it holds.
 M1 before that was the metadata plane: the harvest, the writer, the rules that check it and the report that sets it against arXiv's own numbers.
 M0 before that was the module, the licence gate and the command set.
 Every other command names the milestone it arrives in and exits non-zero rather than pretending to succeed.
@@ -101,6 +102,35 @@ A rendering is a few hundred kilobytes and a corpus that committed one per paper
 That makes a fetch idempotent and hash checked, in that order.
 A file already on disk whose hash matches is returned without a request, which is what makes re-running an interrupted batch cheap.
 A file whose hash does not match is a finding and never an overwrite, because a source that moved under a paper the corpus has already extracted is exactly the event the manifest exists to catch.
+
+The rendering only exists for papers announced from December 2023 onward and arXiv does not backfill, so most of the archive has no rendering at all and the fallback is the submission itself.
+`ax fetch source` reads that surface through the same gate, the same pace and the same manifest, and what comes back is one gzip stream.
+
+```
+$ ax fetch source 2006.10256v1 1710.05832v1
+fetching 2006.10256v1
+2006.10256v1           fetched  cc-by          1385395  work/source/2006/2006.10256v1.gz
+                       paper.tex of 5 files
+fetching 1710.05832v1
+1710.05832v1           fetched  cc-by          1599186  work/source/1710/1710.05832v1.gz
+  source: this submission is a PDF of 1599186 bytes and not TeX, which arXiv accepts and which leaves no source to read, so the paper is on the native path
+2 fetched, 0 cached, 0 arXiv does not serve, 2 sources in manifests/sources.yaml
+```
+
+Those two are the NumPy paper and the second LIGO detection, and between them they are what a submission turns out to be.
+One is a tar of five files with the document in `paper.tex`, and the other is a PDF the authors produced themselves, which arXiv accepts and which leaves nothing to read as source.
+Nothing announces which of the two arrived, so it is worked out from the bytes, and it is worked out as soon as they land rather than at extraction time, because somebody fetching a hundred papers wants to know which of them have no source before the extraction starts rather than after.
+
+Which file the document starts from is the other question a tarball asks, and it is four passes in the order of how much they are worth believing.
+A `00README` naming a top level file is the first, because the submitter saying so outright is the only answer that is not a guess.
+Then the files that hold both a preamble and a body, which answers most submissions on its own.
+Then the include graph, which removes the chapter files of a paper whose sections each compile alone.
+Then the names people give a main file, which is a convention and is treated as one.
+A submission that gets through all four with two candidates left is usually two papers in one upload, and the answer to that is somebody naming the file rather than this tool picking.
+
+Choosing the sample papers for this path meant reading licences first, and what that reading found is worth writing down.
+Of eight famous machine learning preprints checked in September 2026, being Attention Is All You Need, ResNet, GANs, VAEs, GPT-3, ViT, BERT and DDPM, all eight are under arXiv's own nonexclusive licence, so this corpus may hold their metadata, their structure and their tags and none of their text.
+The famous papers that are CC-BY are elsewhere, and the NumPy paper and the two LIGO detections are three of them.
 
 Once a rendering is on disk, `ax extract` reads it.
 

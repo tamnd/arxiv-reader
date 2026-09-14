@@ -64,10 +64,12 @@ func TestThePaceIsTheSameAsTheLicenceResolverPace(t *testing.T) {
 }
 
 func TestParseRoute(t *testing.T) {
-	if got, err := ParseRoute("render"); err != nil || got != RouteRender {
-		t.Fatalf("got %q, %v", got, err)
+	for _, want := range []Route{RouteRender, RouteSource} {
+		if got, err := ParseRoute(string(want)); err != nil || got != want {
+			t.Fatalf("got %q, %v", got, err)
+		}
 	}
-	for _, s := range []string{"source", "native", "vision", ""} {
+	for _, s := range []string{"native", "vision", ""} {
 		if _, err := ParseRoute(s); err == nil {
 			t.Fatalf("%q parsed as a route that can be fetched", s)
 		}
