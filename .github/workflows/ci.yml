@@ -1249,6 +1249,9 @@ jobs:
           fi
           ARXIV_CORPUS=/tmp/extract-corpus ax tags assign 2501.00001 2>&1 | grep -q "14 tags on 2501.00001, 14 new and 0 kept"
           reg=/tmp/extract-corpus/tags/2501/2501.00001.tags
+          # Which version the identifiers belong to, which is what tells the next
+          # assignment that the paper moved under it.
+          grep -q "^# version: v3$" $reg
           grep -q "^VIS1,s1$" $reg
           grep -q "^VNYA,thm-1$" $reg
           test "$(grep -vc '^#' $reg)" = 14
@@ -1312,9 +1315,93 @@ jobs:
             echo "a refused run wrote a register into the corpus"
             exit 1
           fi
+      # The failure the four passes of 03-tags.md section 6 exist for, run end to
+      # end. The paper gains a theorem in the middle, so the theorem that was
+      # Theorem 1 is now Theorem 2 and a theorem the author has just written has
+      # the identifier the old one had. Assigning straight onto that would hand a
+      # name that has already been published to the wrong theorem.
+      - name: a version that renumbered a theorem is carried over rather than reassigned
+        run: |
+          rm -rf /tmp/diff-corpus && cp -r /tmp/extract-corpus /tmp/diff-corpus
+          # The v4 fixture is the v3 one with a new Theorem 1 in front of the old
+          # one, which is therefore Theorem 2 in it.
+          cat > /tmp/inserted.html <<'HTML'
+          <div id="Thmtheorem0" class="ltx_theorem ltx_theorem_theorem">
+          <h6 class="ltx_title ltx_title_theorem"><span class="ltx_tag ltx_tag_theorem">Theorem 1</span> (Something).</h6>
+          <div id="Thmtheorem0.p1" class="ltx_para">
+          <p id="Thmtheorem0.p1.1" class="ltx_p">Something is something, which is a different claim altogether.</p>
+          </div>
+          </div>
+          HTML
+          sed -e 's/2501\.00001v3/2501.00001v4/g' -e 's/Thmtheorem1/Thmtheorem2/g' -e 's#ltx_tag_theorem">Theorem 1<#ltx_tag_theorem">Theorem 2<#' extract/testdata/rendering.html > /tmp/v4.html
+          awk '/id="Thmtheorem2"/ && !seen { while ((getline line < "/tmp/inserted.html") > 0) print line; seen=1 } { print }' /tmp/v4.html > /tmp/diff-corpus/work/html/2501/2501.00001v4.html
+          sum=$(sha256sum /tmp/diff-corpus/work/html/2501/2501.00001v4.html | cut -d' ' -f1)
+          cat >> /tmp/diff-corpus/manifests/sources.yaml <<YAML
+            - id: "2501.00001"
+              version: 4
+              route: render
+              url: https://arxiv.org/html/2501.00001v4
+              path: work/html/2501/2501.00001v4.html
+              sha256: $sum
+              bytes: 1
+              fetched: 2026-09-15T00:00:00Z
+              licence: cc-by
+              licence_from: abs
+          YAML
+          printf '%s\n' '{"id":"2501.00001","title":"A Paper About Nothing","abstract":"We say nothing.","authors":[{"surname":"First","forename":"Ada"},{"surname":"Second","forename":"Bo"}],"categories":["cs.LG"],"versions":[{"version":3,"created":"2025-02-02T00:00:00Z","licence":"cc-by","licence_from":"abs"},{"version":4,"created":"2025-03-03T00:00:00Z","licence":"cc-by","licence_from":"abs"}],"source":"oai","harvested":"2026-09-15"}' > /tmp/diff-corpus/metadata/2501.jsonl
+          ARXIV_CORPUS=/tmp/diff-corpus ax extract render 2501.00001v4 | grep -q "3 written"
+          # The register was assigned against v3 and the content plane is at v4,
+          # so this is the one thing assignment must not do on its own.
+          if ARXIV_CORPUS=/tmp/diff-corpus ax tags assign 2501.00001; then
+            echo "a register assigned against v3 was reassigned onto v4 without being carried over"
+            exit 1
+          fi
+          ARXIV_CORPUS=/tmp/diff-corpus ax tags assign 2501.00001 2>&1 | grep -q "carry the register over first with ax tags diff"
+      # Reading the decision before it is written down, which is the whole reason
+      # this prints anything at all.
+      - name: the four passes say where every object went
+        run: |
+          ARXIV_CORPUS=/tmp/diff-corpus ax tags diff 2501.00001 -from v3 -to v4 | tee /tmp/diff.txt
+          grep -q "v3 to v4, 14 objects to 15" /tmp/diff.txt
+          grep -qE "number +13" /tmp/diff.txt
+          grep -qE "content +1" /tmp/diff.txt
+          grep -qE "new +1" /tmp/diff.txt
+          grep -qE "gone +0" /tmp/diff.txt
+          # The theorem that was renumbered is matched on its prose, because its
+          # number now belongs to a different theorem. The new one is matched to
+          # nothing, which is the right answer and the point of the exercise.
+          grep -qE "content +thm-1 becomes thm-2" /tmp/diff.txt
+          grep -qE "new +thm-1 is in v4 and nothing in v3 is it" /tmp/diff.txt
+          # A run without -w decides nothing.
+          grep -q "^# version: v3$" /tmp/diff-corpus/tags/2501/2501.00001.tags
+      - name: carrying the register moves every tag onto its new number
+        run: |
+          reg=/tmp/diff-corpus/tags/2501/2501.00001.tags
+          grep -q "^VNYA,thm-1$" $reg
+          ARXIV_CORPUS=/tmp/diff-corpus ax tags diff 2501.00001 -from v3 -to v4 -w 2>&1 | tee /tmp/carry.txt
+          grep -q "1 tag carried and 0 tags tombstoned on 2501.00001, 13 unmoved" /tmp/carry.txt
+          grep -q "^# version: v4$" $reg
+          grep -q "^VNYA,thm-2$" $reg
+          # And now the ordinary case. The new theorem is the only new object, and
+          # the tag the old one has had since v3 is still on the old one.
+          ARXIV_CORPUS=/tmp/diff-corpus ax tags assign 2501.00001 2>&1 | grep -q "15 tags on 2501.00001, 1 new and 14 kept"
+          test "$(grep -vc '^#' $reg)" = 15
+          dir=/tmp/diff-corpus/content/en/2501/2501.00001
+          grep -q "{#thm-2 .statement tag=VNYA" $dir/02_results.md
+          if grep -q "{#thm-1 .statement tag=VNYA" $dir/02_results.md; then
+            echo "the tag of the old theorem was handed to the one that took its number"
+            exit 1
+          fi
+          # The register belongs to v4 now, so carrying it from v3 again would
+          # point every tag in it at whatever has that identifier this time.
+          if ARXIV_CORPUS=/tmp/diff-corpus ax tags diff 2501.00001 -from v3 -to v4 -w; then
+            echo "a register was carried from a version it was not assigned against"
+            exit 1
+          fi
+          ARXIV_CORPUS=/tmp/diff-corpus ax tags diff 2501.00001 -from v3 -to v4 -w 2>&1 | grep -q "assigned against v4"
       - name: tags refuses the arguments it should refuse
         run: |
-          for c in "tags" "tags assign" "tags verify" "tags assign not-an-arxiv-id" "tags assign 2502.00002"; do
+          for c in "tags" "tags assign" "tags verify" "tags assign not-an-arxiv-id" "tags assign 2502.00002" "tags diff" "tags diff 2501.00001" "tags diff 2501.00001 -from v4 -to v3" "tags diff 2501.00001 -from v3 -to v9" "tags diff not-an-arxiv-id -from v1 -to v2" "tags diff 2501.00001 2501.00002 -from v3 -to v4"; do
             if ARXIV_CORPUS=/tmp/extract-corpus ax $c; then
               echo "ax $c was allowed"
               exit 1

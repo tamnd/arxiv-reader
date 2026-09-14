@@ -30,9 +30,64 @@ func TestEveryAttributeBlockIsFoundInReadingOrder(t *testing.T) {
 		t.Fatalf("found %+v", got)
 	}
 	for i := range want {
-		if got[i] != want[i] {
+		if got[i].File != want[i].File || got[i].Local != want[i].Local || got[i].Class != want[i].Class {
 			t.Errorf("the %dth object came out %+v and not %+v", i, got[i], want[i])
 		}
+	}
+}
+
+// The text of an object is the stretch of the file between its own anchor and
+// the next one, which is what pass three hashes and pass four aligns.
+func TestAnObjectCarriesTheTextUnderIt(t *testing.T) {
+	got := Objects("01_introduction.md", sample)
+	if want := `*Suppose that $A\subset\mathbf{F}_{2}^{n}$.*`; got[1].Text != want {
+		t.Errorf("the theorem's text came out %q and not %q", got[1].Text, want)
+	}
+	// The equation's anchor is on its own line and the figure's is on the line
+	// after the next blank one, so there is nothing of the equation's own in
+	// between.
+	if got[2].Text != "" {
+		t.Errorf("the equation picked up %q, which belongs to nothing", got[2].Text)
+	}
+	// The last object runs to the end of the file rather than to the next
+	// anchor, because there is not one.
+	if want := "See [Theorem 1.2](#thm-1-2) for the statement."; got[3].Text != want {
+		t.Errorf("the last object's text came out %q and not %q", got[3].Text, want)
+	}
+}
+
+// The label is the pair pass one matches on, so it is read off the block along
+// with the anchor and the class.
+func TestTheLabelIsReadOffTheBlock(t *testing.T) {
+	body := "**Theorem 1** {#thm-1 .statement label=thm:main env=theorem}\n"
+	got := Objects("a.md", body)
+	if len(got) != 1 || got[0].Label != "thm:main" {
+		t.Fatalf("read %+v", got)
+	}
+}
+
+func TestABlockWithNoLabelHasNone(t *testing.T) {
+	got := Objects("a.md", "**Theorem 1** {#thm-1 .statement env=theorem}\n")
+	if len(got) != 1 || got[0].Label != "" {
+		t.Fatalf("read %+v", got)
+	}
+}
+
+// A top level section has no attribute block of its own, so this is the only
+// text it has.
+func TestLeadIsWhatComesBeforeTheFirstAnchor(t *testing.T) {
+	if got := Lead(sample); got != "" {
+		t.Errorf("the sample starts with an anchor and its lead came out %q", got)
+	}
+	body := "Some prose first.\n\n**Theorem 1** {#thm-1 .statement}\nThe statement.\n"
+	if want := "Some prose first."; Lead(body) != want {
+		t.Errorf("the lead came out %q and not %q", Lead(body), want)
+	}
+}
+
+func TestLeadOfAFileWithNoAnchorsIsTheWholeOfIt(t *testing.T) {
+	if want := "Nothing here is an object."; Lead("Nothing here is an object.\n") != want {
+		t.Errorf("the lead came out %q", Lead("Nothing here is an object.\n"))
 	}
 }
 

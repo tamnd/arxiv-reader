@@ -25,13 +25,15 @@ import (
 // again next year by a better tool.
 func runTags(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: ax tags assign <id> [...]")
+		return errors.New("usage: ax tags assign <id> [...] or ax tags diff <id> -from v2 -to v3")
 	}
 	switch args[0] {
 	case "assign":
 		return tagsAssign(args[1:])
+	case "diff":
+		return tagsDiff(args[1:])
 	default:
-		return fmt.Errorf("unknown tags subcommand %q, the subcommand is assign", args[0])
+		return fmt.Errorf("unknown tags subcommand %q, the subcommands are assign and diff", args[0])
 	}
 }
 
@@ -101,9 +103,22 @@ func tagsAssign(args []string) error {
 		if err != nil {
 			return err
 		}
+		// A register that belongs to an older version of the paper cannot be
+		// assigned from, and this is the one failure here that is silent
+		// otherwise. A paper gains a table in the middle, every table after it is
+		// renumbered, and every identifier in the register still names something,
+		// so matching on the identifier keeps every tag, finds nothing missing
+		// and has just moved every table's permanent name onto the table after
+		// it. Carrying the register over first is what ax tags diff is for.
+		if old.Version != 0 && version > old.Version {
+			return fmt.Errorf("%s is at v%d in the content plane and its register was assigned against v%d, so carry the register over first with ax tags diff %s -from v%d -to v%d -w", id.Canonical, version, old.Version, id.Canonical, old.Version, version)
+		}
 		plan, err := tags.Assign(id.Canonical, objects, old)
 		if err != nil {
 			return err
+		}
+		if version > 0 {
+			plan.Register.Version = version
 		}
 		if *dry {
 			reportAssign(id, plan)

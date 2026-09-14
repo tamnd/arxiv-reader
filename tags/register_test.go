@@ -106,6 +106,37 @@ func TestTheRegisterSaysWhatWroteItAndWhatItIsFor(t *testing.T) {
 	}
 }
 
+// Which version the identifiers belong to is what tells an assignment that the
+// paper moved under it, so it has to survive the file.
+func TestTheVersionSurvivesBeingWrittenAndReadBack(t *testing.T) {
+	b := Register{Version: 3, Entries: []Entry{{Tag: "03QK", Local: "s4-1"}}}.Bytes()
+	if !strings.Contains(string(b), "\n# version: v3\n") {
+		t.Fatalf("the register came out as\n%s", b)
+	}
+	got, err := ParseRegister(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Version != 3 || len(got.Entries) != 1 {
+		t.Fatalf("it read back as %+v", got)
+	}
+}
+
+// Every register written before this was recorded has no such line, and it reads
+// as not knowing rather than as version zero of anything.
+func TestARegisterWithNoVersionLineComesBackAsZero(t *testing.T) {
+	got, err := ParseRegister([]byte("03QK,s4-1\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Version != 0 {
+		t.Fatalf("the version came out %d", got.Version)
+	}
+	if strings.Contains(string(got.Bytes()), "# version:") {
+		t.Fatal("a register that does not know its version wrote a line saying which it is")
+	}
+}
+
 func TestRunsSurviveBeingWrittenAndReadBack(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "2311.05762.runs")
 	want := []Run{{First: "03QK", Last: "0A3F"}, {First: "1B77", Last: "2X40"}}

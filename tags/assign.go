@@ -40,18 +40,20 @@ type Plan struct {
 //
 // The other three passes, the author's own label, the normalised content hash
 // and the sequence alignment, are what catch a paper whose objects moved between
-// versions. They arrive with ax tags diff in M4, together with the tombstones
-// they need. Until then an object that disappeared stops this run rather than
-// being guessed at, because guessing is exactly the failure this whole mechanism
-// exists to prevent: a reference that breaks is visible and a reference silently
-// pointed at the wrong theorem is not.
+// versions, and they are Match rather than this. A revision is handled by
+// carrying the register from the old version onto the new one first, which is ax
+// tags diff -w, and then running this, which then finds the identifiers lined up
+// again. An object that disappeared stops this run rather than being guessed at,
+// because guessing is exactly the failure this whole mechanism exists to
+// prevent: a reference that breaks is visible and a reference silently pointed at
+// the wrong theorem is not.
 func Assign(paper string, objects []Object, old Register) (Plan, error) {
 	if len(objects) == 0 {
 		return Plan{}, ErrNoObjects
 	}
 	byLocal := old.ByLocal()
 	seen := map[string]bool{}
-	p := Plan{Register: Register{Entries: old.Entries}, Assigned: map[string]Tag{}}
+	p := Plan{Register: Register{Entries: old.Entries, Version: old.Version}, Assigned: map[string]Tag{}}
 	space := NewSpace(paper, old.Taken())
 	for _, o := range objects {
 		if seen[o.Local] {
@@ -90,5 +92,5 @@ func (p Plan) Err() error {
 	if len(p.Missing) == 0 {
 		return nil
 	}
-	return fmt.Errorf("tags: the register names %s the paper no longer has, starting with %s, and matching them to what replaced them is ax tags diff in M4", prose.Count(len(p.Missing), "object"), p.Missing[0])
+	return fmt.Errorf("tags: the register names %s the paper no longer has, starting with %s, and matching them to what replaced them is ax tags diff <id> -from v2 -to v3 -w", prose.Count(len(p.Missing), "object"), p.Missing[0])
 }
