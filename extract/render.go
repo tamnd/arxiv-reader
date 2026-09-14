@@ -219,8 +219,8 @@ func theorem(n *html.Node) Block {
 		}
 	}
 	if title := firstClass(n, "ltx_title"); title != nil {
-		b.Title = inline(title)
 		b.Tag = tagOf(firstClass(title, "ltx_tag"))
+		b.Title = runin(title)
 	}
 	b.Blocks = blocks(n)
 	return b
@@ -233,6 +233,29 @@ func proof(n *html.Node) Block {
 	}
 	b.Blocks = blocks(n)
 	return b
+}
+
+// runin is the author's own title for a theorem, which is what they put in the
+// square brackets and nothing else.
+//
+// LaTeXML writes the heading as the number in one span and the full stop after
+// it in another, both bold, so reading the whole heading gives back "Theorem 1"
+// and a stray piece of punctuation that has already been accounted for. The tag
+// span is skipped because the number is read separately, and what is left is
+// trimmed, because a title of "." is not a title.
+func runin(title *html.Node) string {
+	var b strings.Builder
+	for c := title.FirstChild; c != nil; c = c.NextSibling {
+		if hasClass(c, "ltx_tag") {
+			continue
+		}
+		writeInline(&b, c)
+	}
+	s := strings.TrimSpace(tidy(b.String()))
+	if strings.Trim(s, "*.,:;()[] ") == "" {
+		return ""
+	}
+	return s
 }
 
 // equation reads one display equation, or a group of them where the author
@@ -275,8 +298,16 @@ func eqnText(n *html.Node) string {
 			continue
 		}
 		for _, m := range allTag(cell, "math") {
-			if tex := strings.TrimSpace(attr(m, "alttext")); tex != "" {
-				parts = append(parts, strings.Join(strings.Fields(tex), " "))
+			tex := strings.Join(strings.Fields(attr(m, "alttext")), " ")
+			// LaTeXML puts a \displaystyle in front of every cell of an align,
+			// because each cell is its own piece of inline mathematics on the
+			// page and has to be told to typeset large. The author did not
+			// write it, the cells are joined back into one display here, and
+			// leaving it in gives "\displaystyle x \displaystyle= y" in the
+			// middle of a $$ block that is already display mathematics.
+			tex = strings.TrimSpace(strings.TrimPrefix(tex, `\displaystyle`))
+			if tex != "" {
+				parts = append(parts, tex)
 			}
 		}
 	}
@@ -449,24 +480,48 @@ func listing(n *html.Node) Block {
 		b.Tag = tagOf(firstClass(c, "ltx_tag"))
 		b.Caption = caption(c)
 	}
+	// A listing with no mathematics in it is code, and code is written
+	// verbatim. One with mathematics is pseudocode, which is an algorithm
+	// written with the algorithmic package and is mathematics with keywords
+	// around it. The two cannot be emitted the same way: code goes in a fence
+	// where a backslash is a backslash, and pseudocode has to keep its dollar
+	// signs live or the algorithm prints as the LaTeX somebody typed.
+	b.Verbatim = len(allTag(n, "math")) == 0
 	lines := allClass(n, "ltx_listingline")
 	if len(lines) == 0 {
-		b.Text = strings.TrimRight(text(n), "\n")
+		b.Text = strings.TrimRight(verbatim(n), "\n")
 		return b
 	}
 	// A listing keeps its line breaks, which is the one place in this package
 	// where a newline in the middle of something is correct. Code is not prose.
-	//
-	// Each line still goes through inline, because an algorithm written with
-	// the algorithmic package is mathematics with keywords around it, and
-	// taking the flat text would give both the MathML glyphs and the LaTeX
-	// beside them.
 	var out []string
 	for _, l := range lines {
+		if b.Verbatim {
+			out = append(out, strings.TrimRight(verbatim(l), "\n"))
+			continue
+		}
 		out = append(out, inline(l))
 	}
 	b.Text = strings.TrimRight(strings.Join(out, "\n"), "\n")
 	return b
+}
+
+// verbatim is the text of a listing line with its indentation intact.
+//
+// Not tidy, which collapses every run of whitespace, because the indentation of
+// a line of code is part of the code. LaTeXML indents with non-breaking spaces,
+// so those become ordinary spaces and the zero width characters go, and
+// everything else is left exactly as it was written.
+func verbatim(n *html.Node) string {
+	return strings.Map(func(r rune) rune {
+		switch r {
+		case '\u00a0', '\u2007', '\u202f', '\u2009':
+			return ' '
+		case '\u200b', '\u200c', '\u200d', '\u2060', '\ufeff':
+			return -1
+		}
+		return r
+	}, text(n))
 }
 
 func list(n *html.Node) Block {

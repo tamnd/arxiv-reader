@@ -44,7 +44,7 @@ var commands = []command{
 	{"figures", "crop, convert and size cap the figures", "M3", nil},
 	{"tables", "keep every table twice, as Markdown and as LaTeX", "M3", nil},
 	{"refs", "parse a bibliography and resolve it into the corpus", "M3", nil},
-	{"split", "one file per top level section, with front matter", "M3", nil},
+	{"split", "one file per top level section, with front matter", "M3", runSplit},
 	{"tags", "assign, diff and verify the permanent identifiers", "M3", nil},
 	{"objects", "the sixteen object kinds, results and artefacts", "M6", nil},
 	{"graph", "build, query and verify the connected web", "M6", nil},

@@ -110,6 +110,11 @@ type Block struct {
 	Items []string
 	// Ordered is true for an enumerate and false for an itemize.
 	Ordered bool
+	// Verbatim is true for a listing that holds no mathematics, which is code
+	// rather than pseudocode. The two are emitted differently: code goes in a
+	// fence where a backslash is a backslash, and pseudocode keeps its dollar
+	// signs live or an algorithm prints as the LaTeX somebody typed.
+	Verbatim bool
 	// Blocks are the blocks nested inside this one, which is what a figure
 	// panel, a theorem body and a row of an align are.
 	Blocks []Block

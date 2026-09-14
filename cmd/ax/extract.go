@@ -14,6 +14,8 @@ import (
 	"github.com/tamnd/arxiv-reader/corpus"
 	"github.com/tamnd/arxiv-reader/extract"
 	"github.com/tamnd/arxiv-reader/fetch"
+	"github.com/tamnd/arxiv-reader/internal/prose"
+	"github.com/tamnd/arxiv-reader/metadata"
 )
 
 func runExtract(args []string) error {
@@ -28,29 +30,32 @@ func runExtract(args []string) error {
 	}
 }
 
-// extractRender reads a cached rendering and says what is in it.
+// extractRender reads a cached rendering and writes the paper into the content
+// plane.
 //
-// Reading only, for now. The writer is the next change, and the two are
-// separate because the reject rule sits between them: a rendering LaTeXML could
-// not finish is thrown away and the paper falls through to the source path, and
-// a writer that had already put half a paper into the content plane would have
-// to take it out again.
+// Reading and writing are one command and two steps, with the reject rule
+// between them. A rendering LaTeXML could not finish is thrown away and the
+// paper falls through to the source path, and nothing of it is written, because
+// a half written paper in the content plane is worse than no paper at all.
+//
+// -n does the reading and stops, which is how a paper is looked at before it is
+// committed to anything.
 func extractRender(args []string) error {
 	fs := flag.NewFlagSet("ax extract render", flag.ContinueOnError)
 	dry := fs.Bool("n", false, "report what the rendering holds and write nothing")
 	outline := fs.Bool("outline", false, "print every heading and block, and not just the counts")
+	force := fs.Bool("force", false, "overwrite a file somebody has corrected by hand")
+	lang := fs.String("lang", "en", "the language directory to write into")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	refs := fs.Args()
 	if len(refs) == 0 {
-		return errors.New("usage: ax extract render -n <id>v<n> [...]")
-	}
-	if !*dry {
-		return errors.New("ax extract render writes nothing yet: the reader is here and the writer is the next change, so pass -n to see what a rendering holds")
+		return errors.New("usage: ax extract render [-n] <id>v<n> [...]")
 	}
 
 	root := corpusRoot()
+	plane := metadata.Plane{Root: root}
 	manifest, err := fetch.Load(corpus.SourcesPath(root))
 	if err != nil {
 		return err
@@ -58,7 +63,11 @@ func extractRender(args []string) error {
 
 	rejected := 0
 	for _, ref := range refs {
-		p, err := readRendering(root, manifest, ref)
+		id, err := axid.Parse(ref)
+		if err != nil {
+			return err
+		}
+		p, entry, err := readRendering(root, manifest, id, ref)
 		if err != nil {
 			return err
 		}
@@ -69,10 +78,153 @@ func extractRender(args []string) error {
 			for _, f := range r.Faults {
 				fmt.Fprintf(os.Stderr, "  at %s: %s\n", f.Where, f.Text)
 			}
+			continue
+		}
+		if *dry {
+			continue
+		}
+		if err := writePaper(plane, id, p, entry, *lang, *force); err != nil {
+			return err
 		}
 	}
 	if rejected > 0 {
 		return fmt.Errorf("%d of %d renderings are too broken to use, and those papers are on the source path", rejected, len(refs))
+	}
+	return nil
+}
+
+// writePaper runs the gate, builds the front matter and puts the files down.
+func writePaper(plane metadata.Plane, id axid.ID, p *extract.Paper, entry fetch.Source, lang string, force bool) error {
+	rec, err := record(plane, id)
+	if err != nil {
+		return err
+	}
+	front, err := frontMatter(rec, id, p, entry, lang)
+	if err != nil {
+		return err
+	}
+	files, err := extract.Files(p, front)
+	if err != nil {
+		return err
+	}
+	dir := corpus.ContentDir(plane.Root, lang, id)
+	results, err := extract.Write(dir, files, force)
+	if err != nil {
+		return err
+	}
+	return reportWrite(dir, results)
+}
+
+// frontMatter fills in everything a content file says about itself that is not
+// in the file.
+//
+// The gate runs here and not only in ax fetch. Fetching and extracting are
+// separate runs and the licence can be re-resolved between them, so a paper
+// whose v1 licence was corrected after its rendering was downloaded has to be
+// refused at the point something is about to be published rather than at the
+// point something was downloaded.
+func frontMatter(rec metadata.Record, id axid.ID, p *extract.Paper, entry fetch.Source, lang string) (extract.Front, error) {
+	if err := fetch.Gate(rec, id.Version); err != nil {
+		return extract.Front{}, err
+	}
+	v, _ := rec.VersionAt(id.Version)
+	// The manifest says which licence was in force when the bytes were
+	// downloaded. A disagreement means the licence was re-resolved since, and
+	// the bytes on disk are of a version whose terms nobody has checked against
+	// the ones being published under now.
+	if entry.Licence != v.Licence {
+		return extract.Front{}, fmt.Errorf("%s was fetched under %s and the plane now says %s, so run ax fetch render %s again before publishing it", entry.Ref(), entry.Licence, v.Licence, entry.Ref())
+	}
+	// The rendering states a licence of its own, in the info box at the top of
+	// the page. It is arXiv saying what one version is under, which is the same
+	// kind of statement the abs page makes, so a disagreement is one of the two
+	// being stale and neither is safe to publish on.
+	if label, ok := corpus.LicenceFromLabel(p.Licence); ok && label != v.Licence {
+		return extract.Front{}, fmt.Errorf("%s is recorded as %s and its rendering says %q, which is %s, so one of the two is of a different version", entry.Ref(), v.Licence, p.Licence, label)
+	} else if !ok && p.Licence != "" {
+		fmt.Fprintf(os.Stderr, "%s: the rendering labels its licence %q, which this does not recognise, so the crosscheck was skipped\n", entry.Ref(), p.Licence)
+	}
+	out, err := corpus.PublishedLicence(v.Licence)
+	if err != nil {
+		return extract.Front{}, err
+	}
+
+	f := extract.Front{
+		Paper:           rec.ID,
+		Version:         fmt.Sprintf("v%d", id.Version),
+		Title:           rec.Title,
+		Submitted:       v.Created.UTC().Format("2006-01-02"),
+		Announced:       announced(rec, v),
+		PrimaryCategory: rec.Primary(),
+		Categories:      rec.Categories,
+		MSCClass:        rec.MSCClass,
+		ACMClass:        rec.ACMClass,
+		DOI:             rec.DOI,
+		JournalRef:      rec.JournalRef,
+		Access:          string(corpus.AccessFor(v.Licence)),
+		Licence:         out.SPDX(),
+		LicenceOfSource: string(v.Licence),
+		LicenceFrom:     string(v.LicenceFrom),
+		Lang:            lang,
+		Path:            string(fetch.RouteRender),
+		SourceURL:       entry.URL,
+		SourceSHA256:    entry.SHA256,
+	}
+	// The metadata plane's author list and not the rendering's. The rendering
+	// is a byline laid out for a page, with thanks notes and affiliations in
+	// it, and arXiv holds the list of people.
+	for _, a := range rec.Authors {
+		f.Authors = append(f.Authors, a.String())
+	}
+	// Unless the plane has none. The arXivRaw format OAI-PMH serves the versions
+	// and the licence in does not carry a parsed author list, so a record that
+	// has only been through that pass knows nothing about who wrote the paper.
+	// A byline read off the rendering is worse than the plane's list and much
+	// better than an empty one, and the note says which of the two this is.
+	if len(f.Authors) == 0 && len(p.Authors) > 0 {
+		for _, a := range p.Authors {
+			f.Authors = append(f.Authors, a.Name)
+		}
+		fmt.Fprintf(os.Stderr, "%s: the metadata plane has no authors for %s, so the byline was read off the rendering, and an authors pass with ax harvest oai -format arXiv will replace it\n", entry.Ref(), rec.ID)
+	}
+	if f.Categories == nil {
+		f.Categories = []string{}
+	}
+	if f.Authors == nil {
+		f.Authors = []string{}
+	}
+	return f, nil
+}
+
+// announced is the month the paper first appeared, which is the month its v1
+// went out and not the month this version did.
+//
+// It is what the shard is named after, so taking it from the version in hand
+// would put announced: 2024-05 on a file that lives under 2312, and the first
+// person to sort by it would get a paper list that disagrees with the
+// directories it came out of.
+func announced(rec metadata.Record, v metadata.Version) string {
+	if len(rec.Versions) > 0 && !rec.Versions[0].Created.IsZero() {
+		return rec.Versions[0].Created.UTC().Format("2006-01")
+	}
+	return v.Created.UTC().Format("2006-01")
+}
+
+func reportWrite(dir string, results []extract.Result) error {
+	counts := map[extract.State]int{}
+	for _, r := range results {
+		counts[r.State]++
+		if r.State == extract.StateProtected {
+			fmt.Fprintf(os.Stderr, "%s was left alone because %s\n", filepath.Join(dir, r.Name), r.Why)
+			continue
+		}
+		fmt.Printf("  %-8s %s\n", r.State, r.Name)
+	}
+	fmt.Printf("%d files in %s: %d written, %d unchanged, %d removed, %d left alone\n",
+		len(results), dir, counts[extract.StateWritten], counts[extract.StateUnchanged],
+		counts[extract.StateRemoved], counts[extract.StateProtected])
+	if counts[extract.StateProtected] > 0 {
+		return fmt.Errorf("%s been corrected by hand, so run ax split -accept to keep the correction or ax extract render -force to throw it away", prose.Count(counts[extract.StateProtected], "file has"))
 	}
 	return nil
 }
@@ -83,25 +235,21 @@ func extractRender(args []string) error {
 // recorded is a rendering nobody knows the licence of, and reading one off the
 // disk because it happens to be there is how a corpus ends up publishing
 // something it was never given.
-func readRendering(root string, m fetch.Manifest, ref string) (*extract.Paper, error) {
-	id, err := axid.Parse(ref)
-	if err != nil {
-		return nil, err
-	}
+func readRendering(root string, m fetch.Manifest, id axid.ID, ref string) (*extract.Paper, fetch.Source, error) {
 	if id.Version < 1 {
-		return nil, fmt.Errorf("%s names no version, and a rendering is of one version", ref)
+		return nil, fetch.Source{}, fmt.Errorf("%s names no version, and a rendering is of one version", ref)
 	}
 	entry, ok := m.Find(id.Canonical, id.Version, fetch.RouteRender)
 	if !ok {
-		return nil, fmt.Errorf("the manifest has no rendering of %sv%d, so run ax fetch render %sv%d first", id.Canonical, id.Version, id.Canonical, id.Version)
+		return nil, entry, fmt.Errorf("the manifest has no rendering of %sv%d, so run ax fetch render %sv%d first", id.Canonical, id.Version, id.Canonical, id.Version)
 	}
 	body, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(entry.Path)))
 	if err != nil {
-		return nil, fmt.Errorf("%s is in the manifest but not on disk, so run ax fetch render %s again: %w", entry.Ref(), entry.Ref(), err)
+		return nil, entry, fmt.Errorf("%s is in the manifest but not on disk, so run ax fetch render %s again: %w", entry.Ref(), entry.Ref(), err)
 	}
 	p, err := extract.Parse(body, id.Canonical, id.Version)
 	if err != nil {
-		return nil, err
+		return nil, entry, err
 	}
 	// arXiv serves /html/<id>v<n> and a request for a version it has no
 	// rendering of can land on a different one. Extracting v4 into a corpus
@@ -109,9 +257,9 @@ func readRendering(root string, m fetch.Manifest, ref string) (*extract.Paper, e
 	// nobody was given the right to republish, so this stops rather than
 	// reports.
 	if got := p.StampVersion(); got != 0 && got != id.Version {
-		return nil, fmt.Errorf("the rendering cached for %s says it is of v%d, so either arXiv served a different version or the file has been swapped: %q", entry.Ref(), got, p.Stamp)
+		return nil, entry, fmt.Errorf("the rendering cached for %s says it is of v%d, so either arXiv served a different version or the file has been swapped: %q", entry.Ref(), got, p.Stamp)
 	}
-	return p, nil
+	return p, entry, nil
 }
 
 func report(p *extract.Paper, outline bool) {

@@ -199,7 +199,11 @@ func TestAnEquationGroupKeepsItsRows(t *testing.T) {
 	if group.Blocks[0].Tag != "1a" || group.Blocks[1].Tag != "1b" {
 		t.Fatalf("the rows are tagged %q and %q", group.Blocks[0].Tag, group.Blocks[1].Tag)
 	}
-	want := `\displaystyle h^{\prime}(t) \displaystyle=\bm{A}h(t)`
+	// The cells are joined back into one display and the \displaystyle LaTeXML
+	// put in front of each of them on the way out is dropped, because the
+	// author did not write it and the $$ block it lands in is display
+	// mathematics already.
+	want := `h^{\prime}(t) =\bm{A}h(t)`
 	if group.Blocks[0].Text != want {
 		t.Fatalf("got %q\nwant %q", group.Blocks[0].Text, want)
 	}
