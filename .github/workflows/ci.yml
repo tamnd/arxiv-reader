@@ -1083,21 +1083,21 @@ jobs:
               exit 1
             fi
           done
-      # Groups T, M, F, R, G and X over the paper the steps above built, fetched,
-      # rendered, split, figured, tabled, referenced and tagged. Every rule has
-      # to say pass and not "not run": a rule with nothing to look at has not
-      # passed anything, and telling those two apart is what the four states are
-      # for.
+      # Groups S, T, M, F, R, G and X over the paper the steps above built,
+      # fetched, rendered, split, figured, tabled, referenced and tagged. Every
+      # rule has to say pass and not "not run": a rule with nothing to look at
+      # has not passed anything, and telling those two apart is what the four
+      # states are for.
       - name: the content plane audit is clean over the paper the tools just built
         run: |
           ARXIV_CORPUS=/tmp/extract-corpus ax audit -plane content -q | tee /tmp/audit-content.txt
           grep -q "3 files over 1 paper, nothing found" /tmp/audit-content.txt
-          test "$(grep -cE '^[TMFRGX][0-9]+ +pass ' /tmp/audit-content.txt)" = 49
+          test "$(grep -cE '^[STMFRGX][0-9]+ +pass ' /tmp/audit-content.txt)" = 54
           if grep -q "not run" /tmp/audit-content.txt; then
             echo "a content rule had nothing to look at"
             exit 1
           fi
-      # And the same forty nine rules over nothing at all, which has to read as
+      # And the same fifty four rules over nothing at all, which has to read as
       # not run rather than as a clean corpus. A green audit over an empty plane
       # is the single easiest way for this project to lie to itself.
       - name: an empty content plane runs nothing rather than passing everything
@@ -1105,7 +1105,7 @@ jobs:
           rm -rf /tmp/empty-corpus && mkdir -p /tmp/empty-corpus
           ARXIV_CORPUS=/tmp/empty-corpus ax audit -plane content -q | tee /tmp/audit-empty.txt
           grep -q "0 files over 0 papers, nothing to check" /tmp/audit-empty.txt
-          test "$(grep -cE '^[TMFRGX][0-9]+ +not run ' /tmp/audit-empty.txt)" = 49
+          test "$(grep -cE '^[STMFRGX][0-9]+ +not run ' /tmp/audit-empty.txt)" = 54
       # Each rule fired by breaking the one thing it is about. A rule that has
       # only ever been watched passing is a rule nobody has tested.
       - name: a content file that is wrong fails the rule that is about it
@@ -1238,6 +1238,15 @@ jobs:
           copy && sed -i 's/^      resolved: "2303.00002"$/      resolved: "2501.00001"/' $bib && fails R05
           copy && sed -i 's/^      year: 1999$/      year: 2030/' $bib && soft R06
           copy && add $intro 'The proof is in [Appendix C](#app-c), which nobody wrote.' && restamp && fails T12
+          # The licence gate read back off the files. S01 is broken in every
+          # file of the paper rather than in one, because the access class is a
+          # fact about the paper and a corpus where one file of three disagrees
+          # is a different defect from the one this rule is about.
+          copy && sed -i 's/^access: open$/access: verbatim/' $front $intro $results && fails S01
+          copy && rm /tmp/broken-corpus/metadata/2501.jsonl && fails S04
+          copy && sed -i 's/^version: v3$/version: v9/' $intro && fails S07
+          copy && sed -i 's/^licence_from: abs$/licence_from: kaggle/' $intro && fails S10
+          copy && sed -i 's/^licence: CC-BY-4.0$/licence: CC-BY-SA-4.0/' $intro && fails S12
       - name: the audit refuses the arguments it should refuse
         run: |
           for c in "audit --plane both" "audit -rules S99" "audit -rules" "audit -cap 0" "audit -shard 2113" "audit meta"; do

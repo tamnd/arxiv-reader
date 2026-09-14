@@ -74,6 +74,10 @@ type pending struct {
 	named []mention
 	// again is every resolved entry, with the record it claims.
 	again []recheck
+	// own is every paper of the content plane, with what its files say about
+	// themselves. Group S is what reads it, and it is held here because it is
+	// the same question of the same plane. See own.
+	own []own
 }
 
 type mention struct {
@@ -225,14 +229,21 @@ func (c Content) anchors(col *collector, id axid.ID, files []content, entries ma
 	}
 }
 
-// plane answers the two rules that need the metadata plane, once, for the whole
+// plane answers the rules that need the metadata plane, once, for the whole
 // run.
 //
 // Only the months that were asked about are read. A run over one paper wants a
 // handful of shards and a run over the whole content plane wants most of them,
 // and either way each one is read once.
+//
+// Two of the questions are group R's and the rest are group S's, and they are
+// answered together because they are the same read of the same file. What they
+// do differ on is a month the plane has not got: a reference into one is not
+// judged at all, and a paper of the content plane in one is S04's finding,
+// because the content plane is what somebody extracted and the record it was
+// extracted from cannot be a month nobody has fetched.
 func (c Content) plane(col *collector, hold *pending) error {
-	if !col.wanted("R01") && !col.wanted("R04") {
+	if !col.wanted("R01") && !col.wanted("R04") && !col.wanted("S01") && !col.wanted("S04") && !col.wanted("S07") && !col.wanted("S12") {
 		return nil
 	}
 	p := metadata.Plane{Root: c.Root}
@@ -248,7 +259,7 @@ func (c Content) plane(col *collector, hold *pending) error {
 	for _, s := range shards {
 		holds[s] = true
 	}
-	named, again := map[string][]mention{}, map[string][]recheck{}
+	named, again, mine := map[string][]mention{}, map[string][]recheck{}, map[string][]own{}
 	for _, m := range hold.named {
 		if holds[m.shard] {
 			named[m.shard] = append(named[m.shard], m)
@@ -259,13 +270,17 @@ func (c Content) plane(col *collector, hold *pending) error {
 			again[r.shard] = append(again[r.shard], r)
 		}
 	}
-	var months []string
-	for s := range named {
-		months = append(months, s)
+	for _, p := range hold.own {
+		mine[p.shard] = append(mine[p.shard], p)
 	}
-	for s := range again {
-		if _, ok := named[s]; !ok {
-			months = append(months, s)
+	seen := map[string]bool{}
+	var months []string
+	for _, in := range []map[string]bool{keys(named), keys(again), keys(mine)} {
+		for s := range in {
+			if !seen[s] {
+				seen[s] = true
+				months = append(months, s)
+			}
 		}
 	}
 	sort.Strings(months)
@@ -278,15 +293,23 @@ func (c Content) plane(col *collector, hold *pending) error {
 		for _, r := range again[shard] {
 			want[r.paper] = true
 		}
-		found := map[string]metadata.Record{}
-		if err := p.Scan(shard, func(rec metadata.Record) error {
-			if want[rec.ID] {
-				found[rec.ID] = rec
-			}
-			return nil
-		}); err != nil {
-			return err
+		for _, o := range mine[shard] {
+			want[o.id] = true
 		}
+		found := map[string]metadata.Record{}
+		// A month the plane has not got is not read and holds nothing, which
+		// leaves every paper of the content plane filed under it to S04.
+		if holds[shard] {
+			if err := p.Scan(shard, func(rec metadata.Record) error {
+				if want[rec.ID] {
+					found[rec.ID] = rec
+				}
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		c.records(col, mine[shard], found)
 		for _, m := range named[shard] {
 			col.checked("R01")
 			if _, ok := found[m.id]; !ok {
@@ -352,3 +375,12 @@ var (
 	anchorDef  = regexp.MustCompile(`\{#([^\s}]+)`)
 	anchorLink = regexp.MustCompile(`\]\(#([^)\s]+)\)`)
 )
+
+// keys is the set of months a map of questions asks about.
+func keys[T any](m map[string][]T) map[string]bool {
+	out := map[string]bool{}
+	for k := range m {
+		out[k] = true
+	}
+	return out
+}

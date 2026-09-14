@@ -40,7 +40,7 @@ func paper(t *testing.T, docs ...extract.Document) string {
 	figured(t, root)
 	tabled(t, root)
 	bibbed(t, root, oneEntry())
-	planed(t, root, oneRecord())
+	planed(t, root, oneRecord(), ownRecord())
 	var objects []tags.Object
 	for i, d := range docs {
 		if d.Front.LocalID != "" && d.Front.Kind != "front" {
@@ -63,6 +63,7 @@ func paper(t *testing.T, docs ...extract.Document) string {
 		d.Front.Access = string(corpus.AccessOpen)
 		d.Front.Licence = corpus.LicenceCCBY.SPDX()
 		d.Front.LicenceOfSource = string(corpus.LicenceCCBY)
+		d.Front.LicenceFrom = string(metadata.SourceAbs)
 		if tag, ok := plan.Assigned[d.Front.LocalID]; ok {
 			d.Front.Tag = string(tag)
 		}
@@ -144,15 +145,30 @@ func bibbed(t *testing.T, root string, entries ...refs.Entry) {
 	}
 }
 
-// planed writes the metadata plane the reference rules ask their questions of.
+// planed writes the metadata plane the reference and source rules ask their
+// questions of.
 //
-// The one record in it is the paper the fixture's bibliography resolves to. It
-// is the whole of the plane on purpose: R01 says nothing about a month the
-// plane has not got, and a fixture with one month in it is what proves that.
+// Two records: the fixture paper itself, which group S reads, and the paper its
+// bibliography resolves to, which group R reads. Those two months are the whole
+// of the plane on purpose, because R01 says nothing about a month the plane has
+// not got and a fixture that stops somewhere is what proves it.
+//
+// Each record goes in its own month, so a test that moves one somewhere else
+// moves the file it lives in with it.
 func planed(t *testing.T, root string, recs ...metadata.Record) {
 	t.Helper()
-	if _, err := (metadata.Plane{Root: root}).Write("2401", recs); err != nil {
-		t.Fatal(err)
+	byShard := map[string][]metadata.Record{}
+	for _, rec := range recs {
+		shard, err := rec.Shard()
+		if err != nil {
+			t.Fatal(err)
+		}
+		byShard[shard] = append(byShard[shard], rec)
+	}
+	for shard, in := range byShard {
+		if _, err := (metadata.Plane{Root: root}).Write(shard, in); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -209,7 +225,13 @@ func audited(t *testing.T, root string) map[string]Result {
 // fires checks that one rule found something and that nothing else did, which
 // is the half of a rule test that usually goes missing. A rule that fires on
 // the right file and takes three others with it is not a working rule.
-func fires(t *testing.T, root, rule string) Finding {
+//
+// also is the rules that cannot help going with it, which is one corpus and two
+// true things said about it rather than a rule reaching too far. A paper the
+// corpus may not publish the text of is the case: S01 says the text should not
+// be there and F08 says the figure should not be either, and there is no way to
+// break the one without the other.
+func fires(t *testing.T, root, rule string, also ...string) Finding {
 	t.Helper()
 	got := audited(t, root)
 	res, ok := got[rule]
@@ -219,8 +241,15 @@ func fires(t *testing.T, root, rule string) Finding {
 	if res.Total == 0 {
 		t.Fatalf("%s found nothing", rule)
 	}
+	allowed := map[string]bool{rule: true}
+	for _, id := range also {
+		allowed[id] = true
+		if got[id].Total == 0 {
+			t.Errorf("%s was allowed to fire and did not", id)
+		}
+	}
 	for id, other := range got {
-		if id != rule && other.Total > 0 {
+		if !allowed[id] && other.Total > 0 {
 			t.Errorf("%s also fired: %v", id, other.Findings)
 		}
 	}

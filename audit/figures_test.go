@@ -9,6 +9,7 @@ import (
 	"github.com/tamnd/arxiv-reader/corpus"
 	"github.com/tamnd/arxiv-reader/extract"
 	"github.com/tamnd/arxiv-reader/figures"
+	"github.com/tamnd/arxiv-reader/metadata"
 )
 
 // oneFigure is the entry the fixture's manifest holds, which is a picture with
@@ -174,13 +175,21 @@ func TestF07ReportsAManifestThatDoesNotLoad(t *testing.T) {
 // A record paper is one the corpus may hold the metadata and the structure of
 // and nothing else, so a figure of one in the corpus is a leak of the thing the
 // gate exists to stop.
+//
+// S01 goes with it, and that is the corpus rather than the rule: a paper whose
+// figure should not be there is a paper whose text should not be there either.
+// The record moves with the files, so the only thing wrong here is the one the
+// two rules are about.
 func TestF08ReportsAFigureOfAPaperTheCorpusMayNotPublish(t *testing.T) {
 	root := paper(t, front(), section(1, "One", prose(8)))
-	rewrite(t, root, "00_front.md", func(d *extract.Document) {
-		d.Front.Access = string(corpus.AccessRecord)
-		d.Front.LicenceOfSource = string(corpus.LicenceArXiv)
-	})
-	if f := fires(t, root, "F08"); !strings.Contains(f.What, "is a record paper") {
+	for _, name := range []string{"00_front.md", "01_one.md"} {
+		rewrite(t, root, name, func(d *extract.Document) {
+			d.Front.Access = string(corpus.AccessRecord)
+			d.Front.LicenceOfSource = string(corpus.LicenceArXiv)
+		})
+	}
+	filed(t, root, func(r *metadata.Record) { r.Versions[0].Licence = corpus.LicenceArXiv })
+	if f := fires(t, root, "F08", "S01"); !strings.Contains(f.What, "is a record paper") {
 		t.Errorf("the finding reads %q", f.What)
 	}
 }

@@ -22,10 +22,16 @@ import (
 // run them over, which is the trade the two planes were split on: every paper
 // on arXiv has a record and only the ones somebody extracted have content.
 //
-// Six groups so far, one of them complete. The rules that are missing are named
-// in the six lists, each with what it needs and where that arrives, because a
-// rule registered before it can run is a rule everybody believes is working.
-var ContentRules = slices.Concat(structureRules, mathRules, figureRules, refRules, tagRules, objectRules)
+// Seven groups so far, one of them complete. The rules that are missing are
+// named in the seven lists, each with what it needs and where that arrives,
+// because a rule registered before it can run is a rule everybody believes is
+// working.
+//
+// Group S is the one that is in both planes. Its metadata half is in MetaRules
+// and runs over three million records, and the rules here are the ones that
+// read a content file, which is a different set of rules asking the same
+// question: may this be published, and is what it says about itself true.
+var ContentRules = slices.Concat(sourceRules, structureRules, mathRules, figureRules, refRules, tagRules, objectRules)
 
 // structureRules say a content file is a content file.
 //
@@ -361,6 +367,7 @@ func (c Content) paper(col *collector, id axid.ID, files []content, hold *pendin
 	if err := c.tagged(col, id, parsed); err != nil {
 		return err
 	}
+	c.sources(col, id, parsed, hold)
 	c.maths(col, id, parsed)
 	if err := c.pictures(col, id, parsed); err != nil {
 		return err
