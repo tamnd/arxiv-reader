@@ -217,6 +217,28 @@ A file that states no resolution is not judged by this rule and the report says 
 The headers are read by hand rather than by decoding the picture.
 A figure is judged on its size and its shape, decoding the whole raster to find that out costs about as much as everything else in this pipeline put together, and there are three million papers.
 
+Without `-n` the same command fetches each picture at the fifteen second pace, runs the whole gate over the bytes and commits the ones that pass.
+
+```
+$ ax figures 2501.00001v3
+2501.00001v3: 1 committed, 1 withheld, 0 already decided, 2 figures in manifests/figures/2501.yaml
+```
+
+What it decided is written to `manifests/figures/<shard>.yaml`, one entry per picture, and a withheld figure gets an entry too.
+That is the point of the file: without one, nothing can tell a picture that was refused from one that was never fetched, and the download is paid for again on every run.
+The entry records the hash, what the header measured, where the physical size was read from, which rule refused it and what the caption said.
+
+This command does not touch the content plane.
+`ax extract render` reads the manifest and writes the image lines, because if `ax figures` edited the Markdown then the next extraction would put the arXiv paths back and the two commands would take turns undoing each other.
+So a committed figure becomes an image pointing at `/figures/...`, a withheld one becomes a line saying what is missing and where to see it, and a picture nothing has decided about yet is written as it stands, which is the state of every figure until `ax figures` has run.
+
+Running it twice costs nothing and writes nothing.
+A picture already in the manifest is skipped without a request, and `-recheck` is how to make it decide again.
+A recheck that finds the same bytes keeps the time they were first read, so a recheck that changes no decision leaves the file byte for byte as it was, which is what makes this manifest worth committing.
+
+`-from <dir>` reads the pictures out of a directory instead of off the website.
+That is for somebody who already has the source tarball unpacked, and it is what CI uses, because CI does not talk to arXiv and a committing path nothing exercises is a committing path nobody has run.
+
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
 

@@ -103,7 +103,11 @@ func writePaper(plane metadata.Plane, id axid.ID, p *extract.Paper, entry fetch.
 	if err != nil {
 		return err
 	}
-	files, err := extract.Files(p, front)
+	pics, err := decided(plane.Root, id, p.Version)
+	if err != nil {
+		return err
+	}
+	files, err := extract.Files(p, front, pics)
 	if err != nil {
 		return err
 	}

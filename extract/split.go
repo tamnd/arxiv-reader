@@ -21,8 +21,10 @@ type File struct {
 // retry.
 //
 // The base carries every field that is the same in every file of the paper, and
-// this fills in the ones that are not.
-func Files(p *Paper, base Front) ([]File, error) {
+// this fills in the ones that are not. The pictures are what ax figures decided
+// about the paper's figure files, and an empty set means nothing has decided
+// yet, which is the state of every paper until it has run.
+func Files(p *Paper, base Front, pics Pictures) ([]File, error) {
 	if p == nil {
 		return nil, fmt.Errorf("extract: there is no paper to split")
 	}
@@ -38,7 +40,7 @@ func Files(p *Paper, base Front) ([]File, error) {
 	front.Kind = "front"
 	front.SectionTitle = "Front matter"
 	front.LocalID = "front"
-	w := &body{names: n}
+	w := &body{names: n, pics: pics}
 	w.objects++ // The front itself, which is one of the sixteen kinds.
 	w.blocks(p.Abstract, within{})
 	out := []File{{Name: "00_front.md", Doc: Document{Front: count(front, w), Body: w.String()}}}
@@ -52,7 +54,7 @@ func Files(p *Paper, base Front) ([]File, error) {
 		f.Kind = "section"
 		f.SectionTitle = "Body"
 		f.LocalID = "s1"
-		w := &body{names: n}
+		w := &body{names: n, pics: pics}
 		out = append(out, File{Name: "01_body.md", Doc: Document{Front: count(f, w), Body: w.String()}})
 		return out, nil
 	}
@@ -66,7 +68,7 @@ func Files(p *Paper, base Front) ([]File, error) {
 		}
 		f.SectionTitle = s.Title
 		f.Tag = "" // The section's permanent tag, filled in by ax tags assign.
-		w := &body{names: n}
+		w := &body{names: n, pics: pics}
 		w.objects++ // The section itself, whose heading lives in the front matter.
 		// The heading of a top level section is in the front matter rather than
 		// in the body, so there is no line for its attribute block to sit on,
