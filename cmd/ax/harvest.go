@@ -107,10 +107,16 @@ func readSnapshotFile(source metadata.Source, path string, dry, quiet bool, batc
 
 	b := newBatcher(metadata.Plane{Root: corpusRoot()}, batch, dry)
 	read, err := reader.Read(f, b.add)
-	if err != nil {
-		return err
+	// Flushed first, for the reason given in harvestHF: a bad line three
+	// million records into a five gigabyte file should not throw away the three
+	// million good ones in front of it.
+	if ferr := b.flush(); ferr != nil {
+		return ferr
 	}
-	if err := b.flush(); err != nil {
+	if err != nil {
+		if !dry && read.Read > 0 {
+			fmt.Fprintf(os.Stderr, "%s, written\n", b.stats)
+		}
 		return err
 	}
 
@@ -176,7 +182,7 @@ func harvestHF(args []string) error {
 		return errors.New("-offset has to be at least 0")
 	}
 	// The split is about 3.17 million rows and the page is a hundred, so a full
-	// walk is over thirty thousand requests and most of nine hours. That should
+	// walk is over thirty thousand requests and a day of them. That should
 	// be a number somebody typed rather than what happens when a flag is
 	// forgotten, which is what -all is: it asks for the count out loud.
 	if *limit == 0 && *all == 0 {
@@ -202,10 +208,19 @@ func harvestHF(args []string) error {
 
 	b := newBatcher(metadata.Plane{Root: corpusRoot()}, *batch, *dry)
 	read, err := client.List(context.Background(), harvest.RowsQuery{Offset: *offset, Limit: *limit}, b.add)
-	if err != nil {
-		return err
+	// Flushed before the error is returned, and that ordering is the point.
+	// A walk of this length will be stopped by the far end sooner or later, and
+	// throwing away four thousand rows that arrived fine because the four
+	// thousand and first did not is how an interrupted harvest becomes an
+	// afternoon of repeating work. What was read is written and the message
+	// says where to pick it up.
+	if ferr := b.flush(); ferr != nil {
+		return ferr
 	}
-	if err := b.flush(); err != nil {
+	if err != nil {
+		if !*dry && read.Read > 0 {
+			fmt.Fprintf(os.Stderr, "%s, written: resume with -offset %d\n", b.stats, *offset+read.Read+read.Skipped)
+		}
 		return err
 	}
 

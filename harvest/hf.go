@@ -36,14 +36,20 @@ const RowsPage = 100
 
 // RowsPace is the gap left between requests.
 //
-// Hugging Face publishes no number the way arXiv does, so this is a judgement
-// and not a quoted limit. One second is slow enough not to look like an attack
-// and quick enough to be worth running.
+// Hugging Face publishes no number the way arXiv does, so this was measured
+// rather than quoted. A second a request died on a CloudFront 429 forty pages
+// into a walk. Three seconds ran seventy pages without one, twice. So three,
+// which is also what arXiv asks for, and there is something to be said for one
+// pace in the whole tool.
 //
-// It is also the reason this is the fallback and not the bootstrap. The corpus
-// is about 3.17 million rows, the page is a hundred, so a full walk is 31646
-// requests and most of nine hours. Read the file if you can get the file.
-const RowsPace = time.Second
+// The limit is CloudFront's and not the application's: the 429 comes back as
+// HTML with no Retry-After, and it cleared in about twenty seconds. That is a
+// short window rather than a ban, which is why backoff is worth doing at all.
+//
+// It is also why this is the fallback and not the bootstrap. The page is a
+// hundred rows and the split is about 3.17 million, so a full walk is 31646
+// requests and a day. Read the file if you can get the file.
+const RowsPace = 3 * time.Second
 
 // Rows reads the snapshot through the Hugging Face datasets server.
 //
@@ -249,14 +255,11 @@ func (r *Rows) get(ctx context.Context, offset, length int) ([]byte, error) {
 		body, readErr := io.ReadAll(resp.Body)
 		resp.Body.Close()
 
-		// 429 is the one Hugging Face uses for too many requests and 503 turns
-		// up while the server is building a dataset's parquet index. Both mean
-		// wait rather than stop.
-		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusServiceUnavailable {
+		if temporary(resp.StatusCode) {
 			if try == tries {
-				return nil, fmt.Errorf("harvest: hugging face asked us to wait %d times in a row, so it is down and not busy", tries)
+				return nil, fmt.Errorf("harvest: hugging face answered %s %d times in a row, so it is down and not busy", resp.Status, tries)
 			}
-			time.Sleep(retryAfter(resp.Header.Get("Retry-After"), pace))
+			time.Sleep(backoff(resp.Header.Get("Retry-After"), pace, try))
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
@@ -273,6 +276,44 @@ func (r *Rows) get(ctx context.Context, offset, length int) ([]byte, error) {
 		}
 		return body, nil
 	}
+}
+
+// backoff is how long to wait before try number try+1.
+//
+// A server that says Retry-After is answered literally, because it knows when
+// it will be ready and this does not, and doubling a number somebody sent on
+// purpose turns a five minute wait into forty.
+//
+// A server that says nothing gets a doubling wait instead. Repeating at the
+// ordinary pace is the wrong thing after a 502: something between here and the
+// dataset is restarting, and asking again a second later is asking during the
+// restart. Five tries at a doubling second spans about a quarter of a minute.
+func backoff(header string, pace time.Duration, try int) time.Duration {
+	if header != "" {
+		return retryAfter(header, pace)
+	}
+	return pace << (try - 1)
+}
+
+// temporary reports whether a status means wait rather than stop.
+//
+// 429 is what Hugging Face uses for too many requests and 503 turns up while
+// the server is building a dataset's parquet index. Those two were obvious.
+//
+// 502 and 504 were not, and they are the ones that actually stopped a harvest:
+// the datasets server sits behind a proxy, the proxy answers for it when it is
+// slow or restarting, and a 5000 row walk hit one about forty pages in. A walk
+// that gives up on a gateway hiccup is a walk nobody can leave running, which
+// is the only way a walk of this length gets used at all.
+func temporary(status int) bool {
+	switch status {
+	case http.StatusTooManyRequests,
+		http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout:
+		return true
+	}
+	return false
 }
 
 func (r *Rows) wait(ctx context.Context, pace time.Duration) error {

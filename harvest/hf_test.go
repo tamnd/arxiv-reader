@@ -306,6 +306,124 @@ func TestRowsRetryA429(t *testing.T) {
 	}
 }
 
+// A 502 is the one that actually stopped a live walk, about forty pages into a
+// 5000 row run. The datasets server sits behind a proxy and the proxy answers
+// for it while it is slow or restarting.
+func TestRowsRetryAGatewayError(t *testing.T) {
+	for _, status := range []int{http.StatusBadGateway, http.StatusGatewayTimeout, http.StatusServiceUnavailable} {
+		t.Run(strconv.Itoa(status), func(t *testing.T) {
+			var n int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if atomic.AddInt32(&n, 1) == 1 {
+					http.Error(w, "bad gateway", status)
+					return
+				}
+				w.Write(fixture(t, "rows_end.json"))
+			}))
+			t.Cleanup(srv.Close)
+
+			if _, _, err := listOnce(rows(srv.URL)); err != nil {
+				t.Fatal(err)
+			}
+			if n != 2 {
+				t.Errorf("made %d requests, want a retry after the %d", n, status)
+			}
+		})
+	}
+}
+
+// A status that is not temporary has to stop rather than be tried five times.
+// A 404 is not going to become a 200.
+func TestARowsNotFoundIsNotRetried(t *testing.T) {
+	var n int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&n, 1)
+		w.WriteHeader(http.StatusNotFound)
+		w.Write(fixture(t, "rows_error.json"))
+	}))
+	t.Cleanup(srv.Close)
+
+	if _, _, err := listOnce(rows(srv.URL)); err == nil {
+		t.Fatal("a 404 read as an empty split")
+	}
+	if n != 1 {
+		t.Errorf("made %d requests for a 404, want 1", n)
+	}
+}
+
+// Five tries and then stop. A harvest that retries forever is a harvest nobody
+// notices has stopped.
+func TestRowsGiveUpAfterFiveTries(t *testing.T) {
+	var n int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&n, 1)
+		w.Header().Set("Retry-After", "0")
+		http.Error(w, "bad gateway", http.StatusBadGateway)
+	}))
+	t.Cleanup(srv.Close)
+
+	_, _, err := listOnce(rows(srv.URL))
+	if err == nil {
+		t.Fatal("an endpoint that is always down read as an empty split")
+	}
+	if n != 5 {
+		t.Errorf("made %d requests, want 5", n)
+	}
+	// The message has to name the status, or a 502 that lasted all night reads
+	// the same as a 429 that did.
+	if !strings.Contains(err.Error(), "502") {
+		t.Errorf("the error is %q, which does not say what the server kept answering", err)
+	}
+}
+
+// A walk that the far end stops still has to report what it read, because the
+// caller writes that and resumes from the count. Losing four thousand good rows
+// because the four thousand and first failed is how an interrupted harvest
+// becomes an afternoon of repeating work.
+func TestAStoppedWalkKeepsWhatItRead(t *testing.T) {
+	var n int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if atomic.AddInt32(&n, 1) == 1 {
+			w.Write(fixture(t, "rows_0.json"))
+			return
+		}
+		http.Error(w, "rate limited by the front end, as HTML with no Retry-After", http.StatusTooManyRequests)
+	}))
+	t.Cleanup(srv.Close)
+
+	var got []metadata.Record
+	stats, err := rows(srv.URL).List(context.Background(), RowsQuery{}, func(rec metadata.Record) error {
+		got = append(got, rec)
+		return nil
+	})
+	if err == nil {
+		t.Fatal("a walk the server stopped came back without an error")
+	}
+	if stats.Read != 2 {
+		t.Errorf("the stopped walk reports %d rows read, want the 2 it got", stats.Read)
+	}
+	if len(got) != 2 {
+		t.Errorf("handed over %d records before it stopped, want 2", len(got))
+	}
+}
+
+func TestBackoff(t *testing.T) {
+	// A server that says how long knows when it will be ready and this does
+	// not, so the header wins and it is not doubled.
+	for try := 1; try <= 5; try++ {
+		if got := backoff("2", time.Second, try); got != 2*time.Second {
+			t.Errorf("try %d with a Retry-After waited %s, want 2s", try, got)
+		}
+	}
+	// A server that says nothing gets a doubling wait.
+	want := []time.Duration{time.Second, 2 * time.Second, 4 * time.Second, 8 * time.Second}
+	for i, w := range want {
+		if got := backoff("", time.Second, i+1); got != w {
+			t.Errorf("try %d waited %s, want %s", i+1, got, w)
+		}
+	}
+}
+
 func TestRowsTotal(t *testing.T) {
 	srv, _, queries := serveJSON(t, "rows_0.json")
 	total, err := rows(srv.URL).Total(context.Background())
@@ -328,8 +446,11 @@ func TestTheDefaultRowsPaceIsKept(t *testing.T) {
 	if (&Rows{}).Pace != 0 {
 		t.Fatal("the zero value stopped being zero")
 	}
-	if RowsPace < time.Second {
-		t.Errorf("the default pace is %s, which is faster than anyone agreed to", RowsPace)
+	// Three seconds, because one was measured to die on a CloudFront 429 forty
+	// pages into a walk. Anything faster than that is a number somebody guessed
+	// after the person who measured it had gone.
+	if RowsPace < 3*time.Second {
+		t.Errorf("the default pace is %s, which is faster than the pace that was measured to work", RowsPace)
 	}
 }
 
