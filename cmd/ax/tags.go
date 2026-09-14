@@ -32,8 +32,10 @@ func runTags(args []string) error {
 		return tagsAssign(args[1:])
 	case "diff":
 		return tagsDiff(args[1:])
+	case "report":
+		return tagsReport(args[1:])
 	default:
-		return fmt.Errorf("unknown tags subcommand %q, the subcommands are assign and diff", args[0])
+		return fmt.Errorf("unknown tags subcommand %q, the subcommands are assign, diff and report", args[0])
 	}
 }
 
