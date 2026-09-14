@@ -384,6 +384,55 @@ Every paper named in one run is resolved by a single pass over the plane.
 The plane holds three million records and a bibliography holds a hundred entries, so the entries are what goes into a map and the plane is streamed past them, which keeps the memory proportional to the bibliography and makes a run over fifty papers cost the same pass as a run over one.
 Resolution is cleared and redone from scratch each time, because the plane grows and an entry that resolved to nothing last month is a question worth asking again.
 
+`ax refs cites` reads every citation out of a paper's sections, with the locator each of them carries.
+
+```
+$ ax refs cites -n 2311.05762
+2311.05762v2       75 citations
+  with a locator   24 of 75
+  via after-comma  23
+  via before-of    1
+  conjecture 2.2.2  bib.bib29  ...f the desired $2K^{C}$. It was Ruzsa \[[28](#bib.bib28)\], \[[29](#bib.bib29), Conjecture...
+  page 8  bib.bib11  ...[33](#bib.bib33)\], and see also the comments on page 8 of \[[11](#bib.bib11)\]) showed that...
+  theorem 1.11  bib.bib11  ...18)\]. ## Applications {#su1-1 .section} It was shown in \[[11](#bib.bib11), Theorem 1.11\]...
+```
+
+A citation says that one paper mentioned another and a locator says which result of it was used, and the difference between those two is the whole of 08-graph.md section 5.
+The first is a citation edge, which a paper level citation graph already has.
+The second is a `uses` edge, which is the hard one, the novel one and the one worth the most, because it says that this theorem was proved using that theorem.
+
+That paper is "On a conjecture of Marton" by Gowers, Green, Manners and Tao, which is the proof of the polynomial Freiman-Ruzsa conjecture.
+It is here because a mathematics paper is where locators live.
+Mamba and KAN between them make 412 citations and not one of them names a result, which is not a failure of the patterns, it is how machine learning cites.
+
+The patterns are in `manifests/graph.yaml` and the binary carries a default set.
+A corpus file replaces it rather than adding to it, because the person who notices that a field writes locators in a shape nothing matches is the person reading that field's papers, not whoever is editing this repository that week.
+
+```
+$ ax refs locators
+patterns  after-comma after-parens after-bare before-of before-comma before-credit
+kinds     30
+  algorithm
+  appendix
+  assumption
+  ...
+```
+
+08-graph.md estimated about thirty patterns.
+What is actually there is a vocabulary of thirty kind words crossed with six shapes, which covers more than thirty flat patterns would and is easier to be right about: the thirty flat patterns are these six shapes written out thirty times, and a flat list of near identical regular expressions is where a typo hides for a year.
+
+The shapes split down the middle.
+Three of them read the text after the citation, which is where a numeric style prints the locator, so "[12, Lemma 3.4]".
+Three read the text before it, which is where the sentence puts it, so "by Theorem 2 of [7]".
+The first pattern that matches wins, and the order in the file is the order of certainty: a locator inside the citation's own brackets cannot be anything else, and a locator read out of the surrounding sentence can.
+
+Every citation is recorded and not only the ones that carry a locator, because a citation is an edge either way and where in the paper it sits is half of what it says.
+The prose around a citation is kept only where there is a locator to check it against, since a paper makes a thousand citations and a handful of them name a result.
+
+One record per place in the paper that cites something, which is why a work cited nine times is nine lines in `manifests/cites/` and one line in `manifests/refs/` beside it.
+Nothing in the citations file says what the entry resolved to.
+That is in the bibliography, it belongs in exactly one place, and the graph joins the two rather than reading a copy out of one and having to wonder which is older.
+
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
 
