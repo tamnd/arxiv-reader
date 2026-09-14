@@ -433,6 +433,54 @@ One record per place in the paper that cites something, which is why a work cite
 Nothing in the citations file says what the entry resolved to.
 That is in the bibliography, it belongs in exactly one place, and the graph joins the two rather than reading a copy out of one and having to wonder which is older.
 
+`ax tags assign` gives every object in a paper a permanent name.
+
+```
+$ ax tags assign -n 2311.05762
+2311.05762  116 objects
+  new       116
+  kept      0
+  run       X22B to XQEF
+  X22B  s1
+  86R6  prob-1-1
+  UI64  thm-1-2
+```
+
+A tag is four characters of the Stacks Project's alphabet, it is assigned once, and it never changes.
+Every link in the reading app, every edge in the graph and every translated file points at one, which is what lets all three survive the paper being extracted again next year by a better tool.
+Numbering is not stable over time, LaTeX labels are human readable and therefore get edited, and a reference has to survive both.
+
+Four characters is 1,679,616 names, which is nowhere near enough for a corpus and is absurdly loose for a paper.
+That is the trick: a tag is unique inside one paper and the arXiv id carries the other half of the name, so the canonical reference is `2311.05762#UI64` and a bare tag is not a reference at all.
+Bourbaki and papers used four hex digits, which is 65,536, and that was enough for one treatise and for a hundred papers.
+The answer here is not a longer tag, it is a tag with a smaller job.
+
+Tags are handed out from a shuffled space, so nothing about one says where its object sits.
+The order is the same on every run, which is what makes re-running an assignment write nothing, and it is different for every paper, so a person looking at two papers side by side sees nothing in common between them.
+The alternative is worse than it looks: the first person to notice that tags ascend in reading order writes code that sorts by them, and that works until somebody inserts a section.
+
+The register is the record and the content files are the copy, and both are written.
+
+```
+# tags/2311/2311.05762.tags
+X22B,s1
+86R6,prob-1-1
+UI64,thm-1-2
+```
+
+```markdown
+**Conjecture 1.1** {#prob-1-1 .problem tag=86R6 env=conjecture}
+```
+
+The anchor is the local identifier and not the tag, so a URL is readable and a tag is stable.
+One register per paper and not one for the corpus: a single file would be five million lines, two people extracting two unrelated papers would conflict in git on every run, and a takedown would be a rewrite rather than a deletion.
+`tags/2311/2311.05762.runs` sits beside it and says where one assignment stopped and the next began, which is what tells a correct edit apart from a tag somebody pasted in the wrong place.
+
+An object that is in the register and no longer in the paper stops the run.
+Matching it to whatever replaced it is the four pass matcher in 03-tags.md section 6, which is the author's own `\label`, then the kind and number, then a hash of the normalised prose, then a sequence alignment, and it arrives with `ax tags diff` in M4.
+Guessing in the meantime is exactly the failure this whole mechanism exists to prevent.
+A reference that breaks is visible and a reference silently pointed at the wrong theorem is not.
+
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
 
