@@ -214,6 +214,10 @@ func TestT12LeavesALinkThePaperCanAnswer(t *testing.T) {
 // Two rules of this group ask the metadata plane a question, and a corpus with
 // no metadata plane in it cannot answer either. Not run and not passed, which
 // is the whole point of having four states.
+//
+// S04 is the one rule that reads the same absence as an answer, because a
+// content file is written out of a record and a corpus that has the file and
+// not the record has lost something. The two readings live together on purpose.
 func TestTheRulesThatNeedThePlaneDoNotRunWithoutIt(t *testing.T) {
 	root := paper(t, front(), section(1, "One", prose(8)))
 	if err := os.RemoveAll(filepath.Join(root, "metadata")); err != nil {
@@ -221,8 +225,11 @@ func TestTheRulesThatNeedThePlaneDoNotRunWithoutIt(t *testing.T) {
 	}
 	for id, res := range audited(t, root) {
 		want := Pass
-		if id == "R01" || id == "R04" {
+		switch id {
+		case "R01", "R04":
 			want = NotRun
+		case "S04":
+			want = Fail
 		}
 		if res.State() != want {
 			t.Errorf("%s is %s with %v", id, res.State(), res.Findings)

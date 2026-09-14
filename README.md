@@ -486,6 +486,11 @@ A reference that breaks is visible and a reference silently pointed at the wrong
 ```
 $ ax audit -plane content -q
 rule  state    checked  findings
+S01   pass     26
+S04   pass     2
+S07   pass     26
+S10   pass     26
+S12   pass     26
 T01   pass     26
 T02   pass     26
 T03   pass     26
@@ -542,6 +547,16 @@ R01 every arXiv id written down in this corpus names a paper the metadata plane 
   manifests/refs/2404/2404.19756.yaml: 2404.19756: bib.bib18 names arXiv:2312.14276, and the metadata plane has no paper with that identifier
 ax: a hard rule found something
 ```
+
+Group S is the licence gate read back off the files.
+Its other half runs over the metadata plane and asks what a record's licence was read from, and these five ask the same question of a file that got written: was this allowed, and is what it says about itself true.
+`S01` is the gate itself, and a paper the corpus may only hold a record of has no content file at all, which is a thing to check rather than a thing to trust, because the check costs nothing and the failure is republishing somebody's paper without their permission.
+It reads the access line and the licence the article carries against each other as well, since the tool derives the one from the other and a file where the two disagree was written by somebody.
+`S10` is where the licence came from, and the answer has to be the abs page, because every bulk surface states one licence for a whole paper and only the abs page states the licence of a version.
+`S12` is the version trap, which is the reason the licence is carried per version everywhere in this project.
+A paper relicensed at v3 still has a v1 under the old terms, so a corpus that reads the licence off the paper and publishes the version it extracted has published one version under another version's permission, and when the finding sees that shape it says so.
+`S04` is a paper with content and no record behind it, and it is the floor the other four stand on: every question here is asked of the record, so a paper it reports is a paper the rest of the group steps over rather than four findings about one missing line.
+`S07` is the version the file names, which the plane has to hold, because a licence checked against a version that does not exist has not been checked.
 
 Group T is the one that says a content file is a content file: it parses, its fields are known and typed, its recorded hash matches the body under it, its sections run from 0 with no gaps, its headings skip no level, and it has a front matter file with an abstract in it.
 The three that catch what a bad extraction actually leaves behind are the last ones.
@@ -602,7 +617,7 @@ That block still gets a tag, on purpose, because an anchor nothing can be writte
 
 The checked column is the point of the whole thing.
 A rule with no findings and nothing checked has not passed, it has not run, and the two are different states in the report and not the same green tick.
-`T04`, `T06`, `T07`, `M02`, `M14`, `F07`, `F08`, `F10`, `F11`, `R03`, `G01`, `G03` and `G04` are about a paper rather than a file, which is why they say 2 where the rest say 26.
+`S04`, `T04`, `T06`, `T07`, `M02`, `M14`, `F07`, `F08`, `F10`, `F11`, `R03`, `G01`, `G03` and `G04` are about a paper rather than a file, which is why they say 2 where the rest say 26.
 The F rules that count figures say 40 and 14 and 41 because those are pictures and not files: 41 decisions in the two manifests, 14 of them committed, and 40 image lines across the bodies.
 `T08` says 24 because an abstract is as long as its author made it and is not a section that came out too short.
 `R06` says 234 because that is the number of bibliography entries in the two papers that printed a year, which is what the rule reads.
@@ -610,6 +625,11 @@ The F rules that count figures say 40 and 14 and 41 because those are pictures a
 Mathematics and code are masked out of a body before the T rules read it, delimiters and all, with every line kept exactly where it was so a finding still points at a line somebody can open.
 Without it `$a<b>c$` is an HTML tag, a listing that shows a table is raw markup, and a shell session with a number on a line is a page number.
 Where the mathematics and the code are is the M group's splitter answering, and not a second reading of the same body, so the two groups cannot end up with different opinions about which lines are a fence.
+
+Seven rules of group S are not here, and five of those seven are the ones that read the metadata plane rather than a file, which is where they run.
+`S02` and `S06` are the two about translated files, one saying a no-derivatives paper has none and the other holding a translation to the licence the propagation table gives it, and nothing is translated yet, so both arrive with M8.
+`S03` and `S11` are git and the takedown manifest, neither of which this tool has to read yet.
+`S08` and `S09` measure a body against the pages it was read off, and a page count is something only the native path has, so the two of them arrive with it in M4.
 
 Three rules of group R are not here.
 `R07` is the acquire selection report, which is a paper three or more papers in the content plane cite and which is not in the plane itself, and nothing writes that report yet.
