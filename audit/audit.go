@@ -46,6 +46,11 @@ const (
 	// GroupStructure is T, the group that says a content file is a content
 	// file.
 	GroupStructure Group = "T"
+	// GroupTags is G, the group that reads a paper's register against the
+	// bodies the tags in it were written into.
+	GroupTags Group = "G"
+	// GroupObjects is X, the group that reads the object model.
+	GroupObjects Group = "X"
 )
 
 // Name is what the scoreboard calls the group.
@@ -55,6 +60,10 @@ func (g Group) Name() string {
 		return "Sources"
 	case GroupStructure:
 		return "Structure"
+	case GroupTags:
+		return "Tags"
+	case GroupObjects:
+		return "Objects"
 	}
 	return string(g)
 }

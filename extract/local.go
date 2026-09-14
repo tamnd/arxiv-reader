@@ -74,6 +74,46 @@ var prefixes = map[string]string{
 	"section":    "s",
 }
 
+// Kinds are the sixteen object kinds of 2166-06, each under the class it is
+// written as.
+//
+// The list is here, next to the mapping that produces it, rather than in the
+// audit that reads it. A list kept on the reading side drifts from the writing
+// side the first time a kind is added, and the whole point of a fixed set of
+// kinds is that every later group dispatches on it.
+var Kinds = map[string]bool{
+	"section":    true,
+	"statement":  true,
+	"definition": true,
+	"remark":     true,
+	"problem":    true,
+	"exercise":   true,
+	"proof":      true,
+	"equation":   true,
+	"figure":     true,
+	"table":      true,
+	"code":       true,
+	"result":     true,
+	"artefact":   true,
+	"reference":  true,
+	"note":       true,
+	"front":      true,
+}
+
+// FileKinds are what the kind field of a content file may say.
+//
+// Four and not sixteen, because a file is the front matter or it is a section.
+// Appendix and references are sections too and they are named separately
+// because the splitter and the audit both have to know where the appendices
+// start: a references section belongs last, and an appendix is the one thing
+// allowed after it.
+var FileKinds = map[string]bool{
+	"front":      true,
+	"section":    true,
+	"appendix":   true,
+	"references": true,
+}
+
 // classOf is the object class a block belongs to, and it is the class written
 // into the attribute block.
 func classOf(b Block) string {

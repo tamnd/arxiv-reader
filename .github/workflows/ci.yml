@@ -1083,33 +1083,36 @@ jobs:
               exit 1
             fi
           done
-      # Group T over the paper the steps above built, fetched, rendered, split,
-      # figured, tabled, referenced and tagged. Every rule has to say pass and
-      # not "not run": a rule with nothing to look at has not passed anything,
-      # and telling those two apart is what the four states are for.
+      # Groups T, G and X over the paper the steps above built, fetched,
+      # rendered, split, figured, tabled, referenced and tagged. Every rule has
+      # to say pass and not "not run": a rule with nothing to look at has not
+      # passed anything, and telling those two apart is what the four states are
+      # for.
       - name: the content plane audit is clean over the paper the tools just built
         run: |
           ARXIV_CORPUS=/tmp/extract-corpus ax audit -plane content -q | tee /tmp/audit-content.txt
           grep -q "3 files over 1 paper, nothing found" /tmp/audit-content.txt
-          test "$(grep -cE '^T[0-9]+ +pass ' /tmp/audit-content.txt)" = 12
+          test "$(grep -cE '^[TGX][0-9]+ +pass ' /tmp/audit-content.txt)" = 19
           if grep -q "not run" /tmp/audit-content.txt; then
             echo "a content rule had nothing to look at"
             exit 1
           fi
-      # And the same twelve rules over nothing at all, which has to read as not
-      # run rather than as a clean corpus. A green audit over an empty plane is
-      # the single easiest way for this project to lie to itself.
+      # And the same nineteen rules over nothing at all, which has to read as
+      # not run rather than as a clean corpus. A green audit over an empty plane
+      # is the single easiest way for this project to lie to itself.
       - name: an empty content plane runs nothing rather than passing everything
         run: |
           rm -rf /tmp/empty-corpus && mkdir -p /tmp/empty-corpus
           ARXIV_CORPUS=/tmp/empty-corpus ax audit -plane content -q | tee /tmp/audit-empty.txt
           grep -q "0 files over 0 papers, nothing to check" /tmp/audit-empty.txt
-          test "$(grep -cE '^T[0-9]+ +not run ' /tmp/audit-empty.txt)" = 12
+          test "$(grep -cE '^[TGX][0-9]+ +not run ' /tmp/audit-empty.txt)" = 19
       # Each rule fired by breaking the one thing it is about. A rule that has
       # only ever been watched passing is a rule nobody has tested.
       - name: a content file that is wrong fails the rule that is about it
         run: |
           intro=/tmp/broken-corpus/content/en/2501/2501.00001/01_introduction.md
+          results=/tmp/broken-corpus/content/en/2501/2501.00001/02_results.md
+          reg=/tmp/broken-corpus/tags/2501/2501.00001.tags
           copy() { rm -rf /tmp/broken-corpus && cp -r /tmp/extract-corpus /tmp/broken-corpus; }
           # Appending to a body moves it away from its recorded hash, which is
           # T03's finding and not the one under test, so the cases that append
@@ -1135,6 +1138,17 @@ jobs:
           copy && rm /tmp/broken-corpus/content/en/2501/2501.00001/00_front.md && fails T06
           copy && printf '\narXiv:2501.00001v3 [math.NT] 2 Jan 2025\n' >> $intro && restamp && fails T10
           copy && printf '\n<table><tr><td>1.0</td></tr></table>\n' >> $intro && restamp && fails T11
+          # The register on its own, then the copy on its own, then the two
+          # disagreeing. A tag lives in the register and in the file it was
+          # written into, so each of those three is a different way for a paper
+          # to end up with a name nothing resolves.
+          copy && echo "ABC,s9" >> $reg && fails G01
+          copy && printf '\nSee [Theorem 1](#VNYA) for the rest.\n' >> $intro && restamp && fails G02
+          copy && echo "VIS1,s9" >> $reg && fails G03
+          copy && echo "ZZZZ,s1" >> $reg && fails G04
+          copy && sed -i 's/^tag: VIS1$/tag: ZZZZ/' $intro && fails G05
+          copy && sed -i 's/ tag=VNYA//' $results && restamp && fails G06
+          copy && sed -i 's/{#thm-1 .statement/{#thm-1 .theorem/' $results && restamp && fails X01
       - name: the audit refuses the arguments it should refuse
         run: |
           for c in "audit --plane both" "audit -rules S99" "audit -rules" "audit -cap 0" "audit -shard 2113" "audit meta"; do

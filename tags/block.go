@@ -40,19 +40,32 @@ type Object struct {
 	Class string
 }
 
-// Objects reads every attribute block out of one file's body, in reading order.
+// Objects reads every taggable attribute block out of one file's body, in
+// reading order.
 //
 // Reading order is the order of the file, which is the order of the paper. It
 // matters here only because it is the order the register is written in, and a
 // register whose order is stable is a register a re-run does not rewrite.
 func Objects(file, body string) []Object {
 	var out []Object
-	for _, m := range block.FindAllStringSubmatchIndex(body, -1) {
-		o := Object{File: file, Local: body[m[4]:m[5]], Class: firstClass(body[m[6]:m[7]])}
+	for _, o := range Blocks(file, body) {
 		if !Taggable(o.Class) {
 			continue
 		}
 		out = append(out, o)
+	}
+	return out
+}
+
+// Blocks reads every attribute block, taggable or not.
+//
+// Objects is what the assignment walks, because a footnote does not get a tag.
+// This is what a reader of the object model walks, because a footnote is still
+// an object and its kind is still one of the sixteen.
+func Blocks(file, body string) []Object {
+	var out []Object
+	for _, m := range block.FindAllStringSubmatchIndex(body, -1) {
+		out = append(out, Object{File: file, Local: body[m[4]:m[5]], Class: firstClass(body[m[6]:m[7]])})
 	}
 	return out
 }

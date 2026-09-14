@@ -498,6 +498,13 @@ T09   pass   26
 T10   pass   26
 T11   pass   26
 T13   pass   26
+G01   pass   2
+G02   pass   26
+G03   pass   2
+G04   pass   2
+G05   pass   26
+G06   pass   26
+X01   pass   26
 
 26 files over 2 papers, nothing found
 ```
@@ -508,9 +515,18 @@ The three that catch what a bad extraction actually leaves behind are the last o
 `T11` is HTML a converter gave up on, which matters most on the render path, because a table left as `<table>` markup passes every other group in the audit and is unreadable.
 `T13` is a word the page broke in half at a hyphen, which is soft, because sometimes a hyphen is a hyphen.
 
+Group G reads the register against the bodies the tags in it were written into.
+The register is the record and the content files are the copy, which is the shape of the group: `G01`, `G03` and `G04` read the register on its own, `G06` reads the copy on its own, and `G05` is the two disagreeing, which is what a rewrite that stopped half way leaves behind and is the state that makes a tag resolve to the wrong object rather than to nothing.
+`G02` is the rule that pays for scoping tags to a paper: a bare `03QK` is not a reference here, because `03QK` exists in thousands of papers and means something different in each, and the reference is `2106.09685#03QK`.
+`G06` scans a body with the same function `ax tags assign` scans it with, so the rule and the command cannot disagree about what a taggable object is, and a paper nobody has tagged fails it on every object it has, which is the answer wanted: content is committed tagged.
+
+`X01` is the object model, and it holds every object to one of the sixteen kinds in 06-objects.md, because the kind is what every later group dispatches on.
+A block the extractor gave an anchor and no class is reported by it too.
+That block still gets a tag, on purpose, because an anchor nothing can be written against is worse than a tag on something that turns out to be a footnote, and it is still a hole in the class mapping.
+
 The checked column is the point of the whole thing.
 A rule with no findings and nothing checked has not passed, it has not run, and the two are different states in the report and not the same green tick.
-`T04`, `T06` and `T07` are about a paper rather than a file, which is why they say 2 where the rest say 26.
+`T04`, `T06`, `T07`, `G01`, `G03` and `G04` are about a paper rather than a file, which is why they say 2 where the rest say 26.
 `T08` says 24 because an abstract is as long as its author made it and is not a section that came out too short.
 
 Mathematics and code are masked out of a body before any of these read it, delimiters and all, with every line kept exactly where it was so a finding still points at a line somebody can open.
@@ -518,6 +534,9 @@ Without it `$a<b>c$` is an HTML tag, a listing that shows a table is raw markup,
 
 `T12`, which is a Markdown link left in a body, is not here.
 It arrives with group R, because on the render path a link to `#bib.bib28` is a link `ax refs` has not resolved yet, and telling that apart from a leak means reading the bibliography.
+`G07` and `G08` are not here either: `G07` is about tombstones and nothing writes one until `ax tags diff`, and `G08` reads git history for a tag that used to be in a register and is not any more, which is the same milestone.
+Of group X only `X01` runs, because the other eight read a result, a concept or an artefact record and none of those three things exist yet.
+Every one of them is named in the source with what it needs, because a rule registered before it can run is a rule everybody believes is working.
 
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.

@@ -6,6 +6,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -21,14 +22,19 @@ import (
 // run them over, which is the trade the two planes were split on: every paper
 // on arXiv has a record and only the ones somebody extracted have content.
 //
-// Group T is here in full bar T12. That rule fails a Markdown link left in a
-// body, and on the render path a link into the paper's own bibliography is
-// deliberately left for ax refs to resolve, so the rule cannot tell a leak from
-// work in progress until it can read the bibliography. It arrives with group R.
-// The other groups in 2166-10 that read content are not here yet for the same
-// reason the S rules that read content were not here before: a rule registered
-// before it can run is a rule everybody believes is working.
-var ContentRules = []Rule{
+// Three groups so far and none of the three complete. The rules that are
+// missing are named in the three lists, each with what it needs and where that
+// arrives, because a rule registered before it can run is a rule everybody
+// believes is working.
+var ContentRules = slices.Concat(structureRules, tagRules, objectRules)
+
+// structureRules say a content file is a content file.
+//
+// Group T in full bar T12. That rule fails a Markdown link left in a body, and
+// on the render path a link into the paper's own bibliography is deliberately
+// left for ax refs to resolve, so the rule cannot tell a leak from work in
+// progress until it can read the bibliography. It arrives with group R.
+var structureRules = []Rule{
 	{
 		ID: "T01", Group: GroupStructure, Hard: true,
 		Says: "every content file parses: front matter, then body",
@@ -167,7 +173,9 @@ func (c Content) Run(papers []axid.ID) (Report, error) {
 		if err != nil {
 			return report, err
 		}
-		c.paper(col, id, files)
+		if err := c.paper(col, id, files); err != nil {
+			return report, err
+		}
 		report.Records += len(files)
 		report.Shards++
 		if c.Log != nil {
@@ -186,6 +194,9 @@ type content struct {
 	path string
 	raw  []byte
 	doc  extract.Document
+	// masked is the body with its mathematics and its code blanked out, which
+	// is what every rule about the shape of prose reads.
+	masked string
 	// ok says the file parsed. Everything but T01 and T02 needs it.
 	ok bool
 }
@@ -213,6 +224,7 @@ func (c Content) read(id axid.ID) ([]content, error) {
 		}
 		if doc, err := extract.ParseDocument(b); err == nil {
 			f.doc, f.ok = doc, true
+			f.masked = mask(doc.Body)
 		}
 		out = append(out, f)
 	}
@@ -221,7 +233,7 @@ func (c Content) read(id axid.ID) ([]content, error) {
 }
 
 // paper runs every rule over one paper.
-func (c Content) paper(col *collector, id axid.ID, files []content) {
+func (c Content) paper(col *collector, id axid.ID, files []content) error {
 	shard := corpus.Shard(id)
 	for _, f := range files {
 		at := func(rule string, line int, what string, args ...any) {
@@ -263,15 +275,14 @@ func (c Content) paper(col *collector, id axid.ID, files []content) {
 			at("T03", 0, "has been edited since it was written, and ax split -accept is what records that")
 		}
 
-		body := mask(f.doc.Body)
 		col.checked("T05")
-		c.headings("T05", at, body)
+		c.headings("T05", at, f.masked)
 		col.checked("T10")
-		c.furniture("T10", at, body)
+		c.furniture("T10", at, f.masked)
 		col.checked("T11")
-		c.markup("T11", at, body)
+		c.markup("T11", at, f.masked)
 		col.checked("T13")
-		c.hyphens("T13", at, body)
+		c.hyphens("T13", at, f.masked)
 
 		n := utf8.RuneCountInString(strings.TrimSpace(f.doc.Body))
 		if f.doc.Front.Kind != "front" {
@@ -299,7 +310,7 @@ func (c Content) paper(col *collector, id axid.ID, files []content) {
 		}
 	}
 	if len(parsed) == 0 {
-		return
+		return nil
 	}
 
 	col.checked("T04")
@@ -337,6 +348,8 @@ func (c Content) paper(col *collector, id axid.ID, files []content) {
 		}
 		break
 	}
+
+	return c.tagged(col, id, parsed)
 }
 
 const (
