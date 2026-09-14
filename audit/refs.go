@@ -340,6 +340,13 @@ func matches(e refs.Entry, rec metadata.Record) (string, bool) {
 // id, in the citation form or as one of the site's own paths. A bare 2501.00001
 // in a body is a number, and a rule that read every number that way would spend
 // its time on page ranges and equation numbers.
+//
+// The id form is deliberately not anchored, because an identifier is read
+// wherever a sentence puts it. CodeQL reads the arxiv.org in it as a host check
+// that could be bypassed by a URL carrying that host somewhere in the middle,
+// which would matter if anything here decided access from it. Nothing does. This
+// scans prose for a mention, and what says the paper exists is R01 asking the
+// metadata plane and not the shape of the text it was written in.
 var (
 	arxivRef   = regexp.MustCompile(`(?i)arxiv(?:\.org/(?:abs|pdf|html)/|[:\s]\s*)((?:\d{4}\.\d{4,5})|(?:[a-z-]+(?:\.[A-Za-z]{2})?/\d{7}))`)
 	anchorDef  = regexp.MustCompile(`\{#([^\s}]+)`)
