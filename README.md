@@ -102,6 +102,42 @@ That makes a fetch idempotent and hash checked, in that order.
 A file already on disk whose hash matches is returned without a request, which is what makes re-running an interrupted batch cheap.
 A file whose hash does not match is a finding and never an overwrite, because a source that moved under a paper the corpus has already extracted is exactly the event the manifest exists to catch.
 
+Once a rendering is on disk, `ax extract` reads it.
+
+```
+$ ax extract render -n 2312.00752v2
+2312.00752v2  arXiv:2312.00752v2 [cs.LG] 31 May 2024
+  licence     CC BY 4.0
+  title       Mamba: Linear-Time Sequence Modeling with Selective State Spaces
+  authors     Albert Gu, Tri Dao
+  abstract    1 block
+  headings    111
+  blocks      2 algorithm, 26 equation, 32 figure, 23 list, 2 listing, 201 paragraph, 1 proof, 8 table, 3 theorem
+  unparsed    18
+  faults      none
+```
+
+The render path costs one HTTP GET and no model call, and it gives back more than text.
+Every piece of mathematics in arXiv's rendering carries an `alttext` attribute holding the LaTeX the author typed, and the MathML beside it is only what a browser draws, so the corpus keeps the LaTeX and throws the MathML away and regenerates it at build time with KaTeX.
+Figures keep their captions, their numbers and their files, including the SVGs that arrive as an `object` rather than an `img`.
+Tables keep their cells, their headings, their alignment and their spans.
+Theorems keep whatever the author called them, so a paper full of claims and remarks reads as one rather than as a column of the word theorem.
+`-outline` prints the whole document, heading by heading and block by block.
+
+Reading and writing are separate commands because the reject rule sits between them.
+
+```
+$ ax extract render -n 2501.00001v3
+  faults      1, 1 of them inside the body of the paper
+2501.00001v3: extract: the rendering has 1 conversion error inside the body of the paper, so a piece of the paper is missing
+  at S1: \nothingmacro
+```
+
+LaTeXML leaves an error marker in place of anything it could not read.
+One in a bibliography entry is a reference that prints badly, and about a quarter of arXiv's conversions carry at least one of those, so rejecting on the first would throw away most of the corpus to fix a typo in a citation.
+One inside a section body is a sentence of the paper that is gone, and that is a rejection however many there are.
+A rejected paper is not a failed paper: it falls through to the source path, where LaTeXML runs here with this project's flags rather than arXiv's, and a good share of the errors do not happen twice.
+
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
 
