@@ -661,6 +661,32 @@ Nothing is written when more than a fifth of a paper's objects fall through to p
 The label is on the source path only, since neither arXiv's HTML nor LaTeXML's own carries it, so a paper on the render path is matched by number, content and sequence, which works and is weaker.
 Both versions are read out of `work/`, which is where every conversion and every rendering is kept with its version in the name, and which is the reason they are kept: the content plane holds one extraction of a paper and a comparison needs two.
 
+`ax tags report` is the same question asked of the whole corpus instead of one paper.
+
+```
+$ ax tags report
+58 tags over 1 paper, 0 tombstoned
+116 objects across 2 revisions, 3.4% fell through to pass four
+  label     68
+  number    44
+  content   0
+  sequence  1
+  new       3
+  gone      0
+written to reports/tags.md
+```
+
+The fall through rate is the one number that says whether the permanent names in this corpus are being read off or guessed at.
+Passes one to three match on equality and pass four matches on similarity, so an object that reaches pass four had its name decided by a judgement, and an object no pass could match got a new name on the same judgement from the other side.
+The gate in `ax tags diff` refuses one paper at a time and only when somebody runs it, and this is how the corpus answers before a run meets the line.
+
+Every version is compared against the next rather than the first against the last, because that is the comparison the corpus actually makes: a register is carried from the version it was assigned against onto the one after it.
+That is why the direct preference optimization paper reads 3.4 per cent here and 7 per cent in the diff above, which is the same paper measured over two steps instead of one.
+Each revision is matched again at report time and not read back from what the matcher said when the register was carried, because the matcher is the thing being measured and a number kept from an older one would answer about that instead.
+
+A version the cache does not hold is skipped rather than fetched, so this reads the disk and never the network, and `reports/tags.md` lists each paper's cached versions next to its tags, which is what says why a paper with four versions has one revision in it.
+A corpus with one version of everything has compared nothing, and the report says so rather than printing a rate of nought, which would claim every name was read off when nothing had looked.
+
 `ax audit -plane content` is where all of that gets checked rather than trusted.
 
 ```

@@ -1399,9 +1399,30 @@ jobs:
             exit 1
           fi
           ARXIV_CORPUS=/tmp/diff-corpus ax tags diff 2501.00001 -from v3 -to v4 -w 2>&1 | grep -q "assigned against v4"
+      # The number 12-plan.md asks to be recorded, read off the corpus the steps
+      # above built. One revision, thirteen objects matched by number, one moved
+      # and matched by content, and one theorem that is new, so one in fifteen
+      # did not come off equality.
+      - name: the fall through rate is counted over the corpus
+        run: |
+          ARXIV_CORPUS=/tmp/diff-corpus ax tags report 2>&1 | tee /tmp/tagsreport.txt
+          grep -q "15 tags over 1 paper, 0 tombstoned" /tmp/tagsreport.txt
+          grep -q "15 objects across 1 revision, 6.7% fell through to pass four" /tmp/tagsreport.txt
+          md=/tmp/diff-corpus/reports/tags.md
+          grep -q "^| 2501.00001 | v3 to v4 | 15 | 0 | 13 | 1 | 0 | 1 | 0 | 6.7% |$" $md
+          grep -q "^| 2501.00001 | v4 | 15 | 15 | 0 | 2 | v3 v4 |$" $md
+          # Under the fifth, so nothing is called out and the section is not there.
+          if grep -q "a run would refuse to write" $md; then
+            echo "a revision under the threshold was called out"
+            exit 1
+          fi
+          # A corpus with one version of everything has nothing to compare, and
+          # that is not a rate of nought.
+          ARXIV_CORPUS=/tmp/extract-corpus ax tags report -o /tmp/nothing.md 2>&1 | grep -q "nothing was compared"
+          grep -q "Nothing has been compared across a revision yet" /tmp/nothing.md
       - name: tags refuses the arguments it should refuse
         run: |
-          for c in "tags" "tags assign" "tags verify" "tags assign not-an-arxiv-id" "tags assign 2502.00002" "tags diff" "tags diff 2501.00001" "tags diff 2501.00001 -from v4 -to v3" "tags diff 2501.00001 -from v3 -to v9" "tags diff not-an-arxiv-id -from v1 -to v2" "tags diff 2501.00001 2501.00002 -from v3 -to v4"; do
+          for c in "tags" "tags assign" "tags verify" "tags assign not-an-arxiv-id" "tags assign 2502.00002" "tags diff" "tags diff 2501.00001" "tags diff 2501.00001 -from v4 -to v3" "tags diff 2501.00001 -from v3 -to v9" "tags diff not-an-arxiv-id -from v1 -to v2" "tags diff 2501.00001 2501.00002 -from v3 -to v4" "tags report 2501.00001"; do
             if ARXIV_CORPUS=/tmp/extract-corpus ax $c; then
               echo "ax $c was allowed"
               exit 1
