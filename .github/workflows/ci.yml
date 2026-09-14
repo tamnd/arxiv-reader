@@ -1083,7 +1083,7 @@ jobs:
               exit 1
             fi
           done
-      # Groups T, G and X over the paper the steps above built, fetched,
+      # Groups T, M, G and X over the paper the steps above built, fetched,
       # rendered, split, figured, tabled, referenced and tagged. Every rule has
       # to say pass and not "not run": a rule with nothing to look at has not
       # passed anything, and telling those two apart is what the four states are
@@ -1092,12 +1092,12 @@ jobs:
         run: |
           ARXIV_CORPUS=/tmp/extract-corpus ax audit -plane content -q | tee /tmp/audit-content.txt
           grep -q "3 files over 1 paper, nothing found" /tmp/audit-content.txt
-          test "$(grep -cE '^[TGX][0-9]+ +pass ' /tmp/audit-content.txt)" = 19
+          test "$(grep -cE '^[TMGX][0-9]+ +pass ' /tmp/audit-content.txt)" = 31
           if grep -q "not run" /tmp/audit-content.txt; then
             echo "a content rule had nothing to look at"
             exit 1
           fi
-      # And the same nineteen rules over nothing at all, which has to read as
+      # And the same thirty one rules over nothing at all, which has to read as
       # not run rather than as a clean corpus. A green audit over an empty plane
       # is the single easiest way for this project to lie to itself.
       - name: an empty content plane runs nothing rather than passing everything
@@ -1105,11 +1105,12 @@ jobs:
           rm -rf /tmp/empty-corpus && mkdir -p /tmp/empty-corpus
           ARXIV_CORPUS=/tmp/empty-corpus ax audit -plane content -q | tee /tmp/audit-empty.txt
           grep -q "0 files over 0 papers, nothing to check" /tmp/audit-empty.txt
-          test "$(grep -cE '^[TGX][0-9]+ +not run ' /tmp/audit-empty.txt)" = 19
+          test "$(grep -cE '^[TMGX][0-9]+ +not run ' /tmp/audit-empty.txt)" = 31
       # Each rule fired by breaking the one thing it is about. A rule that has
       # only ever been watched passing is a rule nobody has tested.
       - name: a content file that is wrong fails the rule that is about it
         run: |
+          front=/tmp/broken-corpus/content/en/2501/2501.00001/00_front.md
           intro=/tmp/broken-corpus/content/en/2501/2501.00001/01_introduction.md
           results=/tmp/broken-corpus/content/en/2501/2501.00001/02_results.md
           reg=/tmp/broken-corpus/tags/2501/2501.00001.tags
@@ -1118,9 +1119,28 @@ jobs:
           # T03's finding and not the one under test, so the cases that append
           # restamp it the way a person correcting a file by hand would.
           restamp() { ARXIV_CORPUS=/tmp/broken-corpus ax split -accept 2501.00001 > /dev/null; }
+          # add puts a paragraph on the end of a file, one argument per line,
+          # with a blank line in front of it so it does not join the paragraph
+          # that was already there.
+          add() { f=$1; shift; printf '\n' >> $f; printf '%s\n' "$@" >> $f; }
           fails() {
             if ARXIV_CORPUS=/tmp/broken-corpus ax audit -plane content -q > /tmp/broken.txt 2>&1; then
               echo "the audit passed a corpus broken for $1"
+              cat /tmp/broken.txt
+              exit 1
+            fi
+            if ! grep -qE "^$1 +fail " /tmp/broken.txt; then
+              echo "$1 did not fire"
+              cat /tmp/broken.txt
+              exit 1
+            fi
+          }
+          # A soft rule is checked the other way round, because it is not
+          # allowed to fail the build. The audit has to come back clean and the
+          # rule has to have found something anyway.
+          soft() {
+            if ! ARXIV_CORPUS=/tmp/broken-corpus ax audit -plane content -q > /tmp/broken.txt 2>&1; then
+              echo "$1 is soft and it failed the build"
               cat /tmp/broken.txt
               exit 1
             fi
@@ -1138,6 +1158,26 @@ jobs:
           copy && rm /tmp/broken-corpus/content/en/2501/2501.00001/00_front.md && fails T06
           copy && printf '\narXiv:2501.00001v3 [math.NT] 2 Jan 2025\n' >> $intro && restamp && fails T10
           copy && printf '\n<table><tr><td>1.0</td></tr></table>\n' >> $intro && restamp && fails T11
+          # The mathematics. Eleven of the twelve are one paragraph appended to
+          # a body, because that is what a correction that went wrong looks
+          # like, and each of the eleven fires on its own.
+          copy && add $intro 'The cost is $n + 1 and nothing else.' && restamp && fails M01
+          copy && add $intro 'Every point of $\R$ is a limit.' && restamp && fails M02
+          copy && add $intro 'The bound is \frac{1}{2} of nothing.' && restamp && fails M03
+          copy && add $intro 'The constant is [illegible] in the printed copy.' && restamp && fails M05
+          copy && add $intro 'We know (see $x)$ that nothing converges.' && restamp && fails M07
+          copy && add $intro '$$' 'a = 1 \\' 'b = 2' '$$' && restamp && fails M08
+          copy && add $intro 'The term $x^{a}^{b}$ is in every row.' && restamp && soft M09
+          copy && add $intro 'The claim is that $a \not b$ holds.' && restamp && fails M10
+          copy && add $intro '\[' 'a = 1' '\]' && restamp && fails M11
+          copy && add $intro 'The value $ x + 1 $ is the one.' && restamp && soft M12
+          copy && add $intro '```' 'echo $HOME' '```' && restamp && fails M13
+          # The twelfth is the one rule in the group that reads a paper rather
+          # than a formula, so it is broken by taking every dollar in the paper
+          # out and leaving the mathematics sitting in the prose. It fires with
+          # M03 beside it, which is the point: a paper whose formulas were
+          # dissolved is wrong in more than one way and green in none of them.
+          copy && sed -i 's/\$//g' $front $intro $results && add $intro 'The step α is at most β whenever γ is small.' && restamp && fails M14
           # The register on its own, then the copy on its own, then the two
           # disagreeing. A tag lives in the register and in the file it was
           # written into, so each of those three is a different way for a paper
