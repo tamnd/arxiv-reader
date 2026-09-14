@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/tamnd/arxiv-reader/harvest"
 	"github.com/tamnd/arxiv-reader/metadata"
@@ -39,11 +40,127 @@ func runHarvest(args []string) error {
 		return harvestStatus(args[1:])
 	case "oai":
 		return harvestOAI(args[1:])
-	case "kaggle", "hf":
-		return fmt.Errorf("harvest %s is part of milestone M1 and is not written yet", args[0])
+	case "kaggle":
+		return harvestSnapshot(metadata.SourceKaggle, args[1:])
+	case "hf":
+		return fmt.Errorf("harvest hf is part of milestone M1 and is not written yet")
 	default:
 		return fmt.Errorf("unknown harvest subcommand %q", args[0])
 	}
+}
+
+// harvestSnapshot reads the Cornell metadata snapshot into the metadata plane.
+//
+// This is the bootstrap: 3.17 million records in an afternoon rather than a
+// week of polite paging at OAI-PMH. The file is not downloaded here, because
+// Kaggle wants a login and a login is not something a build tool should be
+// holding. Fetch it with the kaggle client, or from a Hugging Face mirror, and
+// point this at the file.
+func harvestSnapshot(source metadata.Source, args []string) error {
+	fs := flag.NewFlagSet("ax harvest "+string(source), flag.ContinueOnError)
+	dry := fs.Bool("n", false, "read and report, but write nothing")
+	quiet := fs.Bool("q", false, "no progress")
+	batch := fs.Int("batch", 200000, "records to hold before writing a round of months")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	rest := fs.Args()
+	if len(rest) != 1 {
+		return fmt.Errorf("usage: ax harvest %s [-n] [-q] <arxiv-metadata-oai-snapshot.json>", source)
+	}
+	if *batch < 1 {
+		return errors.New("-batch has to be at least 1")
+	}
+
+	// Archives are not unpacked here on purpose. The file arrives as a zip from
+	// Kaggle and as parquet from most Hugging Face mirrors, and guessing at
+	// container formats is how a tool ends up with four of them and a bug in
+	// each. Unpack it first.
+	if strings.HasSuffix(rest[0], ".gz") || strings.HasSuffix(rest[0], ".zip") {
+		return fmt.Errorf("%s is still packed, and this reads the JSON inside it: unpack it first", rest[0])
+	}
+
+	f, err := os.Open(rest[0])
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	reader := harvest.Snapshot{
+		Source: source,
+		Now:    time.Now,
+	}
+	if !*quiet {
+		reader.Log = func(read, skipped int) {
+			fmt.Fprintf(os.Stderr, "%d records read\n", read)
+		}
+	}
+
+	plane := metadata.Plane{Root: corpusRoot()}
+	// Batched rather than all at once. The whole file is 3.17 million records
+	// and holding the parsed form of it costs more memory than most machines
+	// have, so records accumulate until the batch is full and then every month
+	// they touched is written and the map is dropped.
+	//
+	// Batched rather than one month at a time, too: the file is in identifier
+	// order and not in month order, so a paper from 1998 turns up next to one
+	// from 2024 and writing per record would rewrite every month file three
+	// million times.
+	pending := map[string][]metadata.Record{}
+	held := 0
+	var stats metadata.Stats
+
+	flush := func() error {
+		if *dry || held == 0 {
+			pending = map[string][]metadata.Record{}
+			held = 0
+			return nil
+		}
+		shards := make([]string, 0, len(pending))
+		for shard := range pending {
+			shards = append(shards, shard)
+		}
+		sort.Strings(shards)
+		for _, shard := range shards {
+			s, err := plane.Merge(shard, pending[shard])
+			if err != nil {
+				return fmt.Errorf("%s: %w", shard, err)
+			}
+			stats = stats.Add(s)
+		}
+		pending = map[string][]metadata.Record{}
+		held = 0
+		return nil
+	}
+
+	read, err := reader.Read(f, func(r metadata.Record) error {
+		shard, err := r.Shard()
+		if err != nil {
+			return err
+		}
+		pending[shard] = append(pending[shard], r)
+		held++
+		if held >= *batch {
+			return flush()
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if err := flush(); err != nil {
+		return err
+	}
+
+	if *dry {
+		fmt.Printf("%s, nothing written\n", read)
+		return nil
+	}
+	fmt.Printf("%s from %s\n", stats, read)
+	if read.Skipped > 0 {
+		fmt.Fprintf(os.Stderr, "%d lines had an id this tool cannot place\n", read.Skipped)
+	}
+	return nil
 }
 
 // harvestOAI reads arXiv's own endpoint into the metadata plane.

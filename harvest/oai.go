@@ -63,8 +63,13 @@ const Pace = 3 * time.Second
 type OAI struct {
 	// Endpoint defaults to the package constant.
 	Endpoint string
-	// HTTP defaults to a client with a one minute timeout. A full ListRecords
-	// page is about a megabyte and arXiv is not always quick about it.
+	// HTTP defaults to a client with a five minute timeout.
+	//
+	// Five and not one. http.Client's Timeout covers the whole exchange
+	// including reading the body, a full ListRecords page is a couple of
+	// megabytes of XML, and a busy day at arXiv took longer than a minute to
+	// hand one over. A timeout that fires mid page loses the page and then the
+	// retry asks for it again, which is slower than waiting and ruder.
 	HTTP *http.Client
 	// UserAgent should name the project and a way to get hold of a person.
 	// arXiv blocks anonymous bulk readers and they are right to.
@@ -235,7 +240,7 @@ func (o *OAI) get(ctx context.Context, v url.Values) ([]byte, error) {
 	}
 	client := o.HTTP
 	if client == nil {
-		client = &http.Client{Timeout: time.Minute}
+		client = &http.Client{Timeout: 5 * time.Minute}
 	}
 
 	// Up to five tries. Beyond that the endpoint is down rather than busy, and

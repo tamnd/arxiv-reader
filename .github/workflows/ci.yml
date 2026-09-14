@@ -133,8 +133,8 @@ jobs:
             echo "translate exited zero without doing anything"
             exit 1
           fi
-          if ax harvest kaggle; then
-            echo "harvest kaggle exited zero without harvesting anything"
+          if ax harvest hf; then
+            echo "harvest hf exited zero without harvesting anything"
             exit 1
           fi
       # These reach no further than the argument check, which is the point. CI
@@ -158,3 +158,29 @@ jobs:
             echo "a backwards date range was accepted"
             exit 1
           fi
+          if ax harvest kaggle; then
+            echo "a snapshot harvest with no file was allowed"
+            exit 1
+          fi
+          if ax harvest kaggle /tmp/does-not-exist.json; then
+            echo "a snapshot harvest of a missing file exited zero"
+            exit 1
+          fi
+          : > /tmp/snapshot.json.gz
+          if ax harvest kaggle /tmp/snapshot.json.gz; then
+            echo "a packed file was read as if it were JSON"
+            exit 1
+          fi
+      - name: a snapshot harvest reads a snapshot
+        run: |
+          mkdir -p /tmp/snap-corpus
+          printf '%s\n' '{"id":"2106.09685","title":"LoRA","abstract":"a","categories":"cs.CL","license":"http://creativecommons.org/licenses/by/4.0/","versions":[{"version":"v1","created":"Thu, 17 Jun 2021 00:00:00 GMT"}],"authors_parsed":[["Hu","Edward J.",""]]}' > /tmp/snapshot.json
+          ARXIV_CORPUS=/tmp/snap-corpus ax harvest kaggle /tmp/snapshot.json
+          n=$(ARXIV_CORPUS=/tmp/snap-corpus ax harvest status -total)
+          if [ "$n" != "1" ]; then
+            echo "the plane holds $n records after a one record snapshot"
+            exit 1
+          fi
+          # Reading the same file twice must change nothing, or every harvest
+          # is a commit and the history stops meaning anything.
+          ARXIV_CORPUS=/tmp/snap-corpus ax harvest kaggle /tmp/snapshot.json | grep -q "1 unchanged"
