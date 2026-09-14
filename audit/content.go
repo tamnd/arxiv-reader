@@ -22,11 +22,11 @@ import (
 // run them over, which is the trade the two planes were split on: every paper
 // on arXiv has a record and only the ones somebody extracted have content.
 //
-// Three groups so far and none of the three complete. The rules that are
-// missing are named in the three lists, each with what it needs and where that
-// arrives, because a rule registered before it can run is a rule everybody
-// believes is working.
-var ContentRules = slices.Concat(structureRules, tagRules, objectRules)
+// Four groups so far and none of the four complete. The rules that are missing
+// are named in the four lists, each with what it needs and where that arrives,
+// because a rule registered before it can run is a rule everybody believes is
+// working.
+var ContentRules = slices.Concat(structureRules, mathRules, tagRules, objectRules)
 
 // structureRules say a content file is a content file.
 //
@@ -349,7 +349,11 @@ func (c Content) paper(col *collector, id axid.ID, files []content) error {
 		break
 	}
 
-	return c.tagged(col, id, parsed)
+	if err := c.tagged(col, id, parsed); err != nil {
+		return err
+	}
+	c.maths(col, id, parsed)
+	return nil
 }
 
 const (
@@ -478,30 +482,20 @@ func (c Content) hyphens(rule string, at finder, body string) {
 // has angle brackets, and TeX has hashes. Blanking them keeps every line number
 // and every line count exactly where it was, so a finding still points at the
 // line somebody has to open.
+//
+// Where the code and the mathematics are is classify's answer and not this
+// function's, so this group and the M rules cannot end up with two opinions
+// about which lines are a fence.
 func mask(body string) string {
-	lines := strings.Split(body, "\n")
-	fenced, display := false, false
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		switch {
-		case strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~"):
-			fenced = !fenced
-			lines[i] = blank(line)
-			continue
-		case fenced:
-			lines[i] = blank(line)
-			continue
-		case trimmed == "$$":
-			display = !display
-			lines[i] = blank(line)
-			continue
-		case display:
-			lines[i] = blank(line)
+	b := classify(body)
+	for i, line := range b.text {
+		if b.kind[i] == kindProse {
+			b.text[i] = inline(line)
 			continue
 		}
-		lines[i] = inline(line)
+		b.text[i] = blank(line)
 	}
-	return strings.Join(lines, "\n")
+	return strings.Join(b.text, "\n")
 }
 
 // inline blanks the mathematics inside one line, delimiters and all.

@@ -46,6 +46,8 @@ const (
 	// GroupStructure is T, the group that says a content file is a content
 	// file.
 	GroupStructure Group = "T"
+	// GroupMath is M, the group that reads the mathematics.
+	GroupMath Group = "M"
 	// GroupTags is G, the group that reads a paper's register against the
 	// bodies the tags in it were written into.
 	GroupTags Group = "G"
@@ -60,6 +62,8 @@ func (g Group) Name() string {
 		return "Sources"
 	case GroupStructure:
 		return "Structure"
+	case GroupMath:
+		return "Mathematics"
 	case GroupTags:
 		return "Tags"
 	case GroupObjects:
