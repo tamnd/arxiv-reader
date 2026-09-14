@@ -46,6 +46,7 @@ func extractSource(args []string) error {
 	// is on the PATH is a thing somebody eventually needs to be able to choose
 	// without editing their PATH to do it.
 	binary := fs.String("latexmlc", latexml.Binary, "the LaTeXML to run, for a machine with more than one or with it somewhere unusual")
+	post := fs.String("latexmlpost", latexml.Post, "the LaTeXML post processor to run, which ships with the same install")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -73,7 +74,7 @@ func extractSource(args []string) error {
 	if err != nil {
 		return err
 	}
-	conv := &latexml.Converter{Binary: *binary, Timeout: *budget}
+	conv := &latexml.Converter{Binary: *binary, Post: *post, Timeout: *budget}
 	if err := conv.Available(); err != nil {
 		return err
 	}
@@ -256,10 +257,17 @@ func styles(ctx context.Context, conv *latexml.Converter, dir, main, dest string
 	}
 	// The first document is written back rather than converted again, because
 	// the bytes are still here and a third conversion would cost minutes to
-	// arrive at something already in hand.
+	// arrive at something already in hand. Both files of it: a page from one
+	// pass beside the XML of the other is a set of labels that point at anchors
+	// which are not there.
 	fmt.Fprintf(os.Stderr, "%s: reading the style files did not help, so the first conversion is the one kept\n", entry.Ref())
 	if err := os.WriteFile(dest, res.HTML, 0o644); err != nil {
 		return nil, res, err
+	}
+	if len(res.XML) > 0 {
+		if err := os.WriteFile(latexml.XMLPath(dest), res.XML, 0o644); err != nil {
+			return nil, res, err
+		}
 	}
 	return first, res, nil
 }
@@ -280,11 +288,31 @@ func holes(p *extract.Paper) int {
 	return n
 }
 
+// parse reads the document, and puts the author's labels back on it.
+//
+// Two files and not one, because the name the author gave a theorem is in
+// neither the page LaTeXML writes nor the one arXiv serves. The post processor
+// turns every \label into the number the paper prints and the name does not
+// reach the page, so it is read out of the XML the post processor was given and
+// matched back on by the anchor, which is the same string in both.
 func parse(res latexml.Result, id axid.ID, entry fetch.Source) (*extract.Paper, error) {
 	p, err := extract.Parse(res.HTML, id.Canonical, id.Version)
 	if err != nil {
 		return nil, fmt.Errorf("%s converted and the result does not read as a LaTeXML document: %w", entry.Ref(), err)
 	}
+	if len(res.XML) == 0 {
+		return p, nil
+	}
+	byID, err := extract.Labels(res.XML)
+	if err != nil {
+		// Not a rejection. A paper with no labels on it is a paper ax tags diff
+		// follows by its second pass instead, which is what every paper off the
+		// render path is, so a document that will not parse as XML costs the
+		// stronger pass and not the extraction.
+		fmt.Fprintf(os.Stderr, "%s: the conversion's XML does not read, so this paper carries no labels: %v\n", entry.Ref(), err)
+		return p, nil
+	}
+	p.Label(byID)
 	return p, nil
 }
 
@@ -301,10 +329,14 @@ func converted(ctx context.Context, conv *latexml.Converter, dir, main, dest, re
 			fmt.Fprintf(os.Stderr, "%s was converted already, at %s, and -again converts it afresh\n", ref, dest)
 			// The log is read back with it, because the status is in the log and
 			// nowhere else, and a document reused without its status is one this
-			// cannot tell a clean conversion from a conversion that stopped.
+			// cannot tell a clean conversion from a conversion that stopped. The
+			// XML for the same reason: the author's labels are in it and in
+			// nothing else that was kept.
 			log, _ := os.ReadFile(dest + ".log")
+			xml, _ := os.ReadFile(latexml.XMLPath(dest))
 			return latexml.Result{
 				HTML:    body,
+				XML:     xml,
 				Dest:    dest,
 				Status:  latexml.Status(log),
 				Log:     log,

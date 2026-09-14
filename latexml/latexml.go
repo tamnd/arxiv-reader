@@ -34,6 +34,18 @@ import (
 // Binary is the program this package runs.
 const Binary = "latexmlc"
 
+// Post is the program that turns what Binary wrote into a page.
+//
+// LaTeXML is two programs and latexmlc is a front end that runs both in one go.
+// This runs them one at a time, because the document between them is the only
+// place the author's \label survives: latexmlc writes XML with labels="LABEL:
+// thm:main" on the element, the post processor resolves every label into a
+// cross reference, and the HTML that comes out has the number the paper prints
+// and not the name the author chose. The XML's xml:id is the same string as the
+// HTML's id, so keeping the middle step is enough to know which element on the
+// page the author called what.
+const Post = "latexmlpost"
+
 // Timeout is how long one paper gets.
 //
 // Five minutes, which is the number in 2166-04. A TeX document can loop, and a
@@ -89,6 +101,8 @@ type Converter struct {
 	// Binary defaults to the package constant and exists so a test can point
 	// at a script that behaves like LaTeXML and is not LaTeXML.
 	Binary string
+	// Post defaults to the package constant, for the same reason.
+	Post string
 	// Timeout defaults to the package constant. Zero means the default rather
 	// than no limit, because the dangerous value is the one that waits forever
 	// and it is the one a caller should have to write down.
@@ -112,8 +126,12 @@ type Converter struct {
 type Result struct {
 	// HTML is the document, read back off disk.
 	HTML []byte
-	// Dest is where it was written, which is also where the pictures LaTeXML
-	// made or copied are.
+	// XML is what the conversion wrote before the post processor read it, and
+	// it is kept for one attribute: the author's \label, which the post
+	// processor spends itself turning into numbers.
+	XML []byte
+	// Dest is where the document was written, which is also where the pictures
+	// LaTeXML made or copied are.
 	Dest string
 	// Status is LaTeXML's own reading of how it went.
 	Status int
@@ -136,8 +154,10 @@ type Result struct {
 // answer is the same for every paper in it and it is a line the person running
 // the command has to act on.
 func (c *Converter) Available() error {
-	if _, err := exec.LookPath(c.binary()); err != nil {
-		return &NotInstalled{Binary: c.binary()}
+	for _, bin := range []string{c.binary(), c.post()} {
+		if _, err := exec.LookPath(bin); err != nil {
+			return &NotInstalled{Binary: bin}
+		}
 	}
 	return nil
 }
@@ -167,6 +187,9 @@ func (c *Converter) Version(ctx context.Context) (string, error) {
 // A conversion with errors in it is a result and not a failure. LaTeXML writes
 // a document anyway, with a marker where the thing it could not read was, and
 // the caller decides. Only a conversion that wrote nothing is an error here.
+//
+// Two programs run, not one, and the XML between them is kept beside the
+// document at XMLPath(dest). See Post for why.
 func (c *Converter) Convert(ctx context.Context, dir, main, dest string) (Result, error) {
 	if err := c.Available(); err != nil {
 		return Result{}, err
@@ -177,19 +200,55 @@ func (c *Converter) Convert(ctx context.Context, dir, main, dest string) (Result
 	// A stale document from a previous run would be read back as this run's
 	// output if LaTeXML wrote nothing, which is the one way this could report a
 	// conversion that never happened.
-	if err := os.Remove(dest); err != nil && !os.IsNotExist(err) {
-		return Result{}, err
+	middle := XMLPath(dest)
+	for _, path := range []string{dest, middle} {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return Result{}, err
+		}
 	}
 
 	timeout := c.Timeout
 	if timeout == 0 {
 		timeout = Timeout
 	}
+	// One budget for both programs rather than one each. What the budget is for
+	// is a paper that hangs, and a paper that takes four minutes to convert and
+	// four more to paginate is as hung as one that takes eight in a single run.
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	args := []string{
-		"--dest=" + dest,
+	// One writer across both programs, and one writer for both streams within
+	// each. Two writers means two pipes and two goroutines appending to the same
+	// buffer, and the copy that finishes second truncates the buffer back to the
+	// length it read at the start, so the interesting half of the log
+	// disappears. The two streams also interleave the way LaTeXML wrote them
+	// this way, which is how a warning lines up with the file it is about.
+	log := &lineWriter{each: c.Log}
+
+	convert := []string{
+		// No pagination, so the run stops at the XML.
+		"--nopost",
+		"--dest=" + middle,
+	}
+	if c.IncludeStyles {
+		convert = append(convert, "--includestyles")
+	}
+	convert = append(convert, main)
+
+	started := time.Now()
+	err := c.run(ctx, c.binary(), convert, dir, log)
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return Result{}, &TooSlow{Main: main, After: timeout, Log: log.Bytes()}
+	}
+	xml, xmlErr := os.ReadFile(middle)
+	if xmlErr != nil {
+		if err != nil {
+			return Result{}, fmt.Errorf("latexml: converting %s wrote no document: %w%s", main, err, tail(log.Bytes()))
+		}
+		return Result{}, fmt.Errorf("latexml: converting %s reported success and wrote no document to %s%s", main, middle, tail(log.Bytes()))
+	}
+
+	post := []string{
 		"--format=html5",
 		// The LaTeX the author typed, kept beside every formula. It is the
 		// only form of the mathematics worth storing: the MathML next to it is
@@ -203,49 +262,56 @@ func (c *Converter) Convert(ctx context.Context, dir, main, dest string) (Result
 		// Markdown and its own pages, so LaTeXML's CSS is three files nobody
 		// reads and one more thing to keep out of git.
 		"--nodefaultresources",
+		"--dest=" + dest,
+		middle,
 	}
-	if c.IncludeStyles {
-		args = append(args, "--includestyles")
-	}
-	args = append(args, main)
-
-	cmd := exec.CommandContext(ctx, c.binary(), args...)
-	cmd.Dir = dir
-	// One writer for both streams and not two, which is what keeps them one
-	// log. Two writers means two pipes and two goroutines appending to the same
-	// buffer, and the copy that finishes second truncates the buffer back to the
-	// length it read at the start, so the interesting half of the log
-	// disappears. The two streams also interleave the way LaTeXML wrote them
-	// this way, which is how a warning lines up with the file it is about.
-	log := &lineWriter{each: c.Log}
-	cmd.Stdout = log
-	cmd.Stderr = log
-	// Killing latexmlc does not kill whatever it started, and a child holding
-	// the other end of the pipe keeps the wait going long after the thing that
-	// ran out of time was stopped. This caps that at a grace period.
-	cmd.WaitDelay = grace
-
-	started := time.Now()
-	err := cmd.Run()
+	// Run from the submission, like the conversion was, because the pictures
+	// the XML names are named the way the author wrote them and that is
+	// relative to the paper.
+	err = c.run(ctx, c.post(), post, dir, log)
 	took := time.Since(started)
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return Result{}, &TooSlow{Main: main, After: timeout, Log: log.Bytes()}
 	}
 	body, readErr := os.ReadFile(dest)
 	if err != nil && readErr != nil {
-		return Result{}, fmt.Errorf("latexml: converting %s wrote no document: %w%s", main, err, tail(log.Bytes()))
+		return Result{}, fmt.Errorf("latexml: paginating %s wrote no document: %w%s", main, err, tail(log.Bytes()))
 	}
 	if readErr != nil {
-		return Result{}, fmt.Errorf("latexml: converting %s reported success and wrote no document to %s%s", main, dest, tail(log.Bytes()))
+		return Result{}, fmt.Errorf("latexml: paginating %s reported success and wrote no document to %s%s", main, dest, tail(log.Bytes()))
 	}
 	return Result{
 		HTML:    body,
+		XML:     xml,
 		Dest:    dest,
 		Status:  Status(log.Bytes()),
 		Log:     log.Bytes(),
 		Missing: Missing(log.Bytes()),
 		Took:    took,
 	}, nil
+}
+
+// XMLPath is where the document between the two programs is kept, given where
+// the page goes.
+//
+// Beside it and not inside the submission, for the reason the page is: LaTeXML
+// writes the pictures a paper uses next to what it produces, and a destination
+// inside the submission would leave the tool's output mixed in with the
+// author's files.
+func XMLPath(dest string) string {
+	return strings.TrimSuffix(dest, filepath.Ext(dest)) + ".xml"
+}
+
+func (c *Converter) run(ctx context.Context, bin string, args []string, dir string, log *lineWriter) error {
+	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd.Dir = dir
+	cmd.Stdout = log
+	cmd.Stderr = log
+	// Killing latexmlc does not kill whatever it started, and a child holding
+	// the other end of the pipe keeps the wait going long after the thing that
+	// ran out of time was stopped. This caps that at a grace period.
+	cmd.WaitDelay = grace
+	return cmd.Run()
 }
 
 // grace is how long a stopped conversion gets to actually stop.
@@ -256,6 +322,13 @@ func (c *Converter) binary() string {
 		return c.Binary
 	}
 	return Binary
+}
+
+func (c *Converter) post() string {
+	if c.Post != "" {
+		return c.Post
+	}
+	return Post
 }
 
 // reports is the line LaTeXML ends with, which carries its own status and not

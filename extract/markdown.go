@@ -124,7 +124,7 @@ func (w *body) section(s Section, depth int, path []int) {
 	if s.Tag != "" {
 		heading += s.Tag + " "
 	}
-	a := attrs{id: id, class: "section"}
+	a := attrs{id: id, class: "section"}.with("label", s.Label)
 	if s.Kind == "appendix" {
 		a = a.with("kind", "appendix")
 	}
@@ -166,7 +166,7 @@ func (w *body) block(b Block, parent within, i int) string {
 	case KindTheorem:
 		w.theorem(b, id)
 	case KindProof:
-		w.label(proofTitle(b), attrs{id: id, class: "proof"})
+		w.label(proofTitle(b), attrs{id: id, class: "proof"}.with("label", b.Label))
 		w.blocks(b.Blocks, within{})
 	default:
 		w.para(b.Text)
@@ -213,7 +213,7 @@ func (w *body) equation(b Block, id string) {
 	w.equations++
 	w.objects++
 	s := "$$\n" + b.Text + "\n$$"
-	if a := (attrs{id: id, class: "equation"}); id != "" {
+	if a := (attrs{id: id, class: "equation"}.with("label", b.Label)); id != "" {
 		s += "\n" + a.String()
 	}
 	w.para(s)
@@ -228,7 +228,7 @@ func (w *body) equation(b Block, id string) {
 // is one numbered thing with six panels under it.
 func (w *body) float(b Block, id string) {
 	class := classOf(b)
-	w.label(floatTitle(b), attrs{id: id, class: class})
+	w.label(floatTitle(b), attrs{id: id, class: class}.with("label", b.Label))
 	switch class {
 	case "figure":
 		w.figures = append(w.figures, id)
@@ -293,7 +293,7 @@ func (w *body) contained(b Block) string {
 }
 
 func (w *body) listing(b Block, id string) {
-	w.label(floatTitle(b), attrs{id: id, class: "code"})
+	w.label(floatTitle(b), attrs{id: id, class: "code"}.with("label", b.Label))
 	w.code++
 	w.listingBody(b)
 	w.para(b.Caption)
@@ -320,7 +320,7 @@ func (w *body) listingBody(b Block) {
 
 func (w *body) theorem(b Block, id string) {
 	class := classOf(b)
-	a := attrs{id: id, class: class}.with("env", strings.ToLower(b.Env))
+	a := attrs{id: id, class: class}.with("env", strings.ToLower(b.Env)).with("label", b.Label)
 	w.label(theoremTitle(b), a)
 	if class == "statement" {
 		w.statements = append(w.statements, id)

@@ -75,6 +75,7 @@ func Files(p *Paper, base Front, pics Pictures) ([]File, error) {
 		// but references to it still have to land somewhere. Naming it here
 		// gives it an identifier the rest of the paper can point at.
 		f.LocalID = n.section(s, []int{i + 1})
+		f.Label = s.Label
 		w.blocks(s.Blocks, within{})
 		for j, sub := range s.Sections {
 			w.section(sub, 2, []int{i + 1, j + 1})

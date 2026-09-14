@@ -298,6 +298,7 @@ func report(p *extract.Paper, outline bool) {
 	fmt.Fprintf(tw, "  headings\t%d\n", p.Headings())
 	fmt.Fprintf(tw, "  blocks\t%s\n", counted(p.Counts()))
 	fmt.Fprintf(tw, "  unparsed\t%d\n", p.Unparsed)
+	fmt.Fprintf(tw, "  labels\t%s\n", labelled(p))
 	fmt.Fprintf(tw, "  faults\t%s\n", where(p.Faults))
 	tw.Flush()
 	if outline {
@@ -330,6 +331,19 @@ func counted(counts map[extract.Kind]int) string {
 		return "none"
 	}
 	return strings.Join(out, ", ")
+}
+
+// labelled says how much of a paper carries the author's own \label.
+//
+// None is the ordinary answer and not a fault. The label is only in LaTeXML's
+// intermediate XML, so it is on the source path and nowhere else, and a paper
+// read off arXiv's rendering has no way to get it.
+func labelled(p *extract.Paper) string {
+	n := p.Labelled()
+	if n == 0 {
+		return "none"
+	}
+	return fmt.Sprintf("%d", n)
 }
 
 // where says how many conversion errors there are and which ones matter.
