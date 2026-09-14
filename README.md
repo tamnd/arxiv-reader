@@ -239,6 +239,61 @@ A recheck that finds the same bytes keeps the time they were first read, so a re
 `-from <dir>` reads the pictures out of a directory instead of off the website.
 That is for somebody who already has the source tarball unpacked, and it is what CI uses, because CI does not talk to arXiv and a committing path nothing exercises is a committing path nobody has run.
 
+`ax tables` keeps every table twice, once as Markdown and once as the markup it was reconstructed from.
+
+```
+$ ax tables -n 2312.00752v2
+2312.00752v2  15 tables
+  t01         Table 4             9 rows by 4 columns
+  t02         Table 1             26 rows by 11 columns
+  ...
+  t11         Table 4             5 rows by 8 columns
+  t12         Table (unnumbered)  3 rows by 8 columns
+$ ax tables 2312.00752v2
+15 tables in tables/2312/2312.00752: 30 written, 0 unchanged, 0 removed
+```
+
+Markdown is what a reader sees and what a translator works on, and it is lossy on purpose.
+It cannot express a cell that spans several rows, a header centred across several columns, or a rule drawn under part of a row, and academic tables use all three constantly.
+The markup is what the loss is measured against.
+
+The files are numbered by position and not by the number the paper prints, because the printed number is not an identifier.
+Mamba prints Table 4 twice, once in the paper and once in an appendix, and prints one table with no number at all, which is what `t12` above is.
+
+```
+$ cat tables/2501/2501.00001/t01.md
+| Model | Accuracy |  |
+| :--- | :---: | :---: |
+| Nothing | 0.0 | 0.1 |
+$ cat tables/2501/2501.00001/t01.tex
+% Table 1 of 2501.00001, rebuilt from arXiv's own rendering.
+% Not the author's source. The spans, the alignment and the rules are LaTeXML's reading of it.
+\begin{tabular}{lcc}
+\textbf{Model} & \multicolumn{2}{c}{\textbf{Accuracy}} \\
+\hline
+Nothing & 0.0 & 0.1 \\
+\end{tabular}
+```
+
+The Markdown loses the span and writes an empty cell where the second column of the header would be.
+The markup says what the header actually covers, and it says in its first line that it is a reconstruction, because a file called `t01.tex` that does not say so is a file somebody will eventually quote as the author's source.
+The source path replaces it with the author's own bytes when a paper goes down that route.
+
+`ax tables check` is rules F11 and F12, which are that both files are there and that they agree on the row count, the column count and every numeric cell.
+
+```
+$ ax tables check 2501.00001
+2501.00001  2 tables in tables/2501/2501.00001
+  t01       fails    F12: number 2 is 0.1 in the Markdown and 0.2 in the markup
+  t02       F11 F12  both files agree
+```
+
+The numbers are the part that matters.
+A table is where a paper's measured results live, and a second representation that quietly reformats one of them is worse than no second representation at all.
+The two files are read into cells and compared cell by cell rather than compared as text, because they lay the same table out differently by design, and mathematics is compared exactly as it stands on both sides.
+
+The Markdown written here is the same text the extractor puts inside the section the table belongs to, from the same emitter, so the two cannot say different things about the same table.
+
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
 

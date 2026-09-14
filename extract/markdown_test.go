@@ -149,7 +149,7 @@ func TestATable(t *testing.T) {
 		"| :--- | :---: | :---: |",
 		"| Nothing | 0.0 | 0.1 |",
 	}, "\n")
-	if got := table(rows); got != want {
+	if got := Table(rows); got != want {
 		t.Fatalf("got\n%s\nwant\n%s", got, want)
 	}
 }
@@ -161,7 +161,7 @@ func TestATableWithNoHeaderKeepsEveryRow(t *testing.T) {
 		{Cells: []Cell{{Text: "a", Span: 1}, {Text: "b", Span: 1}}},
 		{Cells: []Cell{{Text: "c", Span: 1}, {Text: "d", Span: 1}}},
 	}
-	got := table(rows)
+	got := Table(rows)
 	for _, want := range []string{"| a | b |", "| c | d |"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("want %q in\n%s", want, got)
@@ -175,7 +175,7 @@ func TestATableWithNoHeaderKeepsEveryRow(t *testing.T) {
 // A pipe in a cell would end the column early, so it is escaped. Mathematics
 // with a \mid in it arrives here constantly.
 func TestAPipeInACellIsEscaped(t *testing.T) {
-	got := table([]Row{{Cells: []Cell{{Text: "a|b", Span: 1}}}})
+	got := Table([]Row{{Cells: []Cell{{Text: "a|b", Span: 1}}}})
 	if !strings.Contains(got, `a\|b`) {
 		t.Fatalf("got\n%s", got)
 	}

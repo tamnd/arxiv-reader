@@ -42,6 +42,23 @@ func FiguresDir(root string, id axid.ID) string {
 	return path.Join(root, "figures", Shard(id), PathID(id))
 }
 
+// TablesDir is the directory holding one paper's tables.
+//
+// Not per language, for the same reason figures are not. The Markdown a
+// translator works on is the one inside the section file, because that is where
+// the sentence around the table is, and these two files are the English
+// extraction the translation is checked against.
+func TablesDir(root string, id axid.ID) string {
+	return path.Join(root, "tables", Shard(id), PathID(id))
+}
+
+// TableName is what one table's two files are called, without the extension.
+//
+// Numbered by position in the paper and not by the number the paper prints,
+// because a paper can print Table 1 twice in an appendix, can print no number
+// at all, and can call one A.1. Position is the one thing every table has.
+func TableName(n int) string { return fmt.Sprintf("t%02d", n) }
+
 // TagsPath is one paper's tag register.
 //
 // One file per paper rather than one register for the corpus. A single register
