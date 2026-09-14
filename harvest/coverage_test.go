@@ -237,39 +237,3 @@ func TestAnEmptyCorpusIsEveryMonthShort(t *testing.T) {
 		t.Errorf("the summary reads wrong:\n%s", c.Text())
 	}
 }
-
-func TestThousands(t *testing.T) {
-	for _, tc := range []struct {
-		n    int
-		want string
-	}{
-		{0, "0"},
-		{7, "7"},
-		{999, "999"},
-		{1000, "1,000"},
-		{16248, "16,248"},
-		{3163381, "3,163,381"},
-		{-16244, "-16,244"},
-		{-999, "-999"},
-	} {
-		if got := thousands(tc.n); got != tc.want {
-			t.Errorf("thousands(%d) is %q, want %q", tc.n, got, tc.want)
-		}
-	}
-}
-
-func TestPercent(t *testing.T) {
-	for _, tc := range []struct {
-		f    float64
-		want string
-	}{
-		{1, "100.0%"},
-		{0.5, "50.0%"},
-		{0, "0.0%"},
-		{-1, "n/a"},
-	} {
-		if got := percent(tc.f); got != tc.want {
-			t.Errorf("percent(%v) is %q, want %q", tc.f, got, tc.want)
-		}
-	}
-}

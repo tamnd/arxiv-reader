@@ -268,6 +268,37 @@ jobs:
               exit 1
             fi
           done
+      # The one record in the snapshot corpus is cc-by, so the census has one
+      # paper to count and it is one that may be translated.
+      - name: the licence census counts what may be translated
+        run: |
+          out=$(ARXIV_CORPUS=/tmp/snap-corpus ax licence census)
+          echo "$out"
+          echo "$out" | grep -q "Of 1 paper counted, 1 may be translated"
+          grep -q "^# The licence census" /tmp/snap-corpus/reports/licence.md
+          grep -q "^| cc-by | 1 | 100.0% | open | yes | yes |" /tmp/snap-corpus/reports/licence.md
+          grep -q "^| cs | 1 | 1 | 1 |" /tmp/snap-corpus/reports/licence.md
+          # The number is an upper bound and the report has to say so in the
+          # same breath it says the number, because the headline is the part
+          # that gets quoted.
+          grep -q "upper bounds" /tmp/snap-corpus/reports/licence.md
+          grep -q "^## Why this is an upper bound" /tmp/snap-corpus/reports/licence.md
+      - name: an empty plane counts nothing rather than nothing translatable
+        run: |
+          ARXIV_CORPUS=/tmp/empty-corpus ax licence census -q -o /tmp/empty-licence.md
+          grep -q "Nothing counted, because the metadata plane is empty." /tmp/empty-licence.md
+          if grep -q "0.0%" /tmp/empty-licence.md; then
+            echo "an empty plane reported a percentage of nothing"
+            exit 1
+          fi
+      - name: the licence census refuses the arguments it should refuse
+        run: |
+          for c in "licence census -shard 2113" "licence census extra" "licence census -shard 2106"; do
+            if ARXIV_CORPUS=/tmp/empty-corpus ax $c; then
+              echo "ax $c was allowed"
+              exit 1
+            fi
+          done
       - name: the audit refuses the arguments it should refuse
         run: |
           for c in "audit --plane content" "audit --plane both" "audit -rules S99" "audit -rules" "audit -cap 0" "audit -shard 2113" "audit meta"; do
