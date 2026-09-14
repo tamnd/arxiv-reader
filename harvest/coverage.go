@@ -3,10 +3,10 @@ package harvest
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/tamnd/arxiv-reader/internal/prose"
 	"github.com/tamnd/arxiv-reader/metadata"
 )
 
@@ -196,7 +196,7 @@ func (c Coverage) Markdown() string {
 	var b strings.Builder
 	b.WriteString("# The harvest\n\n")
 	fmt.Fprintf(&b, "%s of the %s arXiv says it has announced, which is %s.\n",
-		count(c.Held(), "record"), count(c.Live(), "record"), percent(c.Fraction()))
+		prose.Count(c.Held(), "record"), prose.Count(c.Live(), "record"), prose.Percent(c.Fraction()))
 	fmt.Fprintf(&b, "Read on %s against %s.\n\n", c.Generated.UTC().Format("2 January 2006"), c.Source)
 
 	b.WriteString("arXiv counts a paper in the month it was submitted and this corpus files it under the month its identifier names, which is the month it was announced.\n")
@@ -204,7 +204,7 @@ func (c Coverage) Markdown() string {
 	b.WriteString("A month with nothing in it is a gap.\n\n")
 
 	if empty := c.Empty(); len(empty) > 0 {
-		fmt.Fprintf(&b, "## %s with nothing in them\n\n", count(len(empty), "month"))
+		fmt.Fprintf(&b, "## %s with nothing in them\n\n", prose.Count(len(empty), "month"))
 		b.WriteString("```\n")
 		for _, r := range capRows(empty, 50) {
 			fmt.Fprintf(&b, "%s  %d announced, none held\n", r.Shard, r.Live())
@@ -232,7 +232,7 @@ func (c Coverage) Markdown() string {
 		b.WriteString("| --- | ---: | ---: | ---: | ---: |\n")
 		for _, r := range short {
 			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n",
-				r.Month.Format("2006-01"), thousands(r.Held), thousands(r.Live()), thousands(r.Short()), percent(r.Coverage()))
+				r.Month.Format("2006-01"), prose.Thousands(r.Held), prose.Thousands(r.Live()), prose.Thousands(r.Short()), prose.Percent(r.Coverage()))
 		}
 		b.WriteString("\n")
 	}
@@ -242,25 +242,25 @@ func (c Coverage) Markdown() string {
 	b.WriteString("| --- | ---: | ---: | ---: | ---: |\n")
 	for _, y := range c.Years() {
 		fmt.Fprintf(&b, "| %d | %d of %d | %s | %s | %s |\n",
-			y.Year, y.Harvested, y.Months, thousands(y.Held), thousands(y.Live), percent(y.Fraction()))
+			y.Year, y.Harvested, y.Months, prose.Thousands(y.Held), prose.Thousands(y.Live), prose.Percent(y.Fraction()))
 	}
 
 	b.WriteString("\n## By month\n\n")
 	b.WriteString("| Month | Held | Announced | Difference | Coverage |\n")
 	b.WriteString("| --- | ---: | ---: | ---: | ---: |\n")
 	for _, r := range c.Rows {
-		announced := thousands(r.Live())
+		announced := prose.Thousands(r.Live())
 		if !r.Listed {
 			announced = "not counted"
 		}
 		// Held minus announced, signed either way, so a month holding more than
 		// arXiv counted reads as the surplus it is rather than as a negative gap.
-		difference := thousands(r.Held - r.Live())
+		difference := prose.Thousands(r.Held - r.Live())
 		if r.Held > r.Live() {
 			difference = "+" + difference
 		}
 		fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n",
-			r.Month.Format("2006-01"), thousands(r.Held), announced, difference, percent(r.Coverage()))
+			r.Month.Format("2006-01"), prose.Thousands(r.Held), announced, difference, prose.Percent(r.Coverage()))
 	}
 	return b.String()
 }
@@ -269,7 +269,7 @@ func (c Coverage) Markdown() string {
 // the gaps and nothing else.
 func (c Coverage) Text() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s of %s announced, %s\n", count(c.Held(), "record"), count(c.Live(), "record"), percent(c.Fraction()))
+	fmt.Fprintf(&b, "%s of %s announced, %s\n", prose.Count(c.Held(), "record"), prose.Count(c.Live(), "record"), prose.Percent(c.Fraction()))
 
 	held := 0
 	for _, r := range c.Rows {
@@ -277,14 +277,14 @@ func (c Coverage) Text() string {
 			held++
 		}
 	}
-	fmt.Fprintf(&b, "%s held, %s announced\n", count(held, "month"), count(len(c.Rows), "month"))
+	fmt.Fprintf(&b, "%s held, %s announced\n", prose.Count(held, "month"), prose.Count(len(c.Rows), "month"))
 
 	if empty := c.Empty(); len(empty) > 0 {
 		fmt.Fprintf(&b, "%s with nothing in them, first %s, last %s\n",
-			count(len(empty), "month"), empty[0].Shard, empty[len(empty)-1].Shard)
+			prose.Count(len(empty), "month"), empty[0].Shard, empty[len(empty)-1].Shard)
 	}
 	if odd := c.Unlisted(); len(odd) > 0 {
-		fmt.Fprintf(&b, "%s arXiv does not count: %s\n", count(len(odd), "month"), shards(odd))
+		fmt.Fprintf(&b, "%s arXiv does not count: %s\n", prose.Count(len(odd), "month"), shards(odd))
 	}
 	return b.String()
 }
@@ -302,36 +302,4 @@ func shards(rows []CoverageRow) string {
 		out = append(out, r.Shard)
 	}
 	return strings.Join(out, " ")
-}
-
-func percent(f float64) string {
-	if f < 0 {
-		return "n/a"
-	}
-	return fmt.Sprintf("%.1f%%", f*100)
-}
-
-func count(n int, what string) string {
-	if n == 1 {
-		return fmt.Sprintf("1 %s", what)
-	}
-	return fmt.Sprintf("%s %ss", thousands(n), what)
-}
-
-// thousands groups a count, because the two numbers this report exists to
-// compare are seven digits long and unreadable side by side without it.
-func thousands(n int) string {
-	s := strconv.Itoa(n)
-	sign := ""
-	if strings.HasPrefix(s, "-") {
-		sign, s = "-", s[1:]
-	}
-	var b strings.Builder
-	for i, r := range s {
-		if i > 0 && (len(s)-i)%3 == 0 {
-			b.WriteByte(',')
-		}
-		b.WriteRune(r)
-	}
-	return sign + b.String()
 }

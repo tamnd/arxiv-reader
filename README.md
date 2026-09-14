@@ -8,19 +8,34 @@ It is not called `arxiv` because [tamnd/arxiv-cli](https://github.com/tamnd/arxi
 
 ## Status
 
-M1, which is the metadata plane: the harvest, the writer, the rules that check it and the report that sets it against arXiv's own numbers.
-M0 before it was the module, the licence gate and the command set.
+M2, which is the licence census: counting what the corpus is permitted to do with what it holds.
+M1 before it was the metadata plane: the harvest, the writer, the rules that check it and the report that sets it against arXiv's own numbers.
+M0 before that was the module, the licence gate and the command set.
 Every other command names the milestone it arrives in and exits non-zero rather than pretending to succeed.
 The plan is in the issues, one per milestone.
 
 ```
-$ ax harvest hf -rows -limit 5000
+$ ax harvest hf -rows -limit 6000
 $ ax audit --plane meta
-5000 records over 126 months, nothing found
+6000 records over 126 months, nothing found
 $ ax harvest report
-5,000 records of 3,163,381 records announced, 0.2%
+6,000 records of 3,163,381 records announced, 0.2%
 126 months held, 423 months announced
+$ ax licence census
+Of 6,000 papers counted, 2,863 may be translated and 3,185 may be republished in English, both as upper bounds.
+  cc0                    83    1.4%  open
+  cc-by               2,464   41.1%  open
+  cc-by-sa              153    2.5%  share-alike
+  cc-by-nc-sa           163    2.7%  share-alike
+  cc-by-nc-nd           322    5.4%  verbatim
+  arxiv-1.0           2,815   46.9%  record
 ```
+
+Those two numbers are upper bounds and the report says so in its first sentence.
+Every surface that serves arXiv metadata in bulk carries one licence per paper rather than one per version, and the one it carries is the latest version's.
+A sample of forty multi-version papers taken in September 2026 found five whose v1 licence differs from their latest, and four of those five had a latest version more permissive than the first, which is the direction that costs something.
+Roughly two fifths of arXiv has more than one version, so the overstatement is on the order of five percent of the corpus.
+Resolving it properly is one page per version, which is over five million pages at arXiv's pace, so `ax licence resolve` runs per paper when a paper is selected rather than over the whole archive.
 
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
