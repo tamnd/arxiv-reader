@@ -52,9 +52,16 @@ func TagsPath(root string, id axid.ID) string {
 	return path.Join(root, "tags", Shard(id), PathID(id)+".tags")
 }
 
-// ManifestPath is the metadata plane's manifest for one month.
-func ManifestPath(root, shard string) string {
-	return path.Join(root, "manifests", "meta", shard+".jsonl")
+// MetadataPath is the metadata plane's file for one month.
+//
+// Under metadata/ and not under manifests/. They were the same directory in the
+// first draft and that was a mistake worth undoing before three million records
+// landed on top of it: manifests/ is configuration, a person writes it and CI
+// checks it, and it is about thirty lines. metadata/ is harvested data, nobody
+// edits it by hand, and it is the largest thing in the repository. Two kinds of
+// file with two lifetimes should not share a directory.
+func MetadataPath(root, shard string) string {
+	return path.Join(root, "metadata", shard+".jsonl")
 }
 
 // GraphPath is the edge file for one month.

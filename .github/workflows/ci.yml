@@ -118,9 +118,22 @@ jobs:
           ax id parse hep-th/9711200
       - name: every licence explains itself
         run: ax licence explain all
+      - name: an empty corpus reports an empty metadata plane
+        run: |
+          mkdir -p /tmp/empty-corpus
+          ARXIV_CORPUS=/tmp/empty-corpus ax harvest status
+          n=$(ARXIV_CORPUS=/tmp/empty-corpus ax harvest status -total)
+          if [ "$n" != "0" ]; then
+            echo "an empty corpus reported $n records"
+            exit 1
+          fi
       - name: a command that is not written yet exits non-zero
         run: |
           if ax translate --lang vi; then
             echo "translate exited zero without doing anything"
+            exit 1
+          fi
+          if ax harvest oai; then
+            echo "harvest oai exited zero without harvesting anything"
             exit 1
           fi
