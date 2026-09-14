@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -123,6 +124,65 @@ printf 'a paper' > "$out"`)}
 		if res.Status != tc.want {
 			t.Fatalf("%q was read as status %d", tc.say, res.Status)
 		}
+	}
+}
+
+// The second pass, and the reason it is a second pass. A .sty is a program, so
+// the conversion that reads them is the retry and the conversion that does not
+// is what runs first.
+func TestIncludeStylesIsPassedOnlyWhenItIsAskedFor(t *testing.T) {
+	for _, want := range []bool{false, true} {
+		c := &Converter{
+			Binary: stub(t, dest+`
+echo "$@" > "$out"`),
+			IncludeStyles: want,
+		}
+		res, err := c.Convert(context.Background(), submission(t), "ms.tex", filepath.Join(t.TempDir(), "paper.html"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Contains(string(res.HTML), "--includestyles"); got != want {
+			t.Fatalf("IncludeStyles is %v and the arguments are %s", want, res.HTML)
+		}
+	}
+}
+
+// A paper that lost a package says so once and then says three hundred times
+// that a command is undefined, so the line naming the package is the one worth
+// pulling out of the log.
+func TestMissingNamesThePackagesThatCouldNotBeRead(t *testing.T) {
+	c := &Converter{Binary: stub(t, dest+`
+echo "Warning:missing_file:tikz Can't find package tikz" >&2
+echo "Error:undefined:\\tikzset Undefined control sequence" >&2
+echo "Warning:missing_file:quantikz Can't find package quantikz" >&2
+echo "Warning:missing_file:tikz Can't find package tikz" >&2
+echo "Status:conversion:2" >&2
+printf 'a paper' > "$out"`)}
+
+	res, err := c.Convert(context.Background(), submission(t), "ms.tex", filepath.Join(t.TempDir(), "paper.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// In the order they were met, and once each, because the same package is
+	// reported again every time something reaches for it.
+	if want := []string{"tikz", "quantikz"}; !slices.Equal(res.Missing, want) {
+		t.Fatalf("got %v, want %v", res.Missing, want)
+	}
+	if res.Status != StatusErrors {
+		t.Fatalf("status %d", res.Status)
+	}
+}
+
+func TestMissingIsEmptyWhenEveryPackageLoaded(t *testing.T) {
+	c := &Converter{Binary: stub(t, dest+`
+echo "Status:conversion:0" >&2
+printf 'a paper' > "$out"`)}
+	res, err := c.Convert(context.Background(), submission(t), "ms.tex", filepath.Join(t.TempDir(), "paper.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Missing) != 0 {
+		t.Fatalf("got %v", res.Missing)
 	}
 }
 

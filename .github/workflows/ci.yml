@@ -729,6 +729,87 @@ jobs:
           echo "$out"
           echo "$out" | grep -q "brew install latexml"
           echo "$out" | grep -q "apt install latexml"
+      # The second pass, and the reason there is one. LaTeXML skips the style
+      # files a submission ships unless it is told to read them, and a paper
+      # rejected for an undefined macro has usually lost one the author defined
+      # in a .sty in the tarball. The stub here is the shape of that paper: it
+      # answers with the faulty fixture, which is a rejection, until it is asked
+      # to read the style files, and then it answers with the one that parses.
+      - name: a rejected paper is converted again with the style files it ships
+        run: |
+          cat > /tmp/stub-styles <<SH
+          #!/bin/sh
+          case "\$1" in --VERSION) echo "a stub converter, and not LaTeXML"; exit 0;; esac
+          for a in "\$@"; do case "\$a" in --dest=*) out="\${a#--dest=}";; esac; done
+          echo "Warning:missing_file:authormacros Can't find package authormacros" >&2
+          for a in "\$@"; do
+            if [ "\$a" = "--includestyles" ]; then
+              echo "Status:conversion:0" >&2
+              cat "$PWD/extract/testdata/rendering.html" > "\$out"
+              exit 0
+            fi
+          done
+          echo "Status:conversion:2" >&2
+          cat "$PWD/extract/testdata/faulty.html" > "\$out"
+          SH
+          chmod +x /tmp/stub-styles
+          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -again -latexmlc /tmp/stub-styles 2501.00001v3 2>&1)
+          echo "$out"
+          # The package it could not read is named once, which is the useful line
+          # in a log that then says the same thing about every macro in it.
+          echo "$out" | grep -q "LaTeXML could not read 1 package: authormacros"
+          echo "$out" | grep -q "converting it again with the style files the submission ships"
+          echo "$out" | grep -q "reading the style files fixed it"
+          echo "$out" | grep -q "faults      1, 0 of them inside the body"
+          if grep -q nothingmacro /tmp/source-corpus/work/converted/2501/2501.00001v3/paper.html; then
+            echo "the rejected first pass was left on disk"
+            exit 1
+          fi
+      # The other half of the same decision. A .sty is a program and LaTeXML
+      # reading one can come out worse than LaTeXML skipping it, so the pass that
+      # is no better is thrown away rather than kept for having been second.
+      - name: a second pass that is no better leaves the first conversion in place
+        run: |
+          cat > /tmp/stub-noworse <<SH
+          #!/bin/sh
+          case "\$1" in --VERSION) echo "a stub converter, and not LaTeXML"; exit 0;; esac
+          for a in "\$@"; do case "\$a" in --dest=*) out="\${a#--dest=}";; esac; done
+          echo "Status:conversion:2" >&2
+          cat "$PWD/extract/testdata/faulty.html" > "\$out"
+          SH
+          chmod +x /tmp/stub-noworse
+          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -again -latexmlc /tmp/stub-noworse 2501.00001v3 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "reading the style files did not help"
+          echo "$out" | grep -q "1 of 1 conversions are too broken to use"
+          grep -q nothingmacro /tmp/source-corpus/work/converted/2501/2501.00001v3/paper.html
+      # LaTeXML gives up after a hundred errors and writes what it had, which for
+      # a paper that lost its packages in the preamble is a title with nothing
+      # under it. That document carries no faults, because the errors happened
+      # before there was anywhere to put them, so the fault count reads it as a
+      # clean paper of no sections and the status is the only thing that knows.
+      - name: a conversion that stopped partway through is refused
+        run: |
+          cat > /tmp/stub-fatal <<'SH'
+          #!/bin/sh
+          case "$1" in --VERSION) echo "a stub converter, and not LaTeXML"; exit 0;; esac
+          for a in "$@"; do case "$a" in --dest=*) out="${a#--dest=}";; esac; done
+          echo "Fatal:too_many_errors:100 Too many errors; aborting" >&2
+          echo "Status:conversion:3" >&2
+          printf '<!DOCTYPE html>\n<html><body><article class="ltx_document"><h1 class="ltx_title ltx_title_document">A Paper About Nothing</h1></article></body></html>\n' > "$out"
+          SH
+          chmod +x /tmp/stub-fatal
+          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -again -latexmlc /tmp/stub-fatal 2501.00001v3 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "faults      none"
+          echo "$out" | grep -q "LaTeXML stopped partway through"
+          echo "$out" | grep -q "1 of 1 conversions are too broken to use"
+          # And a document read back off disk rather than converted again keeps
+          # that verdict, because the status is read out of the log beside it.
+          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -latexmlc /tmp/stub-fatal 2501.00001v3 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "was converted already"
+          echo "$out" | grep -q "LaTeXML stopped partway through"
       # The fixtures are four real files and a drawing. Rule F06 is what
       # separates a corpus from a mirror of copyrighted PDFs and rule F09 is
       # what keeps somebody else's figure out of a repository that claims to be
