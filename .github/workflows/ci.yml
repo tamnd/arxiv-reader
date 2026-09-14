@@ -990,6 +990,99 @@ jobs:
             echo "a refused run wrote citations into the corpus"
             exit 1
           fi
+      # A tag is assigned once and never changes, and every link in the reading
+      # app, every edge in the graph and every translated file points at one.
+      # The tags asserted here are the exact ones the derivation hands out for
+      # this paper, so a change to how they are derived cannot land quietly: it
+      # would change every tag in the corpus, which is the one change in this
+      # project that cannot be undone.
+      - name: a paper's objects get their permanent names
+        run: |
+          ARXIV_CORPUS=/tmp/extract-corpus ax tags assign -n 2501.00001 | tee /tmp/tags.txt
+          grep -q "14 objects" /tmp/tags.txt
+          grep -qE "new +14" /tmp/tags.txt
+          grep -qE "kept +0" /tmp/tags.txt
+          grep -qE "run +VIS1 to A83C" /tmp/tags.txt
+          grep -q "VIS1  s1" /tmp/tags.txt
+          grep -q "A83C  proof-u1" /tmp/tags.txt
+          # Nothing was written by the dry run.
+          if [ -e /tmp/extract-corpus/tags ]; then
+            echo "a dry run wrote a register"
+            exit 1
+          fi
+          ARXIV_CORPUS=/tmp/extract-corpus ax tags assign 2501.00001 2>&1 | grep -q "14 tags on 2501.00001, 14 new and 0 kept"
+          reg=/tmp/extract-corpus/tags/2501/2501.00001.tags
+          grep -q "^VIS1,s1$" $reg
+          grep -q "^VNYA,thm-1$" $reg
+          test "$(grep -vc '^#' $reg)" = 14
+          # The runs file says where this assignment stopped, which is what tells
+          # a correct edit apart from a tag somebody pasted in the wrong place.
+          grep -q "^VIS1,A83C$" /tmp/extract-corpus/tags/2501/2501.00001.runs
+          # The register is the record and the content files are the copy, and
+          # both are written because the reading app serves one and the graph
+          # reads the other.
+          dir=/tmp/extract-corpus/content/en/2501/2501.00001
+          grep -q "^tag: VIS1$" $dir/01_introduction.md
+          grep -q "{#thm-1 .statement tag=VNYA env=theorem}" $dir/02_results.md
+          # The tag goes after the class and before every other pair, and the
+          # front matter file is the title and the abstract and is not an object.
+          grep -q '^tag: ""$' $dir/00_front.md
+      - name: assigning the same tags twice writes nothing
+        run: |
+          ARXIV_CORPUS=/tmp/extract-corpus ax tags assign 2501.00001 2>&1 | tee /tmp/tags2.txt
+          grep -q "0 new and 14 kept" /tmp/tags2.txt
+          grep -q "unchanged" /tmp/tags2.txt
+          # A run that handed out nothing writes no run line, otherwise the runs
+          # file grows by a line every time CI pushes and stops meaning anything.
+          test "$(grep -vc '^#' /tmp/extract-corpus/tags/2501/2501.00001.runs)" = 1
+      # The dangerous case, and the one the four passes in 03-tags.md section 6
+      # exist for. Guessing which new object replaced an old one would point a
+      # reference at the wrong theorem, and a reference silently redirected is
+      # worse than one that breaks, because a broken one is visible.
+      - name: an object that disappeared stops the run
+        run: |
+          rm -rf /tmp/gone-corpus && cp -r /tmp/extract-corpus /tmp/gone-corpus
+          sed -i '/{#thm-1 .statement/d' /tmp/gone-corpus/content/en/2501/2501.00001/02_results.md
+          if ARXIV_CORPUS=/tmp/gone-corpus ax tags assign 2501.00001; then
+            echo "an object that left the paper was written over rather than stopping the run"
+            exit 1
+          fi
+          ARXIV_CORPUS=/tmp/gone-corpus ax tags assign -n 2501.00001 2>&1 | grep -q "gone  thm-1"
+      # Tagging changes the body and restamps the hash that says a correction
+      # happened, so a paper with one in it stops here the same way it stops ax
+      # split and ax extract render.
+      - name: a hand correction stops the tagging
+        run: |
+          rm -rf /tmp/edit-corpus && cp -r /tmp/extract-corpus /tmp/edit-corpus
+          sed -i 's/Nothing is nothing./Nothing is quite nothing./' /tmp/edit-corpus/content/en/2501/2501.00001/02_results.md
+          if ARXIV_CORPUS=/tmp/edit-corpus ax tags assign 2501.00001; then
+            echo "a corrected file was tagged and its hash restamped without anybody accepting it"
+            exit 1
+          fi
+          grep -q "Nothing is quite nothing." /tmp/edit-corpus/content/en/2501/2501.00001/02_results.md
+      # A tag is written into every section of the paper, so a run that tagged a
+      # paper nobody may hold is a run that rewrote a paper nobody may hold.
+      - name: the gate refuses to tag a paper it may not publish
+        run: |
+          rm -rf /tmp/tags-corpus && cp -r /tmp/extract-corpus /tmp/tags-corpus
+          rm -rf /tmp/tags-corpus/tags
+          sed -i 's/"licence_from":"abs"/"licence_from":"kaggle"/' /tmp/tags-corpus/metadata/2501.jsonl
+          if ARXIV_CORPUS=/tmp/tags-corpus ax tags assign 2501.00001; then
+            echo "a paper whose licence was read from a bulk surface was tagged anyway"
+            exit 1
+          fi
+          if [ -e /tmp/tags-corpus/tags ]; then
+            echo "a refused run wrote a register into the corpus"
+            exit 1
+          fi
+      - name: tags refuses the arguments it should refuse
+        run: |
+          for c in "tags" "tags assign" "tags verify" "tags assign not-an-arxiv-id" "tags assign 2502.00002"; do
+            if ARXIV_CORPUS=/tmp/extract-corpus ax $c; then
+              echo "ax $c was allowed"
+              exit 1
+            fi
+          done
       - name: the audit refuses the arguments it should refuse
         run: |
           for c in "audit --plane content" "audit --plane both" "audit -rules S99" "audit -rules" "audit -cap 0" "audit -shard 2113" "audit meta"; do

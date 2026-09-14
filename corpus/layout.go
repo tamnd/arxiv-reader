@@ -69,6 +69,28 @@ func TagsPath(root string, id axid.ID) string {
 	return path.Join(root, "tags", Shard(id), PathID(id)+".tags")
 }
 
+// RunsPath records where one assignment of a paper's tags stopped and the next
+// began.
+//
+// Beside the register and not inside it, because the register is a set and this
+// is a history. A line here is two tags and everything between them in the
+// register is one run, which is what tells a correct edit apart from a tag
+// somebody pasted in the wrong place.
+func RunsPath(root string, id axid.ID) string {
+	return path.Join(root, "tags", Shard(id), PathID(id)+".runs")
+}
+
+// AliasesPath is the corpus wide file for local identifiers that moved.
+//
+// One file for everything, unlike the registers, because it is the one tag file
+// that is read by a question rather than by a paper: somebody followed a link to
+// #thm-3 and needs to know it is #thm-4 now, and they do not have the paper open
+// to look in. It stays small because renumbering is rare and only the objects
+// that actually moved go in it.
+func AliasesPath(root string) string {
+	return path.Join(root, "tags", "aliases")
+}
+
 // MetadataPath is the metadata plane's file for one month.
 //
 // Under metadata/ and not under manifests/. They were the same directory in the
