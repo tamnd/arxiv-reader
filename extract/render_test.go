@@ -407,8 +407,8 @@ func TestTheBibliographyIsNotASection(t *testing.T) {
 // the paper prints, and the blocks in the order they were printed.
 func TestTheBibliographyIsRead(t *testing.T) {
 	p := parse(t, "rendering.html")
-	if len(p.Bibliography) != 3 {
-		t.Fatalf("got %d entries, want 3: %+v", len(p.Bibliography), p.Bibliography)
+	if len(p.Bibliography) != 6 {
+		t.Fatalf("got %d entries, want 6: %+v", len(p.Bibliography), p.Bibliography)
 	}
 	b := p.Bibliography[0]
 	if b.ID != "bib.bibx1" {
@@ -424,8 +424,8 @@ func TestTheBibliographyIsRead(t *testing.T) {
 
 func TestAFaultInTheBodyIsStillAnEntry(t *testing.T) {
 	p := parse(t, "rendering.html")
-	if len(p.Bibliography) != 3 {
-		t.Fatalf("got %d entries, want 3", len(p.Bibliography))
+	if len(p.Bibliography) != 6 {
+		t.Fatalf("got %d entries, want 6", len(p.Bibliography))
 	}
 	// The second entry is the one with the undefined macro in it. It is printed
 	// badly and it is still a reference the paper made, so it is kept and the
