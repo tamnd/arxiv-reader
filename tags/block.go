@@ -33,11 +33,16 @@ var tagPair = regexp.MustCompile(`\s+tag=("(?:[^"\\]|\\.)*"|[^\s"}]*)`)
 // Object is one taggable thing found in the content plane.
 //
 // File and Local together are enough to find it again, and Class is what says
-// whether it is taggable at all.
+// whether it is taggable at all. Label and Text are what the matching passes
+// need when a paper has been extracted again from a new version and Local no
+// longer says the same thing: the author's own name for the object, which
+// survives a renumbering, and the object's own prose, which survives a move.
 type Object struct {
 	File  string
 	Local string
 	Class string
+	Label string
+	Text  string
 }
 
 // Objects reads every taggable attribute block out of one file's body, in
@@ -63,11 +68,65 @@ func Objects(file, body string) []Object {
 // This is what a reader of the object model walks, because a footnote is still
 // an object and its kind is still one of the sixteen.
 func Blocks(file, body string) []Object {
-	var out []Object
-	for _, m := range block.FindAllStringSubmatchIndex(body, -1) {
-		out = append(out, Object{File: file, Local: body[m[4]:m[5]], Class: firstClass(body[m[6]:m[7]])})
+	ms := block.FindAllStringSubmatchIndex(body, -1)
+	out := make([]Object, 0, len(ms))
+	for i, m := range ms {
+		// An object's text is everything from the end of its own attribute block
+		// to the line the next one starts on. That is not a parse of the
+		// Markdown and it does not need to be: what pass three and pass four
+		// want is a stretch of the file that belongs to this object and to no
+		// other, in the same order every time, and the span between two anchors
+		// is exactly that.
+		end := len(body)
+		if i+1 < len(ms) {
+			end = lineStart(body, ms[i+1][0])
+		}
+		if end < m[1] {
+			end = m[1] // Two blocks on one line, so this one has no text.
+		}
+		out = append(out, Object{
+			File:  file,
+			Local: body[m[4]:m[5]],
+			Class: firstClass(body[m[6]:m[7]]),
+			Label: value(body[m[8]:m[9]], "label"),
+			Text:  strings.TrimSpace(body[m[1]:end]),
+		})
 	}
 	return out
+}
+
+// Lead is the text before the first attribute block.
+//
+// A top level section is a whole file and its heading is in the front matter, so
+// it has no attribute block of its own and none of the file's spans belong to
+// it. This is what does: the prose between the front matter and the first thing
+// inside the section.
+func Lead(body string) string {
+	if m := block.FindStringIndex(body); m != nil {
+		return strings.TrimSpace(body[:lineStart(body, m[0])])
+	}
+	return strings.TrimSpace(body)
+}
+
+// lineStart is the index of the beginning of the line index i is on.
+func lineStart(s string, i int) int {
+	if j := strings.LastIndexByte(s[:i], '\n'); j >= 0 {
+		return j + 1
+	}
+	return 0
+}
+
+// pairs matches the key value pairs of an attribute block.
+var pairs = regexp.MustCompile(`\s+([A-Za-z_][A-Za-z0-9_-]*)=("(?:[^"\\]|\\.)*"|[^\s"}]*)`)
+
+// value is one pair's value, or empty when the block does not carry that key.
+func value(block, key string) string {
+	for _, p := range pairs.FindAllStringSubmatch(block, -1) {
+		if p[1] == key {
+			return strings.Trim(p[2], `"`)
+		}
+	}
+	return ""
 }
 
 // Taggable says whether an object of this class gets a tag.

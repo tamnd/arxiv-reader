@@ -8,6 +8,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -35,6 +37,17 @@ type Entry struct {
 // assignment's work. Sorting this would lose that.
 type Register struct {
 	Entries []Entry
+	// Version is the version of the paper the identifiers in it belong to, and
+	// zero for a register written before this was recorded.
+	//
+	// It is here because the failure this package exists to prevent is reachable
+	// without it. A paper gains a table in the middle, every table after it is
+	// renumbered, and every identifier in the register still names something, so
+	// an assignment that matches on the identifier alone keeps every tag, finds
+	// nothing missing, reports nothing wrong and has just moved every table's
+	// permanent name onto the table after it. Knowing which version the
+	// identifiers came from is what lets that be caught.
+	Version int
 }
 
 // LoadRegister reads a paper's register, and a paper nobody has tagged has an
@@ -58,7 +71,7 @@ func ParseRegister(b []byte) (Register, error) {
 	// one shape and this checks the shape itself with a message a person can
 	// act on.
 	r.FieldsPerRecord = -1
-	var reg Register
+	reg := Register{Version: versionLine(b)}
 	seenTag := map[Tag]bool{}
 	seenLocal := map[string]bool{}
 	for {
@@ -88,19 +101,52 @@ func ParseRegister(b []byte) (Register, error) {
 		if seenTag[e.Tag] {
 			return Register{}, fmt.Errorf("tags: %s is in the register twice, so two objects in one paper answer to one name", e.Tag)
 		}
-		if seenLocal[e.Local] {
+		// Two live entries on one identifier is one object with two names, which
+		// is the thing this file exists to prevent. A tombstone on the same
+		// identifier is not that: it is the object that used to be there, and an
+		// identifier is reused as soon as the theorem that had it is removed and
+		// the next one is renumbered into its place.
+		if e.Gone == "" && seenLocal[e.Local] {
 			return Register{}, fmt.Errorf("tags: %s is in the register twice, so one object in one paper has two names", e.Local)
 		}
-		seenTag[e.Tag], seenLocal[e.Local] = true, true
+		seenTag[e.Tag] = true
+		if e.Gone == "" {
+			seenLocal[e.Local] = true
+		}
 		reg.Entries = append(reg.Entries, e)
 	}
 	return reg, nil
+}
+
+// versionComment is the line that records which version of the paper the identifiers
+// belong to.
+//
+// A comment rather than a field, because it is a fact about the whole file and
+// not about any one tag, and because every line of this file is a tag and its
+// object and nothing else. It is still read, so it is written in one shape and
+// matched in one place.
+var versionComment = regexp.MustCompile(`(?m)^# version: v(\d+)$`)
+
+// versionLine reads that line back, and a file without one comes out zero.
+func versionLine(b []byte) int {
+	m := versionComment.FindSubmatch(b)
+	if m == nil {
+		return 0
+	}
+	n, err := strconv.Atoi(string(m[1]))
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 // Bytes is the register as it goes on disk.
 func (r Register) Bytes() []byte {
 	var buf bytes.Buffer
 	buf.WriteString(registerHeader)
+	if r.Version > 0 {
+		fmt.Fprintf(&buf, "# version: v%d\n", r.Version)
+	}
 	w := csv.NewWriter(&buf)
 	for _, e := range r.Entries {
 		rec := []string{string(e.Tag), e.Local}
@@ -117,9 +163,10 @@ func (r Register) Bytes() []byte {
 
 const registerHeader = `# The permanent name of every object in this paper, and the object it names.
 #
-# Written by ax tags assign. A tag is assigned once and never changes, so a line
-# here is only ever added or tombstoned and never edited. Four fields on a line
-# means the object is gone and the tag now resolves to an explanation.
+# Written by ax tags assign, and carried onto a new version of the paper by ax
+# tags diff. A tag is assigned once and never changes, so a line here is only ever
+# added, pointed at the same object in its new place, or tombstoned. Four fields
+# on a line means the object is gone and the tag now resolves to an explanation.
 `
 
 // Save writes the register and says whether the bytes changed.
@@ -130,11 +177,22 @@ func (r Register) Save(path string) (bool, error) {
 // ByLocal is the lookup the content plane needs, from an object to its tag.
 //
 // Tombstoned entries are in it. An object that came back after being removed is
-// the same object and gets its tag back rather than a new one.
+// the same object and gets its tag back rather than a new one. A live entry wins
+// over a tombstone on the same identifier, because an identifier is reused as
+// soon as the object that had it is removed and the next one is renumbered into
+// its place, and the object that is there now is the one the content plane is
+// asking about.
 func (r Register) ByLocal() map[string]Tag {
 	m := make(map[string]Tag, len(r.Entries))
 	for _, e := range r.Entries {
-		m[e.Local] = e.Tag
+		if e.Gone != "" {
+			m[e.Local] = e.Tag
+		}
+	}
+	for _, e := range r.Entries {
+		if e.Gone == "" {
+			m[e.Local] = e.Tag
+		}
 	}
 	return m
 }

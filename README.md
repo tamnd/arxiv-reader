@@ -598,6 +598,7 @@ The register is the record and the content files are the copy, and both are writ
 
 ```
 # tags/2311/2311.05762.tags
+# version: v1
 X22B,s1
 86R6,prob-1-1
 UI64,thm-1-2
@@ -611,10 +612,54 @@ The anchor is the local identifier and not the tag, so a URL is readable and a t
 One register per paper and not one for the corpus: a single file would be five million lines, two people extracting two unrelated papers would conflict in git on every run, and a takedown would be a rewrite rather than a deletion.
 `tags/2311/2311.05762.runs` sits beside it and says where one assignment stopped and the next began, which is what tells a correct edit apart from a tag somebody pasted in the wrong place.
 
-An object that is in the register and no longer in the paper stops the run.
-Matching it to whatever replaced it is the four pass matcher in 03-tags.md section 6, which is the author's own `\label`, then the kind and number, then a hash of the normalised prose, then a sequence alignment, and it arrives with `ax tags diff` in M4.
-Guessing in the meantime is exactly the failure this whole mechanism exists to prevent.
-A reference that breaks is visible and a reference silently pointed at the wrong theorem is not.
+`ax tags diff` is how a tag survives the author posting a new version.
+
+An author posts v3 with a table added in the middle and every table after it renumbered.
+Every identifier in the register still names something, so an assignment that matches on the identifier alone keeps every tag, finds nothing missing, reports nothing wrong, and has just moved every table's permanent name onto the table after it.
+A reference that breaks is visible and a reference silently pointed at the wrong table is not, so the register records which version its identifiers belong to and `ax tags assign` refuses to run once the content plane has moved past it.
+
+```
+$ ax tags diff 2305.18290 -from v1 -to v3
+2305.18290      v1 to v3, 55 objects to 58
+  label         33
+  number        21
+  content       0
+  sequence      1
+  new           3
+  gone          0
+  fell through  7 per cent
+  label         tab-1 becomes tab-2
+  sequence      sc-2 becomes sc-3
+  label         tab-2 becomes tab-3
+  new           tab-1 is in v3 and nothing in v1 is it
+```
+
+That is the direct preference optimization paper, which gained a table and two other objects between May 2023 and July 2024.
+Thirty three objects were matched by the label their author wrote, which is what carried every table's tag past the renumbering, and one subcaption was matched by the alignment.
+Matches that put an object back where it already was are counted and not listed, since there are dozens of them and none of them is a decision worth arguing with.
+
+The four passes are 03-tags.md section 6 and they run strongest evidence first, stopping at the first one that matches an object.
+Pass one is the author's own `\label`, which survives a revision in a way numbering does not, because renumbering is automatic and relabelling is manual.
+Pass two is the kind and the number in the same section, which is the ordinary case where nothing moved.
+Pass three is a hash of the prose with the case, the mathematics and the spacing taken out of it, which is what catches a section moved wholesale.
+Pass four aligns what is left in reading order by edit distance and keeps the pairs that read more than half alike, which is what catches a statement whose wording was lightly edited.
+A pass only pairs two objects when exactly one on each side carries the key, because the same label on two objects is evidence of nothing.
+
+`-w` writes the decisions into the register.
+A tag whose object moved is pointed at where the object is now, and a tag whose object is not in the new version at all is not deleted.
+It stays with a tombstone saying which version it was last present in, and the reading app serves it with a page saying so rather than a 404.
+
+```
+2X40,eq-7,gone:v3,"removed when section 4 was rewritten"
+```
+
+That is straight from the Stacks Project, which keeps the tag of a result that turned out to be wrong along with an explanation of its disappearance.
+A reference that resolves to an explanation is a working reference and a reference that 404s is a broken promise.
+The note is prose, and the command writes a placeholder saying what the object was and where it was, so somebody who knows that section four was rewritten should replace it with that.
+
+Nothing is written when more than a fifth of a paper's objects fall through to pass four or match nothing at all, because a paper that changed that much is a paper somebody should read the diff of first.
+The label is on the source path only, since neither arXiv's HTML nor LaTeXML's own carries it, so a paper on the render path is matched by number, content and sequence, which works and is weaker.
+Both versions are read out of `work/`, which is where every conversion and every rendering is kept with its version in the name, and which is the reason they are kept: the content plane holds one extraction of a paper and a comparison needs two.
 
 `ax audit -plane content` is where all of that gets checked rather than trusted.
 
