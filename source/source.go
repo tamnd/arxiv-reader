@@ -181,11 +181,25 @@ func untar(b []byte) ([]File, bool, error) {
 // says, which is the oldest bug in archive handling, and a submission that
 // carries one is not a submission anybody should be quietly repairing.
 func safeName(name string) (string, error) {
-	clean := path.Clean(strings.TrimPrefix(filepath.ToSlash(name), "./"))
+	// A backslash is a legal character in a file name on this machine and a
+	// separator on another one, so a name carrying one means two different paths
+	// depending on where the corpus is unpacked. That is enough to refuse it, and
+	// refusing it here is what makes the rest of this function mean the same
+	// thing everywhere.
+	if strings.ContainsRune(name, '\\') {
+		return "", fmt.Errorf("source: this tar holds %q, and a backslash in a name is a separator on one machine and a character on another", name)
+	}
+	clean := path.Clean(strings.TrimPrefix(name, "./"))
 	if clean == "." || clean == "" {
 		return "", fmt.Errorf("source: this tar holds an entry with no name")
 	}
-	if path.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, "../") {
+	// The standard library's own answer to the question, rather than a path check
+	// written by hand. It refuses the name that climbs out, the name that starts
+	// at the root and the drive letter, which is the whole of what unpacking an
+	// archive has to be careful about. Names are kept with forward slashes
+	// because that is what a tar carries and what every caller here looks a file
+	// up by, and the backslash refusal above is what makes the two agree.
+	if !filepath.IsLocal(filepath.FromSlash(clean)) {
 		return "", fmt.Errorf("source: this tar holds %q, which points outside the submission, and nothing here unpacks that", name)
 	}
 	return clean, nil
