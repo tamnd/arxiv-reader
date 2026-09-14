@@ -247,11 +247,16 @@ func (r Record) Normalise() Record {
 	for i := range versions {
 		versions[i].Created = versions[i].Created.UTC()
 	}
+	sortVersions(versions)
+	r.Versions = versions
+	return r
+}
+
+// sortVersions puts a version list in the order arXiv announced them.
+func sortVersions(versions []Version) {
 	sort.Slice(versions, func(i, j int) bool {
 		return versions[i].Version < versions[j].Version
 	})
-	r.Versions = versions
-	return r
 }
 
 // unwrap turns arXiv's hard wrapped text back into one line.

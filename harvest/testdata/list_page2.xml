@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">
+    <responseDate>2026-09-14T10:49:50Z</responseDate>
+    <request verb="ListRecords" metadataPrefix="arXivRaw" from="2024-03-05" until="2024-03-05">http://oaipmh.arxiv.org/oai</request>
+    <ListRecords>
+                    <record>
+                <header>
+        <identifier>oai:arXiv.org:2103.08413</identifier>
+        <datestamp>2024-03-05</datestamp>
+            <setSpec>cs:cs:DC</setSpec>
+    </header>
+
+            <metadata>
+                        <arXivRaw xmlns="http://arxiv.org/OAI/arXivRaw/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://arxiv.org/OAI/arXivRaw/ https://oaipmh.arxiv.org/OAI/arXivRaw.xsd">
+        <id>2103.08413</id>
+        <submitter>Meghana Thiyyakat</submitter>
+            <version version="v1">
+                <date>Mon, 15 Mar 2021 14:39:25 GMT</date>
+                <size>1514kb</size>
+                    <source_type>D</source_type>
+            </version>
+            <version version="v2">
+                <date>Thu, 10 Nov 2022 13:00:34 GMT</date>
+                <size>1508kb</size>
+                    <source_type>D</source_type>
+            </version>
+        <title>Megha: Decentralized Global Fair Scheduling for Federated Clusters</title>
+        <authors>Meghana Thiyyakat, Subramaniam Kalambur and Dinkar Sitaram</authors>
+        <categories>cs.DC</categories>
+            <comments>10 pages, 12 figures, conference paper</comments>
+            <doi>10.1016/j.adhoc.2024.103403</doi>
+            <license>http://creativecommons.org/licenses/by-nc-nd/4.0/</license>
+            <abstract>Increasing scale and heterogeneity in data centers have led to the development of federated clusters such as KubeFed, Hydra, and Pigeon, that federate individual data center clusters. In our work, we introduce Megha, a novel decentralized resource management framework for such federated clusters. Megha employs flexible logical partitioning of clusters to distribute its scheduling load, ensuring that the requirements of the workload are satisfied with very low scheduling overheads. It uses a distributed global scheduler that does not rely on a centralized data store but, instead, works with eventual consistency, unlike other schedulers that use a tiered architecture or rely on centralized databases. Our experiments with Megha show that it can schedule tasks taking into account fairness and placement constraints with low resource allocation times - in the order of tens of milliseconds.</abstract>
+    </arXivRaw>
+
+            </metadata>
+        </record>
+        <resumptionToken expirationDate='2026-09-15T00:00:00Z'></resumptionToken>
+    </ListRecords>
+</OAI-PMH>

@@ -246,14 +246,24 @@ func (s Stats) Add(o Stats) Stats {
 	}
 }
 
-// Merge folds recs into the month already on disk.
+// Merger folds an incoming record onto the stored one. Fill and Replace are the
+// two, and which one a harvest wants depends on whether its surface can see the
+// whole paper.
+type Merger func(stored, incoming Record) Record
+
+// Merge folds recs into the month already on disk, under the Fill rule.
 //
-// Incoming records win, with one exception that matters more than the rule: a
-// resolved licence is never overwritten by an unresolved one. The Kaggle
-// snapshot carries no per version licence at all, so a re-bootstrap after the
-// M2 census would otherwise wipe out the one field the whole content plane
-// depends on.
+// Fill is the default because every arXiv surface is partial. Callers that know
+// their records are the whole truth can pass Replace to MergeWith.
 func (p Plane) Merge(shard string, recs []Record) (Stats, error) {
+	return p.MergeWith(shard, recs, Fill)
+}
+
+// MergeWith is Merge with the fold named.
+func (p Plane) MergeWith(shard string, recs []Record, fold Merger) (Stats, error) {
+	if fold == nil {
+		fold = Fill
+	}
 	existing, err := p.Read(shard)
 	if err != nil {
 		return Stats{}, err
@@ -274,7 +284,7 @@ func (p Plane) Merge(shard string, recs []Record) (Stats, error) {
 			stats.Added++
 			continue
 		}
-		merged := keepResolvedLicences(out[i], incoming)
+		merged := fold(out[i], incoming).Normalise()
 		if sameRecord(out[i], merged) {
 			stats.Unchanged++
 			continue
@@ -289,30 +299,6 @@ func (p Plane) Merge(shard string, recs []Record) (Stats, error) {
 	}
 	stats.Written = written
 	return stats, nil
-}
-
-// keepResolvedLicences carries a licence forward from old onto incoming when
-// incoming has none for that version.
-func keepResolvedLicences(old, incoming Record) Record {
-	if len(old.Versions) == 0 {
-		return incoming
-	}
-	prior := make(map[int]Version, len(old.Versions))
-	for _, v := range old.Versions {
-		prior[v.Version] = v
-	}
-	versions := append([]Version(nil), incoming.Versions...)
-	for i, v := range versions {
-		if v.Licence != "" {
-			continue
-		}
-		if was, ok := prior[v.Version]; ok && was.Licence != "" {
-			versions[i].Licence = was.Licence
-			versions[i].LicenceFrom = was.LicenceFrom
-		}
-	}
-	incoming.Versions = versions
-	return incoming
 }
 
 // sameRecord compares two records by the bytes they would be written as.
