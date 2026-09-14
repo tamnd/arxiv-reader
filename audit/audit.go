@@ -50,6 +50,9 @@ const (
 	GroupMath Group = "M"
 	// GroupFigures is F, the group that reads the pictures and the tables.
 	GroupFigures Group = "F"
+	// GroupRefs is R, the group that reads the bibliographies and the edges
+	// built out of them.
+	GroupRefs Group = "R"
 	// GroupTags is G, the group that reads a paper's register against the
 	// bodies the tags in it were written into.
 	GroupTags Group = "G"
@@ -68,6 +71,8 @@ func (g Group) Name() string {
 		return "Mathematics"
 	case GroupFigures:
 		return "Figures"
+	case GroupRefs:
+		return "References"
 	case GroupTags:
 		return "Tags"
 	case GroupObjects:

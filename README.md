@@ -485,51 +485,62 @@ A reference that breaks is visible and a reference silently pointed at the wrong
 
 ```
 $ ax audit -plane content -q
-rule  state  checked  findings
-T01   pass   26
-T02   pass   26
-T03   pass   26
-T04   pass   2
-T05   pass   26
-T06   pass   2
-T07   pass   2
-T08   pass   24
-T09   pass   26
-T10   pass   26
-T11   pass   26
-T13   pass   26
-M01   pass   26
-M02   pass   2
-M03   pass   26
-M05   pass   26
-M07   pass   26
-M08   pass   26
-M09   pass   26
-M10   pass   26
-M11   pass   26
-M12   pass   26
-M13   pass   26
-M14   pass   2
-F01   pass   40
-F02   pass   14
-F03   pass   14
-F05   pass   14
-F06   pass   14
-F07   pass   2
-F08   pass   2
-F09   pass   41
-F10   pass   2
-F11   pass   2
-F12   pass   21
-G01   pass   2
-G02   pass   26
-G03   pass   2
-G04   pass   2
-G05   pass   26
-G06   pass   26
-X01   pass   26
+rule  state    checked  findings
+T01   pass     26
+T02   pass     26
+T03   pass     26
+T04   pass     2
+T05   pass     26
+T06   pass     2
+T07   pass     2
+T08   pass     24
+T09   pass     26
+T10   pass     26
+T11   pass     26
+T12   pass     26
+T13   pass     26
+M01   pass     26
+M02   pass     2
+M03   pass     26
+M05   pass     26
+M07   pass     26
+M08   pass     26
+M09   pass     26
+M10   pass     26
+M11   pass     26
+M12   pass     26
+M13   pass     26
+M14   pass     2
+F01   pass     40
+F02   pass     14
+F03   pass     14
+F05   pass     14
+F06   pass     14
+F07   pass     2
+F08   pass     2
+F09   pass     41
+F10   pass     2
+F11   pass     2
+F12   pass     21
+R01   fail     3        1
+R02   pass     26
+R03   pass     2
+R04   not run  0
+R05   not run  0
+R06   pass     234
+G01   pass     2
+G02   pass     26
+G03   pass     2
+G04   pass     2
+G05   pass     26
+G06   pass     26
+X01   pass     26
 
-26 files over 2 papers, nothing found
+26 files over 2 papers, 1 finding, and the build fails
+
+R01 every arXiv id written down in this corpus names a paper the metadata plane has
+  manifests/refs/2404/2404.19756.yaml: 2404.19756: bib.bib18 names arXiv:2312.14276, and the metadata plane has no paper with that identifier
+ax: a hard rule found something
 ```
 
 Group T is the one that says a content file is a content file: it parses, its fields are known and typed, its recorded hash matches the body under it, its sections run from 0 with no gaps, its headings skip no level, and it has a front matter file with an abstract in it.
@@ -562,6 +573,24 @@ That is not a hypothetical. It is what this rule found on KAN the first time it 
 `F11` counts the tables in the sections against the pairs on disk in one direction only: more tables in the bodies than on disk is a paper `ax tables` has not been run over, and more on disk than in the bodies is a table the paper cut between versions, which `ax tables` sweeps itself.
 `F12` is the measurement, and it is the reason a table is written twice at all.
 
+Group R reads the bibliographies and the edges built out of them.
+`R03` is the rule that loads the manifest at all, the way `F07` loads the figure manifest and `G01` loads the register, and what an entry has to keep is `refs.Load`'s definition rather than a second copy of it written here.
+`R02` is a citation with no entry behind it, which on a paper nobody has run `ax refs` over is every citation that paper has, and that is the answer wanted: a bibliography is part of the content and not an extra.
+`R01` reads every arXiv identifier written down anywhere, in a body, in an entry and in a resolution, against the metadata plane.
+It judges an identifier only when the plane holds that month, because a month nobody has harvested yet is a fact about the harvest and not about the paper, and the plane's own coverage is group S's question.
+`R04` re-runs the matcher over the record the edge points at, which is the only way to say that an edge written months ago would still be written today, and it needs no network to do it because the answer is in the plane.
+`R05` is a bibliography entry that resolves to the paper it sits in, which is what a title match against a paper's own title looks like from the outside.
+`R06` is a citation dated after the paper making it, with two years of slack, because a preprint cited in one year and published two years later is a style printing the publication year and not a defect.
+
+The one finding in the run above is `R01` and it is true of that corpus.
+Those two papers live in a scratch corpus whose metadata plane holds two records, one of them in the month KAN cites into, so the rule judges the identifier and reports it.
+`R04` and `R05` say not run for the same reason: nothing in either bibliography resolved against a two record plane, so there is no edge for either of them to read.
+That is the checked column doing its job rather than a green tick over an empty question.
+
+`T12` is declared with group T and implemented with group R, because a link to `#bib.bib28` is a leak on one reading and a citation `ax refs` has not got to yet on another, and telling those two apart means having the bibliography.
+It found a defect in the render path the first time it ran, on KAN, where two links into numbered equations pointed at anchors nothing in the corpus had.
+LaTeXML numbers a display by putting it in a `tbody` of its own and hanging the identifier there, so the paper links to `S4.E8` while the table wrapping it is `S4.EGx18` and nothing at all links to that, and the rewrite had been reading the identifier off the table.
+
 Group G reads the register against the bodies the tags in it were written into.
 The register is the record and the content files are the copy, which is the shape of the group: `G01`, `G03` and `G04` read the register on its own, `G06` reads the copy on its own, and `G05` is the two disagreeing, which is what a rewrite that stopped half way leaves behind and is the state that makes a tag resolve to the wrong object rather than to nothing.
 `G02` is the rule that pays for scoping tags to a paper: a bare `03QK` is not a reference here, because `03QK` exists in thousands of papers and means something different in each, and the reference is `2106.09685#03QK`.
@@ -573,16 +602,19 @@ That block still gets a tag, on purpose, because an anchor nothing can be writte
 
 The checked column is the point of the whole thing.
 A rule with no findings and nothing checked has not passed, it has not run, and the two are different states in the report and not the same green tick.
-`T04`, `T06`, `T07`, `M02`, `M14`, `F07`, `F08`, `F10`, `F11`, `G01`, `G03` and `G04` are about a paper rather than a file, which is why they say 2 where the rest say 26.
+`T04`, `T06`, `T07`, `M02`, `M14`, `F07`, `F08`, `F10`, `F11`, `R03`, `G01`, `G03` and `G04` are about a paper rather than a file, which is why they say 2 where the rest say 26.
 The F rules that count figures say 40 and 14 and 41 because those are pictures and not files: 41 decisions in the two manifests, 14 of them committed, and 40 image lines across the bodies.
 `T08` says 24 because an abstract is as long as its author made it and is not a section that came out too short.
+`R06` says 234 because that is the number of bibliography entries in the two papers that printed a year, which is what the rule reads.
 
 Mathematics and code are masked out of a body before the T rules read it, delimiters and all, with every line kept exactly where it was so a finding still points at a line somebody can open.
 Without it `$a<b>c$` is an HTML tag, a listing that shows a table is raw markup, and a shell session with a number on a line is a page number.
 Where the mathematics and the code are is the M group's splitter answering, and not a second reading of the same body, so the two groups cannot end up with different opinions about which lines are a fence.
 
-`T12`, which is a Markdown link left in a body, is not here.
-It arrives with group R, because on the render path a link to `#bib.bib28` is a link `ax refs` has not resolved yet, and telling that apart from a leak means reading the bibliography.
+Three rules of group R are not here.
+`R07` is the acquire selection report, which is a paper three or more papers in the content plane cite and which is not in the plane itself, and nothing writes that report yet.
+`R08` reads a rendered reference section and nothing renders one yet.
+`R09` compares a paper's resolution rate against its category's median, which needs the same baselines `M06` needs, so the two arrive together in M6.
 `M04` and `M06` are not here: `M04` is every span parsing under KaTeX and the reader that carries KaTeX is M6, and `M06` compares a paper's displays per page with its category's median, which needs baselines computed over a corpus with more than two papers in it.
 `G07` and `G08` are not here either: `G07` is about tombstones and nothing writes one until `ax tags diff`, and `G08` reads git history for a tag that used to be in a register and is not any more, which is the same milestone.
 `F04` is not here for the same reason as `G08`: it says nothing under `figures/` is untracked, which is a question for git, and this tool is run over a directory that is a checkout on one machine and an unpacked archive on the next.

@@ -271,6 +271,11 @@ func equation(n *html.Node) Block {
 	if len(rows) <= 1 {
 		b.Tag = eqnTag(n)
 		b.Text = eqnText(n)
+		if len(rows) == 1 {
+			if id := eqnID(rows[0]); id != "" {
+				b.ID = id
+			}
+		}
 		return b
 	}
 	// A group of aligned equations carries no number of its own. Each row has
@@ -281,9 +286,35 @@ func equation(n *html.Node) Block {
 		if text == "" {
 			continue
 		}
-		b.Blocks = append(b.Blocks, Block{Kind: KindEquation, ID: attr(r, "id"), Tag: eqnTag(r), Text: text})
+		b.Blocks = append(b.Blocks, Block{Kind: KindEquation, ID: eqnID(r), Tag: eqnTag(r), Text: text})
 	}
 	return b
+}
+
+// eqnID is the identifier every cross reference to one equation points at.
+//
+// LaTeXML numbers a display by putting it in a tbody of its own and hanging the
+// identifier there, so a single numbered equation comes out as a group whose
+// table is S4.EGx18 and whose tbody is S4.E8. The paper links to S4.E8 and
+// nothing at all links to S4.EGx18, so the identifier on the table is the one
+// this must not take.
+//
+// Audit rule T12 found this, on KAN, where two links into equations of section
+// four pointed at anchors the rewrite had never been told about. It is the
+// shape most of that paper's numbered equations are in.
+func eqnID(row *html.Node) string {
+	if id := attr(row, "id"); id != "" {
+		return id
+	}
+	for p := row.Parent; p != nil; p = p.Parent {
+		if p.Data == "tbody" {
+			return attr(p, "id")
+		}
+		if p.Data == "table" {
+			return ""
+		}
+	}
+	return ""
 }
 
 // eqnText is every piece of mathematics in an equation cell, joined.
