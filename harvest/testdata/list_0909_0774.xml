@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">
+    <responseDate>2026-09-14T11:22:26Z</responseDate>
+    <request verb="ListRecords" metadataPrefix="arXivRaw">http://oaipmh.arxiv.org/oai</request>
+    <ListRecords>
+        <record>
+                <header>
+        <identifier>oai:arXiv.org:0909.0774</identifier>
+        <datestamp>2026-09-11</datestamp>
+            <setSpec>math:math:GR</setSpec>
+            <setSpec>math:math:LO</setSpec>
+    </header>
+
+            <metadata>
+                        <arXivRaw xmlns="http://arxiv.org/OAI/arXivRaw/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://arxiv.org/OAI/arXivRaw/ https://oaipmh.arxiv.org/OAI/arXivRaw.xsd">
+        <id>0909.0774</id>
+        <submitter>Zlil Sela</submitter>
+            <version version="v1">
+                <date>Thu, 03 Sep 2009 22:17:07 GMT</date>
+                <size>66kb</size>
+            </version>
+            <version version="v2">
+                <date>Mon, 11 Nov 2024 15:34:20 GMT</date>
+                <size>67kb</size>
+            </version>
+            <version version="v3">
+                <date>Thu, 10 Sep 2026 13:53:49 GMT</date>
+                <size>83kb</size>
+            </version>
+        <title>Diophantine Geometry over Groups IX: Envelopes and Imaginaries</title>
+        <authors>Zlil Sela</authors>
+        <categories>math.GR math.LO</categories>
+            <license>http://arxiv.org/licenses/nonexclusive-distrib/1.0/</license>
+            <abstract>This paper is the ninth in a sequence on the structure of sets of solutions to systems of equations in free and hyperbolic groups, projections of such sets (Diophantine sets), and the structure of definable sets in free and hyperbolic groups. In the ninth paper we associate a Diophantine set with a definable set, and view it as the Diophantine envelope of the definable set. We use the envelope and duo limit groups that were used in proving stability of the theory of free and torsion-free hyperbolic groups [Se9], to study definable equivalence relations, and in particular, to classify imaginaries in these groups.</abstract>
+    </arXivRaw>
+
+            </metadata>
+        </record>
+        <resumptionToken></resumptionToken>
+    </ListRecords>
+</OAI-PMH>
