@@ -1,0 +1,107 @@
+# The pattern set a locator is read with.
+#
+# A locator is the part of a citation that names which result is being used, so
+# the "Theorem 2" in "by Theorem 2 of [7]". It is matched by pattern and never by
+# a model, for the same reason the bibliography is: this runs over every citation
+# in every paper, and a model would cost more than the rest of the pipeline and
+# would be wrong in prose.
+#
+# 08-graph.md section 5 estimated about thirty patterns here, because every field
+# writes a locator differently. What is actually here is a vocabulary of thirty
+# kind words crossed with six shapes, which covers more than thirty flat patterns
+# would and is easier to be right about: the thirty flat patterns are these six
+# shapes written out thirty times, and a flat list of near identical regexps is
+# where a typo hides for a year.
+#
+# The binary carries this file as its default and a copy at manifests/graph.yaml
+# in the corpus replaces it, because the person who notices that a field writes
+# locators in a shape nothing here matches is the person reading that field's
+# papers.
+locators:
+  # A locator number as any field prints one.
+  #
+  # A plain number, a dotted number, a single letter for an appendix, a Roman
+  # numeral, an optional letter suffix for Theorem 2a, and optional brackets
+  # because an equation is cited as (2.4) and a theorem is not. This one is
+  # matched case sensitively, so the single letter branch stays a single capital
+  # letter and does not turn every word after a kind into a number.
+  number: '\(?(?:[0-9]+|[A-Z]|[IVXL]{1,6})(?:\.[0-9]+)*[a-z]?\)?'
+  # The kind words, each under the name the graph stores.
+  #
+  # The aliases are matched case insensitively and longest first, and a trailing
+  # full stop is handled by the shapes rather than repeated here, so "Thm." and
+  # "thm" are one alias and not two.
+  kinds:
+    theorem: [theorems, theorem, thms, thm]
+    lemma: [lemmata, lemmas, lemma, lem]
+    proposition: [propositions, proposition, props, prop]
+    corollary: [corollaries, corollary, cor]
+    definition: [definitions, definition, defn, def]
+    remark: [remarks, remark, rem]
+    example: [examples, example]
+    conjecture: [conjectures, conjecture, conj]
+    claim: [claims, claim]
+    fact: [facts, fact]
+    observation: [observations, observation, obs]
+    assumption: [assumptions, assumption]
+    axiom: [axioms, axiom]
+    hypothesis: [hypotheses, hypothesis]
+    problem: [problems, problem]
+    exercise: [exercises, exercise]
+    result: [results, result]
+    note: [notes, note]
+    section: [subsections, subsection, sections, section, sect, sec, "§§", "§"]
+    chapter: [chapters, chapter, chap, ch]
+    appendix: [appendices, appendix, app]
+    part: [parts, part]
+    equation: [equations, equation, eqns, eqn, eqs, eq]
+    figure: [figures, figure, figs, fig]
+    table: [tables, table, tbl, tab]
+    algorithm: [algorithms, algorithm, algs, alg]
+    page: [pages, page, pp, p]
+    item: [items, item]
+    step: [steps, step]
+    line: [lines, line]
+  # The six shapes.
+  #
+  # Three of them read the text after the citation and three read the text
+  # before it, which is the whole of the difference: a numeric style prints the
+  # locator inside the citation and an author-year style prints it in the
+  # sentence.
+  patterns:
+    # \cite[Lemma 3.4]{smith} in both styles, which comes out as "[12, Lemma
+    # 3.4]" in one and "(Smith, 2020, Lemma 3.4)" in the other. This is the one
+    # that fires most often and it is the only one that cannot misfire, because
+    # the text it matches is inside the citation's own brackets.
+    - name: after-comma
+      where: after
+      match: '^[\\\] ]*,\s*{kind}\.?\s*{number}'
+    # "(Smith, 2020) (Theorem 2)", which is what \citep followed by a
+    # parenthesised locator comes to.
+    - name: after-parens
+      where: after
+      match: '^[\\\] ]*\(\s*{kind}\.?\s*{number}\s*\)'
+    # "see [12] Theorem 3.4", with nothing between the citation and the kind
+    # word but spaces and the citation's own closing bracket.
+    #
+    # No full stop and no newline in the gap, which is what keeps this off "as
+    # shown in [12]. Theorem 3.4 below says", where Theorem 3.4 is this paper's
+    # own. A cross reference to this paper's own numbered object is a link by the
+    # time it gets here, so bare prose after a citation is nearly always the
+    # target's.
+    - name: after-bare
+      where: after
+      match: '^[\\\] ]*{kind}\.?\s*{number}'
+    # "by Theorem 2 of [7]", "as in Lemma 3.4 in [7]".
+    - name: before-of
+      where: before
+      match: '{kind}\.?\s*{number}\s+(?:of|in|from)\s*\\?\[?\s*$'
+    # "Theorem 2, [7]", which is the same thing with the connective left out.
+    - name: before-comma
+      where: before
+      match: '{kind}\.?\s*{number}\s*,\s*\\?\[?\s*$'
+    # "Theorem 2 due to [7]", and the handful of other verbs a paper uses to say
+    # the same thing.
+    - name: before-credit
+      where: before
+      match: '{kind}\.?\s*{number}\s+(?:due to|proved in|proven in|established in|shown in|given in|stated in|introduced in)\s*\\?\[?\s*$'

@@ -138,6 +138,28 @@ func RefsPath(root string, id axid.ID) string {
 	return path.Join(root, "manifests", "refs", Shard(id), PathID(id)+".yaml")
 }
 
+// CitesPath is where one paper's citations sit, with the locator each of them
+// carries.
+//
+// Beside the bibliography and not inside it, because the two are counted
+// differently. A bibliography has one entry per work cited and this has one
+// record per place in the paper that cites it, so a single entry cited in nine
+// proofs is one line there and nine lines here.
+func CitesPath(root string, id axid.ID) string {
+	return path.Join(root, "manifests", "cites", Shard(id), PathID(id)+".yaml")
+}
+
+// LocatorsPath is the pattern set a locator is read with.
+//
+// It sits in the corpus rather than in the binary because every field writes a
+// locator differently, and the person who notices that a field writes them in a
+// shape nothing here matches is the person reading that field's papers, not
+// whoever is editing this package that week. The binary carries a default set
+// and this file replaces it.
+func LocatorsPath(root string) string {
+	return path.Join(root, "manifests", "graph.yaml")
+}
+
 // GraphPath is the edge file for one month.
 //
 // Sharded by the subject's paper, so extracting one paper writes one file.

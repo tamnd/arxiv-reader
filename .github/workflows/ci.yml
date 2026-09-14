@@ -895,9 +895,61 @@ jobs:
       - name: resolving the same bibliography twice writes nothing
         run: |
           ARXIV_CORPUS=/tmp/extract-corpus ax refs resolve 2501.00001 2>&1 | grep -q "unchanged"
+      # A citation says one paper mentioned another and a locator says which
+      # result of it was used, and the difference between those two is the whole
+      # of 08-graph.md section 5. The fixture prints a locator inside the
+      # citation's brackets in one place and in the sentence in front of it in
+      # another, which are the two halves of the pattern set.
+      - name: a citation carries the locator it was printed with
+        run: |
+          ARXIV_CORPUS=/tmp/extract-corpus ax refs cites -n 2501.00001 | tee /tmp/cites.txt
+          grep -q "5 citations" /tmp/cites.txt
+          grep -q "with a locator   2 of 5" /tmp/cites.txt
+          grep -q "via after-comma  1" /tmp/cites.txt
+          grep -q "via before-of    1" /tmp/cites.txt
+          grep -q "theorem 2.1  bib.bibx3" /tmp/cites.txt
+          grep -q "lemma 4  bib.bibx4" /tmp/cites.txt
+          ARXIV_CORPUS=/tmp/extract-corpus ax refs cites 2501.00001 2>&1 | grep -q "5 citations in"
+          f=/tmp/extract-corpus/manifests/cites/2501/2501.00001.yaml
+          grep -q "kind: theorem" $f
+          grep -q 'number: "2.1"' $f
+          grep -q "via: before-of" $f
+          # Every citation is recorded and not only the ones that carry a
+          # locator, because a citation is an edge whether or not it names a
+          # theorem, and where in the paper it sits is half of what it says.
+          grep -q "entry: bib.bibx1" $f
+          grep -q "section: 02_results.md" $f
+          # The prose around a citation is kept only where there is a locator to
+          # check it against. A paper has a thousand citations and a handful
+          # carry one.
+          test "$(grep -c 'text:' $f)" = 2
+      - name: reading the same citations twice writes nothing
+        run: |
+          ARXIV_CORPUS=/tmp/extract-corpus ax refs cites 2501.00001 2>&1 | grep -q "unchanged"
+      # The pattern set lives in the corpus so that a field which writes locators
+      # in a shape nothing matches can be taught without a release.
+      - name: the pattern set can be replaced by the corpus
+        run: |
+          ax refs locators | tee /tmp/locators.txt
+          grep -q "after-comma" /tmp/locators.txt
+          grep -qE "kinds +30" /tmp/locators.txt
+          rm -rf /tmp/pat-corpus && cp -r /tmp/extract-corpus /tmp/pat-corpus
+          cat > /tmp/pat-corpus/manifests/graph.yaml <<'YAML'
+          locators:
+            number: '[0-9]+(?:\.[0-9]+)*'
+            kinds:
+              theorem: [satz]
+            patterns:
+              - {name: german, where: after, match: '^[\\\] ]*,\s*{kind}\.?\s*{number}'}
+          YAML
+          ARXIV_CORPUS=/tmp/pat-corpus ax refs locators | grep -q "german"
+          # A corpus file replaces the embedded set rather than adding to it, so
+          # a set that knows only the German word for theorem reads no locators
+          # out of an English paper.
+          ARXIV_CORPUS=/tmp/pat-corpus ax refs cites -n 2501.00001 | grep -q "with a locator  0 of 5"
       - name: refs refuses the arguments it should refuse
         run: |
-          for c in "refs" "refs build" "refs resolve" "refs resolve 2502.00002" "refs explain 2501.00001v3" "refs build not-an-arxiv-id" "refs resolve not-an-arxiv-id"; do
+          for c in "refs" "refs build" "refs resolve" "refs resolve 2502.00002" "refs explain 2501.00001v3" "refs build not-an-arxiv-id" "refs resolve not-an-arxiv-id" "refs cites" "refs cites 2502.00002" "refs cites not-an-arxiv-id" "refs locators everything"; do
             if ARXIV_CORPUS=/tmp/extract-corpus ax $c; then
               echo "ax $c was allowed"
               exit 1
@@ -925,6 +977,17 @@ jobs:
           sed -i 's/"licence_from":"abs"/"licence_from":"kaggle"/' /tmp/resolve-corpus/metadata/2501.jsonl
           if ARXIV_CORPUS=/tmp/resolve-corpus ax refs resolve 2501.00001; then
             echo "a bibliography that may not be published was resolved anyway"
+            exit 1
+          fi
+          # A citation record holds the prose around the citation, so it is
+          # content as much as the bibliography is.
+          rm -rf /tmp/resolve-corpus/manifests/cites
+          if ARXIV_CORPUS=/tmp/resolve-corpus ax refs cites 2501.00001; then
+            echo "the citations of a paper that may not be published were written anyway"
+            exit 1
+          fi
+          if [ -e /tmp/resolve-corpus/manifests/cites ]; then
+            echo "a refused run wrote citations into the corpus"
             exit 1
           fi
       - name: the audit refuses the arguments it should refuse

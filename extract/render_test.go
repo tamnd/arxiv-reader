@@ -134,7 +134,7 @@ func TestTheSectionTree(t *testing.T) {
 func TestTheBlockCounts(t *testing.T) {
 	p := parse(t, "rendering.html")
 	want := map[Kind]int{
-		KindParagraph: 6,
+		KindParagraph: 7,
 		KindEquation:  4,
 		KindFigure:    4,
 		KindTable:     1,
@@ -228,7 +228,7 @@ func TestASingleEquationKeepsItsNumber(t *testing.T) {
 
 func TestAFigureKeepsItsGraphicAndItsCaption(t *testing.T) {
 	p := parse(t, "rendering.html")
-	fig := p.Sections[0].Blocks[1]
+	fig := p.Sections[0].Blocks[2]
 	if fig.Kind != KindFigure || fig.ID != "S1.F1" {
 		t.Fatalf("got %+v", fig)
 	}
