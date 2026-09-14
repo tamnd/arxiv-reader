@@ -216,6 +216,50 @@ A file marked edited stays that way, because somebody decided about it and a has
 The licence gate runs again here and not only at fetch time.
 Fetching and extracting are separate runs and the licence can be re-resolved between them, so the check belongs at the point something is about to be published as well as at the point it was downloaded.
 
+`ax extract source` is the same command with three steps in front of it, and it is the path most of arXiv is on.
+
+```
+$ ax extract source -n 2006.10256v1
+latexmlc (LaTeXML version 0.8.8)
+converting 2006.10256v1 from paper.tex
+  Error:undefined:\lstlanguagefiles The token T_CS[\lstlanguagefiles] is not defined. at listings.sty.ltxml; line 1603
+  Error:imageprocessing:imageclass No image processing module found to convert types
+converted 2006.10256v1 in 17.549s with errors, and whether they matter is the reject rule's question
+2006.10256v1
+  licence
+  title       Array Programming with NumPy
+  authors     Charles R. Harris, K. Jarrod Millman, Stéfan J. van der Walt, ...
+  abstract    1 block
+  headings    24
+  blocks      3 figure, 4 listing, 93 paragraph, 1 quote
+  unparsed    0
+  faults      none
+```
+
+The three steps are unpacking the submission, working out which file the document starts from, and running LaTeXML over it, and everything after that is the code the render path already uses.
+That is the reason this path costs a runner and no new reader: arXiv's own renderings are made by LaTeXML, so a paper converted here comes back in the same markup, with the same classes and the same `alttext` holding the LaTeX the author typed.
+It does mean LaTeXML has to be installed, which is `brew install latexml` or `apt install latexml`, and a machine without it gets that line rather than a stack trace.
+The flags are chosen rather than copied from arXiv: HTML5 out, the TeX kept beside every formula, TikZ and picture environments drawn as SVG, and no stylesheet copied next to the document.
+
+The two error lines in that run are worth reading, because they are what conversion errors actually look like.
+The first is a macro from a package LaTeXML models but does not model all of, and it costs the paper one code listing header.
+The second is not about the paper at all: LaTeXML converts raster graphics through Image::Magick, and without it the PNGs are copied next to the document rather than converted, which is a limitation of this machine and not of the submission.
+Neither is a hole in the body of the paper, which is why the reject rule passes this one, and the rule is the same rule the render path uses.
+
+The status line LaTeXML prints is its own scale and not the process exit code, and the two disagree on purpose: a conversion with errors in it exits zero because it still wrote a document, with a marker where the thing it could not read was.
+So a conversion that failed is one that wrote nothing, and everything else is a result somebody has to judge.
+A conversion gets five minutes, because a submission that defeats LaTeXML tends to defeat it slowly rather than fail, and the NumPy paper takes under twenty seconds of that budget.
+A paper that runs out of it is stopped and is on the native path.
+
+The conversion is kept under `work/converted/` and reused, and `-again` throws it away and converts afresh.
+It goes beside the unpacked submission rather than inside it because LaTeXML copies every picture a paper uses next to the document it writes, and a conversion written into the submission would leave this project's output mixed in with the author's files with nothing saying which was which.
+The submission itself is unpacked from the cached bytes every time, since those are hashed in the manifest and the unpacked files are not.
+A submission that turns out to be a PDF is reported and stepped over rather than failed on, the same way a version arXiv never rendered is on the fetch side, because a batch of a hundred papers should not stop at the first author who compiled their own paper.
+
+The front matter records which of the two surfaces the file came from, in `path: render` or `path: source`.
+A rendering is what arXiv made of a submission and a conversion is what this project made of the same submission, and they are not always the same document, so a reader comparing two papers has nothing else to go on.
+Figures on this path are still undecided: they come out of the conversion as local files next to the document, and putting them through the figure gate is the next piece of work.
+
 Figures have their own gate, because a `cc-by` article licenses what the authors own and not the plot they reprinted from somebody else's paper with permission.
 There is no metadata for that and there never will be, so `ax figures` reads the signals that are actually in the source.
 

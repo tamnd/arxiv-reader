@@ -439,7 +439,7 @@ jobs:
             echo "an extract with no subcommand was allowed"
             exit 1
           fi
-          for c in "extract render" "extract render -n 2312.00752" "extract render -n not-an-arxiv-id" "extract sideways -n 2312.00752v2" "extract render 2312.00752v2"; do
+          for c in "extract render" "extract render -n 2312.00752" "extract render -n not-an-arxiv-id" "extract sideways -n 2312.00752v2" "extract render 2312.00752v2" "extract source" "extract source -n not-an-arxiv-id"; do
             if ARXIV_CORPUS=/tmp/empty-corpus ax $c; then
               echo "ax $c was allowed"
               exit 1
@@ -632,6 +632,103 @@ jobs:
             echo "a rendering with a piece of the paper missing exited zero"
             exit 1
           fi
+      # LaTeXML is a hundred megabytes of Perl and this job has no network, so
+      # the converter here is a script that answers with the same fixture the
+      # render path is tested against. What that leaves under test is everything
+      # around the conversion, which is the part this project wrote: the
+      # manifest lookup, the unpacking, the main file, the directory LaTeXML is
+      # run in, the status line, the log and the reading of what came back.
+      - name: a submission is read end to end with a stub converter
+        run: |
+          mkdir -p /tmp/source-corpus/work/source/2501 /tmp/source-corpus/manifests /tmp/source-corpus/metadata /tmp/submission/figures
+          printf '%s\n' '\documentclass{article}' '\begin{document}' '\input{sections/one}' '\end{document}' > /tmp/submission/ms.tex
+          mkdir -p /tmp/submission/sections
+          printf 'A section that begins no document of its own.\n' > /tmp/submission/sections/one.tex
+          printf 'not really a picture\n' > /tmp/submission/figures/plot.pdf
+          tar -czf /tmp/source-corpus/work/source/2501/2501.00001v3.gz -C /tmp/submission ms.tex sections/one.tex figures/plot.pdf
+          sum=$(sha256sum /tmp/source-corpus/work/source/2501/2501.00001v3.gz | cut -d' ' -f1)
+          cat > /tmp/source-corpus/manifests/sources.yaml <<YAML
+          sources:
+            - id: "2501.00001"
+              version: 3
+              route: source
+              url: https://arxiv.org/e-print/2501.00001v3
+              path: work/source/2501/2501.00001v3.gz
+              sha256: $sum
+              bytes: 1
+              fetched: 2026-09-14T00:00:00Z
+              licence: cc-by
+              licence_from: abs
+          YAML
+          cat > /tmp/stub-latexmlc <<SH
+          #!/bin/sh
+          case "\$1" in --VERSION) echo "a stub converter, and not LaTeXML"; exit 0;; esac
+          for a in "\$@"; do case "\$a" in --dest=*) out="\${a#--dest=}";; esac; done
+          test -f ms.tex || { echo "the converter was not run inside the submission" >&2; exit 3; }
+          echo "Status:conversion:0"
+          cat "$PWD/extract/testdata/rendering.html" > "\$out"
+          SH
+          chmod +x /tmp/stub-latexmlc
+          ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -latexmlc /tmp/stub-latexmlc 2501.00001v3 | tee /tmp/source.txt
+          grep -q "A Paper About Nothing" /tmp/source.txt
+          grep -q "faults      1, 0 of them inside the body" /tmp/source.txt
+          # The submission is unpacked under work/ and the conversion is kept
+          # beside it rather than inside it, because LaTeXML copies a paper's
+          # pictures next to the document it writes.
+          test -f /tmp/source-corpus/work/source/2501/2501.00001v3/sections/one.tex
+          test -f /tmp/source-corpus/work/converted/2501/2501.00001v3/paper.html
+          test -f /tmp/source-corpus/work/converted/2501/2501.00001v3/paper.html.log
+      - name: the same submission is not converted twice
+        run: |
+          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -latexmlc /tmp/stub-latexmlc 2501.00001v3 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "was converted already"
+          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -again -latexmlc /tmp/stub-latexmlc 2501.00001v3 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "converting 2501.00001v3 from ms.tex"
+      # The one field of the front matter that says how the file below it was
+      # made. A paper read from the source path and a paper read from arXiv's
+      # own rendering are not always the same document, and a reader comparing
+      # two papers has nothing else to go on.
+      - name: a paper read from the source path says so in its front matter
+        run: |
+          cp /tmp/extract-corpus/metadata/2501.jsonl /tmp/source-corpus/metadata/2501.jsonl
+          ARXIV_CORPUS=/tmp/source-corpus ax extract source -latexmlc /tmp/stub-latexmlc 2501.00001v3 | grep -q "3 written"
+          grep -q "^path: source" /tmp/source-corpus/content/en/2501/2501.00001/01_introduction.md
+      - name: a submission that is a PDF is a fact about the paper and not a failure
+        run: |
+          rm -rf /tmp/pdf-corpus && mkdir -p /tmp/pdf-corpus/work/source/2501 /tmp/pdf-corpus/manifests
+          printf '%%PDF-1.5\nthe paper, as the author compiled it\n' | gzip > /tmp/pdf-corpus/work/source/2501/2501.00002v1.gz
+          sum=$(sha256sum /tmp/pdf-corpus/work/source/2501/2501.00002v1.gz | cut -d' ' -f1)
+          cat > /tmp/pdf-corpus/manifests/sources.yaml <<YAML
+          sources:
+            - id: "2501.00002"
+              version: 1
+              route: source
+              url: https://arxiv.org/e-print/2501.00002v1
+              path: work/source/2501/2501.00002v1.gz
+              sha256: $sum
+              bytes: 1
+              fetched: 2026-09-14T00:00:00Z
+              licence: cc-by
+              licence_from: abs
+          YAML
+          out=$(ARXIV_CORPUS=/tmp/pdf-corpus ax extract source -n -latexmlc /tmp/stub-latexmlc 2501.00002v1 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "native path"
+          echo "$out" | grep -q "1 of 1 submissions are a PDF"
+          if [ -e /tmp/pdf-corpus/content ]; then
+            echo "a submission with no source to read wrote into the content plane"
+            exit 1
+          fi
+      # A machine with no LaTeXML is the ordinary state of a machine, and the
+      # answer is one line a person runs once, so the refusal has to carry it.
+      - name: a machine with no LaTeXML says how to get one
+        run: |
+          out=$(ARXIV_CORPUS=/tmp/source-corpus ax extract source -n -latexmlc latexmlc-that-is-not-installed 2501.00001v3 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "brew install latexml"
+          echo "$out" | grep -q "apt install latexml"
       # The fixtures are four real files and a drawing. Rule F06 is what
       # separates a corpus from a mirror of copyrighted PDFs and rule F09 is
       # what keeps somebody else's figure out of a repository that claims to be

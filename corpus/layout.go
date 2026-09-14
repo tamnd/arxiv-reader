@@ -133,6 +133,31 @@ func EPrintPath(root string, id axid.ID, version int) string {
 	return path.Join(root, "work", "source", Shard(id), fmt.Sprintf("%sv%d.gz", PathID(id), version))
 }
 
+// EPrintDir is where one e-print is unpacked.
+//
+// The directory beside the file, named the same thing without the extension,
+// because the two are the same submission in two states and a person looking
+// at work/source/2006 should be able to see that without being told.
+func EPrintDir(root string, id axid.ID, version int) string {
+	return path.Join(root, "work", "source", Shard(id), fmt.Sprintf("%sv%d", PathID(id), version))
+}
+
+// ConvertedDir is where this project's own conversion of one submission goes.
+//
+// Separate from the unpacked submission and not inside it. LaTeXML copies every
+// picture a paper uses next to the document it writes, so a conversion written
+// into the submission would leave the tool's output mixed in with the author's
+// files with nothing saying which was which, and the next run would convert
+// whatever the last one left behind.
+func ConvertedDir(root string, id axid.ID, version int) string {
+	return path.Join(root, "work", "converted", Shard(id), fmt.Sprintf("%sv%d", PathID(id), version))
+}
+
+// ConvertedPath is the document that conversion writes.
+func ConvertedPath(root string, id axid.ID, version int) string {
+	return path.Join(ConvertedDir(root, id, version), "paper.html")
+}
+
 // SourcesPath is the manifest recording where every fetched byte came from.
 func SourcesPath(root string) string {
 	return path.Join(root, "manifests", "sources.yaml")

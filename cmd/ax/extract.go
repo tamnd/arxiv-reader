@@ -20,13 +20,15 @@ import (
 
 func runExtract(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: ax extract render -n <id>v<n> [...]")
+		return errors.New("usage: ax extract <render|source> -n <id>v<n> [...]")
 	}
 	switch args[0] {
 	case "render":
 		return extractRender(args[1:])
+	case "source":
+		return extractSource(args[1:])
 	default:
-		return fmt.Errorf("unknown extract subcommand %q, and render is the only path that is built", args[0])
+		return fmt.Errorf("unknown extract subcommand %q, and the paths are render and source", args[0])
 	}
 }
 
@@ -116,7 +118,20 @@ func writePaper(plane metadata.Plane, id axid.ID, p *extract.Paper, entry fetch.
 	if err != nil {
 		return err
 	}
-	return reportWrite(dir, results)
+	return reportWrite(dir, results, entry.Route)
+}
+
+// document is what the markup being read is called, which is not the same word
+// on the two paths.
+//
+// It is the same markup either way, and a person who is told their rendering
+// disagrees with the plane when they never fetched a rendering has been sent to
+// look in the wrong place.
+func document(route fetch.Route) string {
+	if route == fetch.RouteSource {
+		return "conversion"
+	}
+	return "rendering"
 }
 
 // frontMatter fills in everything a content file says about itself that is not
@@ -137,16 +152,18 @@ func frontMatter(rec metadata.Record, id axid.ID, p *extract.Paper, entry fetch.
 	// the bytes on disk are of a version whose terms nobody has checked against
 	// the ones being published under now.
 	if entry.Licence != v.Licence {
-		return extract.Front{}, fmt.Errorf("%s was fetched under %s and the plane now says %s, so run ax fetch render %s again before publishing it", entry.Ref(), entry.Licence, v.Licence, entry.Ref())
+		return extract.Front{}, fmt.Errorf("%s was fetched under %s and the plane now says %s, so run ax fetch %s %s again before publishing it", entry.Ref(), entry.Licence, v.Licence, entry.Route, entry.Ref())
 	}
-	// The rendering states a licence of its own, in the info box at the top of
-	// the page. It is arXiv saying what one version is under, which is the same
-	// kind of statement the abs page makes, so a disagreement is one of the two
-	// being stale and neither is safe to publish on.
+	// A rendering states a licence of its own, in the info box at the top of the
+	// page. It is arXiv saying what one version is under, which is the same kind
+	// of statement the abs page makes, so a disagreement is one of the two being
+	// stale and neither is safe to publish on. A conversion of the submitter's
+	// own files carries no such box, so on the source path this checks nothing
+	// and the plane is the only statement there is.
 	if label, ok := corpus.LicenceFromLabel(p.Licence); ok && label != v.Licence {
-		return extract.Front{}, fmt.Errorf("%s is recorded as %s and its rendering says %q, which is %s, so one of the two is of a different version", entry.Ref(), v.Licence, p.Licence, label)
+		return extract.Front{}, fmt.Errorf("%s is recorded as %s and its %s says %q, which is %s, so one of the two is of a different version", entry.Ref(), v.Licence, document(entry.Route), p.Licence, label)
 	} else if !ok && p.Licence != "" {
-		fmt.Fprintf(os.Stderr, "%s: the rendering labels its licence %q, which this does not recognise, so the crosscheck was skipped\n", entry.Ref(), p.Licence)
+		fmt.Fprintf(os.Stderr, "%s: the %s labels its licence %q, which this does not recognise, so the crosscheck was skipped\n", entry.Ref(), document(entry.Route), p.Licence)
 	}
 	out, err := corpus.PublishedLicence(v.Licence)
 	if err != nil {
@@ -170,13 +187,18 @@ func frontMatter(rec metadata.Record, id axid.ID, p *extract.Paper, entry fetch.
 		LicenceOfSource: string(v.Licence),
 		LicenceFrom:     string(v.LicenceFrom),
 		Lang:            lang,
-		Path:            string(fetch.RouteRender),
-		SourceURL:       entry.URL,
-		SourceSHA256:    entry.SHA256,
+		// Which surface this paper was read from, which is the one field of the
+		// front matter that says how the file below it was made. A reader
+		// comparing two papers needs it, because a rendering is what arXiv made
+		// of a submission and a conversion is what this project made of the same
+		// submission, and they are not always the same document.
+		Path:         string(entry.Route),
+		SourceURL:    entry.URL,
+		SourceSHA256: entry.SHA256,
 	}
-	// The metadata plane's author list and not the rendering's. The rendering
-	// is a byline laid out for a page, with thanks notes and affiliations in
-	// it, and arXiv holds the list of people.
+	// The metadata plane's author list and not the document's. What is in the
+	// document is a byline laid out for a page, with thanks notes and
+	// affiliations in it, and arXiv holds the list of people.
 	for _, a := range rec.Authors {
 		f.Authors = append(f.Authors, a.String())
 	}
@@ -189,7 +211,7 @@ func frontMatter(rec metadata.Record, id axid.ID, p *extract.Paper, entry fetch.
 		for _, a := range p.Authors {
 			f.Authors = append(f.Authors, a.Name)
 		}
-		fmt.Fprintf(os.Stderr, "%s: the metadata plane has no authors for %s, so the byline was read off the rendering, and an authors pass with ax harvest oai -format arXiv will replace it\n", entry.Ref(), rec.ID)
+		fmt.Fprintf(os.Stderr, "%s: the metadata plane has no authors for %s, so the byline was read off the %s, and an authors pass with ax harvest oai -format arXiv will replace it\n", entry.Ref(), rec.ID, document(entry.Route))
 	}
 	if f.Categories == nil {
 		f.Categories = []string{}
@@ -214,7 +236,7 @@ func announced(rec metadata.Record, v metadata.Version) string {
 	return v.Created.UTC().Format("2006-01")
 }
 
-func reportWrite(dir string, results []extract.Result) error {
+func reportWrite(dir string, results []extract.Result, route fetch.Route) error {
 	counts := map[extract.State]int{}
 	for _, r := range results {
 		counts[r.State]++
@@ -228,7 +250,7 @@ func reportWrite(dir string, results []extract.Result) error {
 		len(results), dir, counts[extract.StateWritten], counts[extract.StateUnchanged],
 		counts[extract.StateRemoved], counts[extract.StateProtected])
 	if counts[extract.StateProtected] > 0 {
-		return fmt.Errorf("%s been corrected by hand, so run ax split -accept to keep the correction or ax extract render -force to throw it away", prose.Count(counts[extract.StateProtected], "file has"))
+		return fmt.Errorf("%s been corrected by hand, so run ax split -accept to keep the correction or ax extract %s -force to throw it away", prose.Count(counts[extract.StateProtected], "file has"), route)
 	}
 	return nil
 }
