@@ -133,8 +133,8 @@ jobs:
             echo "translate exited zero without doing anything"
             exit 1
           fi
-          if ax harvest hf; then
-            echo "harvest hf exited zero without harvesting anything"
+          if ax audit --plane meta; then
+            echo "audit exited zero without auditing anything"
             exit 1
           fi
       # These reach no further than the argument check, which is the point. CI
@@ -171,6 +171,26 @@ jobs:
             echo "a packed file was read as if it were JSON"
             exit 1
           fi
+          if ax harvest hf; then
+            echo "a mirror harvest with neither a file nor -rows was allowed"
+            exit 1
+          fi
+          if ax harvest hf -rows; then
+            echo "an unbounded rows walk was allowed, and that is thirty thousand requests"
+            exit 1
+          fi
+          if ax harvest hf -rows /tmp/snapshot.json.gz; then
+            echo "-rows accepted a file it is not going to read"
+            exit 1
+          fi
+          if ax harvest hf -dataset someone/mirror /tmp/snapshot.json.gz; then
+            echo "a rows only flag was accepted on the file path"
+            exit 1
+          fi
+          if ax harvest hf -rows -limit 1 -offset -5; then
+            echo "an offset before the start of the split was accepted"
+            exit 1
+          fi
       - name: a snapshot harvest reads a snapshot
         run: |
           mkdir -p /tmp/snap-corpus
@@ -184,3 +204,9 @@ jobs:
           # Reading the same file twice must change nothing, or every harvest
           # is a commit and the history stops meaning anything.
           ARXIV_CORPUS=/tmp/snap-corpus ax harvest kaggle /tmp/snapshot.json | grep -q "1 unchanged"
+          # The mirror reads the same file and the only thing that changes is
+          # which mirror it says it came from.
+          mkdir -p /tmp/hf-corpus
+          ARXIV_CORPUS=/tmp/hf-corpus ax harvest hf /tmp/snapshot.json
+          grep -q '"source":"hf"' /tmp/hf-corpus/metadata/2106.jsonl
+          grep -q '"source":"kaggle"' /tmp/snap-corpus/metadata/2106.jsonl

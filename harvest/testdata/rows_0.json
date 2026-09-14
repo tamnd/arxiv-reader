@@ -1,0 +1,218 @@
+{
+    "features": [
+        {
+            "feature_idx": 0,
+            "name": "id",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 1,
+            "name": "submitter",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 2,
+            "name": "authors",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 3,
+            "name": "title",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 4,
+            "name": "comments",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 5,
+            "name": "journal-ref",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 6,
+            "name": "doi",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 7,
+            "name": "report-no",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 8,
+            "name": "categories",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 9,
+            "name": "license",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 10,
+            "name": "abstract",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 11,
+            "name": "versions",
+            "type": {
+                "feature": {
+                    "version": {
+                        "dtype": "string",
+                        "_type": "Value"
+                    },
+                    "created": {
+                        "dtype": "string",
+                        "_type": "Value"
+                    }
+                },
+                "_type": "List"
+            }
+        },
+        {
+            "feature_idx": 12,
+            "name": "update_date",
+            "type": {
+                "dtype": "timestamp[s]",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 13,
+            "name": "authors_parsed",
+            "type": {
+                "feature": {
+                    "feature": {
+                        "dtype": "string",
+                        "_type": "Value"
+                    },
+                    "_type": "List"
+                },
+                "_type": "List"
+            }
+        }
+    ],
+    "rows": [
+        {
+            "row_idx": 0,
+            "row": {
+                "id": "0909.0774",
+                "submitter": "Zlil Sela",
+                "authors": "Zlil Sela",
+                "title": "Diophantine Geometry over Groups IX: Envelopes and Imaginaries",
+                "comments": null,
+                "journal-ref": null,
+                "doi": null,
+                "report-no": null,
+                "categories": "math.GR math.LO",
+                "license": "http://arxiv.org/licenses/nonexclusive-distrib/1.0/",
+                "abstract": "This paper is the ninth in a sequence on the structure of sets of solutions to systems of equations in free and hyperbolic groups, projections of such sets (Diophantine sets), and the structure of definable sets in free and hyperbolic groups. In the ninth paper we associate a Diophantine set with a definable set, and view it as the Diophantine envelope of the definable set. We use the envelope and duo limit groups that were used in proving stability of the theory of free and torsion-free hyperbolic groups [Se9], to study definable equivalence relations, and in particular, to classify imaginaries in these groups.",
+                "versions": [
+                    {
+                        "version": "v1",
+                        "created": "Thu, 03 Sep 2009 22:17:07 GMT"
+                    },
+                    {
+                        "version": "v2",
+                        "created": "Mon, 11 Nov 2024 15:34:20 GMT"
+                    },
+                    {
+                        "version": "v3",
+                        "created": "Thu, 10 Sep 2026 13:53:49 GMT"
+                    }
+                ],
+                "update_date": "2026-09-11T00:00:00",
+                "authors_parsed": [
+                    [
+                        "Sela",
+                        "Zlil",
+                        ""
+                    ]
+                ]
+            },
+            "truncated_cells": []
+        },
+        {
+            "row_idx": 1,
+            "row": {
+                "id": "1101.4616",
+                "submitter": "Wicher Bergsma",
+                "authors": "Wicher Bergsma",
+                "title": "A note on the distribution of the partial correlation coefficient with nonparametrically estimated marginal regressions",
+                "comments": "There is an error in the proofs",
+                "journal-ref": null,
+                "doi": null,
+                "report-no": null,
+                "categories": "math.ST stat.TH",
+                "license": "http://arxiv.org/licenses/nonexclusive-distrib/1.0/",
+                "abstract": "There has been much interest in the nonparametric testing of conditional independence in the econometric and statistical literature, but the simplest and potentially most useful method, based on the sample partial correlation, seems to have been overlooked, its distribution only having been investigated in some simple parametric instances. The present note shows that an easy to apply permutation test based on the sample partial correlation with nonparametrically estimated marginal regressions has good large and small sample properties.",
+                "versions": [
+                    {
+                        "version": "v1",
+                        "created": "Mon, 24 Jan 2011 18:27:13 GMT"
+                    },
+                    {
+                        "version": "v2",
+                        "created": "Tue, 26 May 2020 10:46:02 GMT"
+                    },
+                    {
+                        "version": "v3",
+                        "created": "Sun, 06 Sep 2026 11:22:52 GMT"
+                    },
+                    {
+                        "version": "v4",
+                        "created": "Wed, 09 Sep 2026 16:13:10 GMT"
+                    }
+                ],
+                "update_date": "2026-09-11T00:00:00",
+                "authors_parsed": [
+                    [
+                        "Bergsma",
+                        "Wicher",
+                        ""
+                    ]
+                ]
+            },
+            "truncated_cells": []
+        }
+    ],
+    "num_rows_total": 3164528,
+    "num_rows_per_page": 100,
+    "partial": false
+}
