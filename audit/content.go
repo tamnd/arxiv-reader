@@ -22,18 +22,16 @@ import (
 // run them over, which is the trade the two planes were split on: every paper
 // on arXiv has a record and only the ones somebody extracted have content.
 //
-// Five groups so far and none of the five complete. The rules that are missing
-// are named in the five lists, each with what it needs and where that arrives,
-// because a rule registered before it can run is a rule everybody believes is
-// working.
-var ContentRules = slices.Concat(structureRules, mathRules, figureRules, tagRules, objectRules)
+// Six groups so far, one of them complete. The rules that are missing are named
+// in the six lists, each with what it needs and where that arrives, because a
+// rule registered before it can run is a rule everybody believes is working.
+var ContentRules = slices.Concat(structureRules, mathRules, figureRules, refRules, tagRules, objectRules)
 
 // structureRules say a content file is a content file.
 //
-// Group T in full bar T12. That rule fails a Markdown link left in a body, and
-// on the render path a link into the paper's own bibliography is deliberately
-// left for ax refs to resolve, so the rule cannot tell a leak from work in
-// progress until it can read the bibliography. It arrives with group R.
+// Group T in full. T12 is declared here so that the report reads in rule order
+// and is implemented with group R, because a link into a paper's bibliography
+// is only a leak once the bibliography is there to say it is not an entry.
 var structureRules = []Rule{
 	{
 		ID: "T01", Group: GroupStructure, Hard: true,
@@ -88,6 +86,11 @@ var structureRules = []Rule{
 		ID: "T11", Group: GroupStructure, Hard: true,
 		Says: "no raw HTML markup left in a body",
 		Why:  "The render path converts LaTeXML's HTML5, and a converter that meets a construct it does not know has an obvious wrong way out. A table left as markup passes every other group: the T rules see a body of the right length, the M rules see no mathematics because nothing has dollars round it, and the F rules see no figure.",
+	},
+	{
+		ID: "T12", Group: GroupStructure, Hard: true,
+		Says: "no link left pointing at an anchor this paper does not have",
+		Why:  "A body on the render path is full of links on purpose, because ax extract render rewrites LaTeXML's anchors into this corpus's local identifiers. A link it could not place is a reader sent nowhere. The bibliography is what most of them are, which is why this runs with group R: a link to #bib.bibx28 is work in progress until ax refs has been over the paper and a leak afterwards, and only the manifest says which.",
 	},
 	{
 		ID: "T13", Group: GroupStructure,
@@ -168,12 +171,15 @@ func (c Content) Papers() ([]axid.ID, error) {
 func (c Content) Run(papers []axid.ID) (Report, error) {
 	report := Report{Plane: "content", Unit: "file", Scope: "paper"}
 	col := &collector{cap: c.Cap, only: c.Only}
+	// What the reference rules want from the metadata plane is collected while
+	// the papers are read and answered once at the end. See pending.
+	hold := &pending{}
 	for _, id := range papers {
 		files, err := c.read(id)
 		if err != nil {
 			return report, err
 		}
-		if err := c.paper(col, id, files); err != nil {
+		if err := c.paper(col, id, files, hold); err != nil {
 			return report, err
 		}
 		report.Records += len(files)
@@ -181,6 +187,9 @@ func (c Content) Run(papers []axid.ID) (Report, error) {
 		if c.Log != nil {
 			c.Log(id.Canonical, len(files))
 		}
+	}
+	if err := c.plane(col, hold); err != nil {
+		return report, err
 	}
 	report.Results = col.results(ContentRules)
 	return report, nil
@@ -233,7 +242,7 @@ func (c Content) read(id axid.ID) ([]content, error) {
 }
 
 // paper runs every rule over one paper.
-func (c Content) paper(col *collector, id axid.ID, files []content) error {
+func (c Content) paper(col *collector, id axid.ID, files []content, hold *pending) error {
 	shard := corpus.Shard(id)
 	for _, f := range files {
 		at := func(rule string, line int, what string, args ...any) {
@@ -353,7 +362,10 @@ func (c Content) paper(col *collector, id axid.ID, files []content) error {
 		return err
 	}
 	c.maths(col, id, parsed)
-	return c.pictures(col, id, parsed)
+	if err := c.pictures(col, id, parsed); err != nil {
+		return err
+	}
+	return c.bibliography(col, id, parsed, hold)
 }
 
 const (

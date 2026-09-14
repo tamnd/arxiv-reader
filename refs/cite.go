@@ -36,12 +36,23 @@ func (c Cite) Locator() Locator {
 	return Locator{Kind: c.Kind, Number: c.Number, Via: c.Via}
 }
 
-// citeLink matches a citation in the content plane.
+// citeLink matches a link into the paper's own anchors.
 //
 // A citation comes out of the renderer as a link to the bibliography anchor, so
 // [Vaswani et al., 2017](#bib.bibx106) in an author-year style and [106](#bib.bib106)
-// in a numeric one. Both are the same shape and the anchor is what matters.
-var citeLink = regexp.MustCompile(`\[([^\]]*)\]\(#(bib[^)\s]*)\)`)
+// in a numeric one. Both are the same shape and the anchor is what matters. The
+// anchor is not required to be a bibliography one here, because which anchors
+// are is Bibliographic's answer and not a pattern's.
+var citeLink = regexp.MustCompile(`\[([^\]]*)\]\(#([^)\s]*)\)`)
+
+// Bibliographic says whether a link target is a bibliography anchor.
+//
+// LaTeXML names them bib.bibx106 and bib.bib106 depending on the style, so the
+// prefix is what they have in common. It is a function rather than a prefix
+// written in two places because audit rule T12 has to tell a link into the
+// bibliography from a link into nothing, and a rule that disagreed with this
+// about which is which would report every citation in the corpus.
+func Bibliographic(anchor string) bool { return strings.HasPrefix(anchor, "bib") }
 
 // window is how much prose on either side of a citation the patterns see.
 //
@@ -59,6 +70,9 @@ func Scan(section, body string, l *Locators) []Cite {
 	var out []Cite
 	for _, m := range citeLink.FindAllStringSubmatchIndex(body, -1) {
 		anchor := body[m[4]:m[5]]
+		if !Bibliographic(anchor) {
+			continue
+		}
 		before := tail(body[:m[0]], window)
 		after := head(body[m[1]:], window)
 		c := Cite{Entry: anchor, Section: section}

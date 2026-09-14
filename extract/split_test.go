@@ -170,3 +170,42 @@ func TestSlug(t *testing.T) {
 		}
 	}
 }
+
+// grouped is one numbered equation in the shape LaTeXML writes most of them:
+// an equation group whose table carries an identifier nothing references and
+// whose tbody carries the one every cross reference points at.
+const grouped = `<!DOCTYPE html><html><body><article class="ltx_document">
+<h1 class="ltx_title ltx_title_document">A Paper About Nothing</h1>
+<section id="S1" class="ltx_section">
+<h2 class="ltx_title ltx_title_section"><span class="ltx_tag ltx_tag_section">1 </span>One</h2>
+<div id="S1.p1" class="ltx_para">
+<table id="S1.EGx1" class="ltx_equationgroup ltx_eqn_align ltx_eqn_table">
+<tbody id="S1.E4"><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td class="ltx_eqn_cell ltx_align_center"><math id="S1.E4.m1" class="ltx_Math" alttext="x=y" display="inline"><semantics><mi>x</mi><annotation encoding="application/x-tex">x=y</annotation></semantics></math></td>
+<td class="ltx_eqn_cell ltx_eqn_eqno ltx_align_middle"><span class="ltx_tag ltx_tag_equation">(4)</span></td>
+</tr></tbody></table>
+</div>
+<div id="S1.p2" class="ltx_para"><p id="S1.p2.1" class="ltx_p">It follows from <a href="#S1.E4" class="ltx_ref">(4)</a> directly.</p></div>
+</section></article></body></html>`
+
+// The number is on the tbody and so is the identifier, and the table around it
+// is referenced by nothing. Audit rule T12 found this on KAN, where two links
+// into equations of section four pointed at anchors the rewrite had never been
+// told about.
+func TestALinkIntoAGroupedEquationIsRewritten(t *testing.T) {
+	p, err := Parse([]byte(grouped), "2501.00001", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fs, err := Files(p, Front{Paper: "2501.00001", Version: "v1", Lang: "en"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := fs[1].Doc.Body
+	if !strings.Contains(body, "{#eq-4") {
+		t.Fatalf("the equation has no identifier:\n%s", body)
+	}
+	if !strings.Contains(body, "](#eq-4)") {
+		t.Fatalf("the link was not rewritten:\n%s", body)
+	}
+}

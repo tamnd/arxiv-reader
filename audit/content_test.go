@@ -10,6 +10,8 @@ import (
 	"github.com/tamnd/arxiv-reader/corpus"
 	"github.com/tamnd/arxiv-reader/extract"
 	"github.com/tamnd/arxiv-reader/figures"
+	"github.com/tamnd/arxiv-reader/metadata"
+	"github.com/tamnd/arxiv-reader/refs"
 	"github.com/tamnd/arxiv-reader/tags"
 )
 
@@ -28,14 +30,17 @@ func paper(t *testing.T, docs ...extract.Document) string {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// The last section is where the figure and the table go, because a paper in
-	// this corpus has been through ax figures and ax tables as well, and a
-	// fixture that has not is a fixture the F rules would all have something to
-	// say about. Before the objects are read rather than after, so the figure is
-	// tagged like every other object and the G rules have nothing to say either.
-	docs[len(docs)-1].Body += "\n\n" + picture + "\n\n" + tableMD
+	// The last section is where the figure, the table and the citation go,
+	// because a paper in this corpus has been through ax figures, ax tables and
+	// ax refs as well, and a fixture that has not is a fixture the F and R rules
+	// would all have something to say about. Before the objects are read rather
+	// than after, so the figure is tagged like every other object and the G
+	// rules have nothing to say either.
+	docs[len(docs)-1].Body += "\n\n" + cited + "\n\n" + picture + "\n\n" + tableMD
 	figured(t, root)
 	tabled(t, root)
+	bibbed(t, root, oneEntry())
+	planed(t, root, oneRecord())
 	var objects []tags.Object
 	for i, d := range docs {
 		if d.Front.LocalID != "" && d.Front.Kind != "front" {
@@ -85,6 +90,10 @@ func paper(t *testing.T, docs ...extract.Document) string {
 // the way ax tables writes it, so F12 is comparing the two representations the
 // tool produces rather than two the test made up.
 const (
+	// cited is the pair of links a rendered paper is full of: one into its own
+	// bibliography, which is R02's, and one into another section of itself,
+	// which is T12's.
+	cited    = "The idea is not new [1](#bib.bibx1), and [Section 1](#s1) says why."
 	picture  = "**Figure 1** {#fig-1 .figure}\n\n![A picture of nothing in particular.](/figures/2501/2501.00001/one.svg)"
 	tableMD  = "| Model | Accuracy |\n| :--- | :---: |\n| Nothing | 0.0 |"
 	tableTeX = `% Table 1 of 2501.00001, rebuilt from arXiv's own rendering.
@@ -127,8 +136,32 @@ func tabled(t *testing.T, root string) {
 	}
 }
 
+// bibbed writes the bibliography the fixture cites into.
+func bibbed(t *testing.T, root string, entries ...refs.Entry) {
+	t.Helper()
+	if _, err := (refs.Manifest{Paper: fixture, Version: 1, Entries: entries}).Save(refsPath(root)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// planed writes the metadata plane the reference rules ask their questions of.
+//
+// The one record in it is the paper the fixture's bibliography resolves to. It
+// is the whole of the plane on purpose: R01 says nothing about a month the
+// plane has not got, and a fixture with one month in it is what proves that.
+func planed(t *testing.T, root string, recs ...metadata.Record) {
+	t.Helper()
+	if _, err := (metadata.Plane{Root: root}).Write("2401", recs); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func manifestPath(root string) string {
 	return filepath.Join(root, "manifests", "figures", "2501.yaml")
+}
+
+func refsPath(root string) string {
+	return filepath.Join(root, "manifests", "refs", "2501", "2501.00001.yaml")
 }
 
 // fixture is the paper every test in this package builds.

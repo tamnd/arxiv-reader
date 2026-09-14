@@ -1083,7 +1083,7 @@ jobs:
               exit 1
             fi
           done
-      # Groups T, M, F, G and X over the paper the steps above built, fetched,
+      # Groups T, M, F, R, G and X over the paper the steps above built, fetched,
       # rendered, split, figured, tabled, referenced and tagged. Every rule has
       # to say pass and not "not run": a rule with nothing to look at has not
       # passed anything, and telling those two apart is what the four states are
@@ -1092,12 +1092,12 @@ jobs:
         run: |
           ARXIV_CORPUS=/tmp/extract-corpus ax audit -plane content -q | tee /tmp/audit-content.txt
           grep -q "3 files over 1 paper, nothing found" /tmp/audit-content.txt
-          test "$(grep -cE '^[TMFGX][0-9]+ +pass ' /tmp/audit-content.txt)" = 42
+          test "$(grep -cE '^[TMFRGX][0-9]+ +pass ' /tmp/audit-content.txt)" = 49
           if grep -q "not run" /tmp/audit-content.txt; then
             echo "a content rule had nothing to look at"
             exit 1
           fi
-      # And the same forty two rules over nothing at all, which has to read as
+      # And the same forty nine rules over nothing at all, which has to read as
       # not run rather than as a clean corpus. A green audit over an empty plane
       # is the single easiest way for this project to lie to itself.
       - name: an empty content plane runs nothing rather than passing everything
@@ -1105,7 +1105,7 @@ jobs:
           rm -rf /tmp/empty-corpus && mkdir -p /tmp/empty-corpus
           ARXIV_CORPUS=/tmp/empty-corpus ax audit -plane content -q | tee /tmp/audit-empty.txt
           grep -q "0 files over 0 papers, nothing to check" /tmp/audit-empty.txt
-          test "$(grep -cE '^[TMFGX][0-9]+ +not run ' /tmp/audit-empty.txt)" = 42
+          test "$(grep -cE '^[TMFRGX][0-9]+ +not run ' /tmp/audit-empty.txt)" = 49
       # Each rule fired by breaking the one thing it is about. A rule that has
       # only ever been watched passing is a rule nobody has tested.
       - name: a content file that is wrong fails the rule that is about it
@@ -1116,6 +1116,7 @@ jobs:
           reg=/tmp/broken-corpus/tags/2501/2501.00001.tags
           man=/tmp/broken-corpus/manifests/figures/2501.yaml
           tab=/tmp/broken-corpus/tables/2501/2501.00001
+          bib=/tmp/broken-corpus/manifests/refs/2501/2501.00001.yaml
           copy() { rm -rf /tmp/broken-corpus && cp -r /tmp/extract-corpus /tmp/broken-corpus; }
           # Appending to a body moves it away from its recorded hash, which is
           # T03's finding and not the one under test, so the cases that append
@@ -1225,6 +1226,18 @@ jobs:
             '      caption: The same picture, committed a second time.' \
             '      licence: cc-by' >> $man
           fails F05
+          # The bibliography and the edges built out of it. Four of the six read
+          # the metadata plane the steps above filled, which is why these come
+          # after the resolve and not with the rest of the content rules. T12 is
+          # here too, because a link is only a link into nothing once the
+          # bibliography is there to say it is not an entry.
+          copy && add $intro 'The idea comes from arXiv:2401.99999 originally.' && restamp && fails R01
+          copy && add $intro 'The bound is due to [9](#bib.bibx9), who proved it first.' && restamp && fails R02
+          copy && sed -i 's/^      text: N. Nobody. On nothing. 1999.$/      text: ""/' $bib && fails R03
+          copy && sed -i 's/^      title: Nothing In Particular, Revisited$/      title: Something Else Entirely/' $bib && soft R04
+          copy && sed -i 's/^      resolved: "2303.00002"$/      resolved: "2501.00001"/' $bib && fails R05
+          copy && sed -i 's/^      year: 1999$/      year: 2030/' $bib && soft R06
+          copy && add $intro 'The proof is in [Appendix C](#app-c), which nobody wrote.' && restamp && fails T12
       - name: the audit refuses the arguments it should refuse
         run: |
           for c in "audit --plane both" "audit -rules S99" "audit -rules" "audit -cap 0" "audit -shard 2113" "audit meta"; do
