@@ -7,7 +7,7 @@ import (
 
 func files(t *testing.T, name string) []File {
 	t.Helper()
-	fs, err := Files(parse(t, name), Front{Paper: "2501.00001", Version: "v3", Lang: "en"})
+	fs, err := Files(parse(t, name), Front{Paper: "2501.00001", Version: "v3", Lang: "en"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,13 +133,13 @@ func TestAForwardReferenceIsRewritten(t *testing.T) {
 // through to the source path, so the splitter refuses it rather than writing
 // half a paper out.
 func TestFilesRefusesARejectedPaper(t *testing.T) {
-	if _, err := Files(parse(t, "faulty.html"), Front{}); err == nil {
+	if _, err := Files(parse(t, "faulty.html"), Front{}, nil); err == nil {
 		t.Fatal("split a paper that should have been rejected")
 	}
 }
 
 func TestFilesRefusesNothing(t *testing.T) {
-	if _, err := Files(nil, Front{}); err == nil {
+	if _, err := Files(nil, Front{}, nil); err == nil {
 		t.Fatal("split a paper that is not there")
 	}
 }

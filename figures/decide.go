@@ -56,21 +56,28 @@ func Decide(caption string, im Image) Decision {
 	// picture and this one is about the corpus not being entitled to it, and a
 	// figure that is refused should be refused for the reason that matters.
 	if s, why := InspectCaption(caption); s != Owned {
-		return refuse(d, "F09", s, why)
+		return d.Withhold("F09", s, why)
 	}
 	if d.PageFraction > PageCap {
-		return refuse(d, "F06", Owned, fmt.Sprintf("it covers %.0f per cent of a page at the %.2f by %.2f inches the file states, and the cap is %.0f per cent", d.PageFraction*100, im.WidthIn, im.HeightIn, PageCap*100))
+		return d.Withhold("F06", Owned, fmt.Sprintf("it covers %.0f per cent of a page at the %.2f by %.2f inches the file states, and the cap is %.0f per cent", d.PageFraction*100, im.WidthIn, im.HeightIn, PageCap*100))
 	}
 	if im.Width < MinSide || im.Height < MinSide {
-		return refuse(d, "F02", Owned, fmt.Sprintf("it is %d by %d pixels, which is under the %d a figure has to be on both sides", im.Width, im.Height, MinSide))
+		return d.Withhold("F02", Owned, fmt.Sprintf("it is %d by %d pixels, which is under the %d a figure has to be on both sides", im.Width, im.Height, MinSide))
 	}
 	if im.Bytes > SizeCap {
-		return refuse(d, "F03", Owned, fmt.Sprintf("it is %s, which is over the %s cap", prose.Bytes(im.Bytes), prose.Bytes(SizeCap)))
+		return d.Withhold("F03", Owned, fmt.Sprintf("it is %s, which is over the %s cap", prose.Bytes(im.Bytes), prose.Bytes(SizeCap)))
 	}
 	return d
 }
 
-func refuse(d Decision, rule string, s Suspicion, why string) Decision {
+// Withhold turns a decision into a refusal.
+//
+// Exported because the two rules that cannot be answered from one file, F05 and
+// the confirmed half of F09, are answered by the caller and have to record a
+// refusal the same way the rules in here do. There are four fields that have to
+// agree, and a caller that sets three of them leaves a manifest entry saying a
+// figure was committed and also saying why it was not.
+func (d Decision) Withhold(rule string, s Suspicion, why string) Decision {
 	d.Commit, d.Rule, d.Suspicion, d.Why = false, rule, s, why
 	return d
 }

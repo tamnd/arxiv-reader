@@ -1,5 +1,7 @@
 package figures
 
+import "math"
+
 // PageWidthIn and PageHeightIn are US Letter, which is what arXiv's own
 // renderings and most of its submissions are set on.
 //
@@ -35,7 +37,10 @@ func (im Image) PageFraction() float64 {
 	if f > 1 {
 		return 1
 	}
-	return f
+	// Rounded to four places because this number is written into a manifest
+	// that is committed, and seventeen digits of it are seventeen digits nobody
+	// reads and one more thing that can differ between two machines that agree.
+	return math.Round(f*1e4) / 1e4
 }
 
 // Measured says rule F06 had something to measure.

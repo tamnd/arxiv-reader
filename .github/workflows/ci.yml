@@ -691,12 +691,72 @@ jobs:
             echo "a file that is not a picture was read as one"
             exit 1
           fi
-          # Committing is not written yet, and the reason it is not is that the
-          # rules above had to come first.
-          if ARXIV_CORPUS=/tmp/extract-corpus ax figures 2501.00001v3; then
-            echo "figures were committed by a command that cannot commit them"
+          if ARXIV_CORPUS=/tmp/extract-corpus ax figures -pace 1s 2501.00001v3; then
+            echo "a pace faster than the fifteen seconds arXiv asks for was accepted"
             exit 1
           fi
+          if ARXIV_CORPUS=/tmp/extract-corpus ax figures -from /tmp/does-not-exist 2501.00001v3; then
+            echo "a directory of pictures that is not there was accepted"
+            exit 1
+          fi
+      # The committing half, with -from standing in for the website because CI
+      # does not talk to arXiv. The two pictures are the two answers: one is
+      # committed and one is refused by rule F09 on the caption alone.
+      - name: a figure is committed and a credited one is not
+        run: |
+          mkdir -p /tmp/figs
+          cp figures/testdata/drawing.svg /tmp/figs/nothing.svg
+          cp figures/testdata/plot.png /tmp/figs/second.png
+          out=$(ARXIV_CORPUS=/tmp/extract-corpus ax figures -from /tmp/figs 2501.00001v3 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "1 committed, 1 withheld, 0 already decided"
+          test -f /tmp/extract-corpus/figures/2501/2501.00001/nothing.svg
+          if [ -e /tmp/extract-corpus/figures/2501/2501.00001/second.png ]; then
+            echo "the bytes of a figure rule F09 refused are in the corpus"
+            exit 1
+          fi
+          # A withheld figure still gets an entry, because without one nothing
+          # can tell a picture that was refused from one never fetched and the
+          # download gets paid for again on every run.
+          m=/tmp/extract-corpus/manifests/figures/2501.yaml
+          grep -q "source: 2501.00001v3/second.png" $m
+          grep -q "rule: F09" $m
+          grep -q "third_party: suspected" $m
+          grep -q "page_from: pHYs" $m
+      - name: deciding twice costs nothing and writes nothing
+        run: |
+          before=$(sha256sum /tmp/extract-corpus/manifests/figures/2501.yaml)
+          out=$(ARXIV_CORPUS=/tmp/extract-corpus ax figures -from /tmp/figs 2501.00001v3 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "0 committed, 0 withheld, 2 already decided"
+          if [ "$before" != "$(sha256sum /tmp/extract-corpus/manifests/figures/2501.yaml)" ]; then
+            echo "a run that decided nothing rewrote the manifest"
+            exit 1
+          fi
+          # -recheck is the way to make it decide again, and deciding the same
+          # things again has to leave the same file behind.
+          ARXIV_CORPUS=/tmp/extract-corpus ax figures -recheck -from /tmp/figs 2501.00001v3
+          if [ "$before" != "$(sha256sum /tmp/extract-corpus/manifests/figures/2501.yaml)" ]; then
+            echo "a recheck that decided the same things wrote a different manifest"
+            exit 1
+          fi
+      # ax figures does not touch the Markdown. It writes the manifest, ax
+      # extract render reads it, and this is the step that holds the two
+      # together.
+      - name: the writer publishes the decision the gate made
+        run: |
+          ARXIV_CORPUS=/tmp/extract-corpus ax extract render -force 2501.00001v3
+          d=/tmp/extract-corpus/content/en/2501/2501.00001
+          grep -q '](/figures/2501/2501.00001/nothing.svg)' $d/01_introduction.md
+          if grep -q '](2501.00001v3/second.png)' $d/02_results.md; then
+            echo "a withheld figure is still being served off arXiv as an image"
+            exit 1
+          fi
+          grep -q "The image is withheld because" $d/02_results.md
+          grep -q "It is in the paper on arXiv at https://arxiv.org/html/2501.00001v3/second.png" $d/02_results.md
+          # The caption, the number and the tag are published either way, which
+          # is the whole reason the page is worth publishing without the picture.
+          grep -q '\*\*Figure 3\*\* {#fig-3 .figure}' $d/02_results.md
       - name: the audit refuses the arguments it should refuse
         run: |
           for c in "audit --plane content" "audit --plane both" "audit -rules S99" "audit -rules" "audit -cap 0" "audit -shard 2113" "audit meta"; do

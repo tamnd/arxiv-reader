@@ -84,6 +84,32 @@ func SourcesPath(root string) string {
 	return path.Join(root, "manifests", "sources.yaml")
 }
 
+// FiguresPath is the manifest of what was decided about one month's figures.
+//
+// Sharded rather than one file for the corpus, for the same reason the metadata
+// plane is: a manifest of every figure on arXiv is tens of millions of lines and
+// every extraction would rewrite it.
+//
+// Separate from sources.yaml, which holds one entry per artefact keyed by paper,
+// version and route. A paper has one rendering and forty figures, so figures do
+// not fit that key, and they need fields no other artefact has: what the caption
+// said, what the picture measured, and which rule withheld it.
+func FiguresPath(root, shard string) string {
+	return path.Join(root, "manifests", "figures", shard+".yaml")
+}
+
+// FigureFile is where one figure's bytes are committed, relative to the corpus
+// root.
+//
+// Committed, unlike a rendering, because a figure is part of the paper and not
+// a copy of arXiv's working file. It is also the path the content plane points
+// at, which is why it is rooted: the corpus root is the reading app's web root,
+// and a path relative to a content file would be four levels of dot dot from
+// every one of them and would break the moment a file moved.
+func FigureFile(id axid.ID, name string) string {
+	return "/" + path.Join("figures", Shard(id), PathID(id), name)
+}
+
 // GraphPath is the edge file for one month.
 //
 // Sharded by the subject's paper, so extracting one paper writes one file.

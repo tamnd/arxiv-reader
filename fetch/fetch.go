@@ -287,6 +287,30 @@ func (f *Fetcher) Render(ctx context.Context, root string, m *Manifest, o Order)
 	return Result{Entry: entry, Outcome: OutcomeFetched}, nil
 }
 
+// Get reads one URL off the website at this fetcher's pace.
+//
+// It exists for figures. A figure is a second file on the same host as the
+// rendering that named it, so it goes through the same fetcher and shares the
+// same pace clock rather than getting its own. Two fetchers each waiting
+// fifteen seconds is one request every seven and a half, which is not the pace
+// that was agreed to.
+//
+// The ref is what a failure is reported against and what the log line names, so
+// it should read like "2312.00752v2 selection.svg" and not like a URL.
+func (f *Fetcher) Get(ctx context.Context, url, ref string) ([]byte, error) {
+	if f.Log != nil {
+		f.Log(ref)
+	}
+	return f.get(ctx, url, ref)
+}
+
+// URL is where this fetcher would look for one path under the rendering base.
+//
+// Exported so that a caller building a figure URL out of the path a rendering
+// gave gets the same base a test pointed at, rather than hardcoding arxiv.org
+// and quietly making itself untestable.
+func (f *Fetcher) URL(rel string) string { return f.base() + rel }
+
 func (f *Fetcher) base() string {
 	if f.Base != "" {
 		return f.Base
@@ -336,7 +360,7 @@ func (f *Fetcher) get(ctx context.Context, url, ref string) ([]byte, error) {
 	case resp.StatusCode != http.StatusOK:
 		return nil, fmt.Errorf("fetch: %s returned %s", url, resp.Status)
 	case len(body) > maxBody:
-		return nil, fmt.Errorf("fetch: %s is over %d bytes, which is not a rendering of a paper", url, maxBody)
+		return nil, fmt.Errorf("fetch: %s is over %d bytes, which is not a rendering of a paper or a picture in one", url, maxBody)
 	}
 	return body, nil
 }

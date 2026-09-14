@@ -74,8 +74,11 @@ func quote(v string) string {
 // checking one against the other would then be checking this package against
 // itself.
 type body struct {
-	out        strings.Builder
-	names      *names
+	out   strings.Builder
+	names *names
+	// pics is what ax figures decided about this paper's pictures, and it is
+	// empty until it has run.
+	pics       Pictures
 	objects    int
 	equations  int
 	code       int
@@ -235,12 +238,7 @@ func (w *body) float(b Block, id string) {
 		w.code++
 	}
 	for _, img := range b.Images {
-		// The source is the name arXiv's rendering gave, relative to the
-		// rendering's own URL. ax figures downloads them, converts them and
-		// rewrites these lines to the committed file, which is the point at
-		// which the third party check in the licence spec runs. Until then the
-		// line says truthfully where the picture is, which is on arXiv.
-		w.para(fmt.Sprintf("![%s](%s)", img.Alt, img.Src))
+		w.picture(img)
 	}
 	if len(b.Rows) > 0 {
 		w.para(table(b.Rows))
