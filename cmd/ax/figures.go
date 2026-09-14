@@ -356,6 +356,11 @@ func pictures(p *extract.Paper) []picture {
 			sections(s.Sections)
 		}
 	}
+	// The abstract first, because a paper that opens with a teaser figure puts
+	// it there and the front matter is written from it. Rule F01 found this:
+	// KAN's Figure 0.1 was the one picture of the paper still pointing at
+	// arXiv, because nothing here had ever offered it a decision.
+	walk(p.Abstract, "")
 	sections(p.Sections)
 	return found
 }

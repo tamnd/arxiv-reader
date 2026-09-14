@@ -1083,7 +1083,7 @@ jobs:
               exit 1
             fi
           done
-      # Groups T, M, G and X over the paper the steps above built, fetched,
+      # Groups T, M, F, G and X over the paper the steps above built, fetched,
       # rendered, split, figured, tabled, referenced and tagged. Every rule has
       # to say pass and not "not run": a rule with nothing to look at has not
       # passed anything, and telling those two apart is what the four states are
@@ -1092,12 +1092,12 @@ jobs:
         run: |
           ARXIV_CORPUS=/tmp/extract-corpus ax audit -plane content -q | tee /tmp/audit-content.txt
           grep -q "3 files over 1 paper, nothing found" /tmp/audit-content.txt
-          test "$(grep -cE '^[TMGX][0-9]+ +pass ' /tmp/audit-content.txt)" = 31
+          test "$(grep -cE '^[TMFGX][0-9]+ +pass ' /tmp/audit-content.txt)" = 42
           if grep -q "not run" /tmp/audit-content.txt; then
             echo "a content rule had nothing to look at"
             exit 1
           fi
-      # And the same thirty one rules over nothing at all, which has to read as
+      # And the same forty two rules over nothing at all, which has to read as
       # not run rather than as a clean corpus. A green audit over an empty plane
       # is the single easiest way for this project to lie to itself.
       - name: an empty content plane runs nothing rather than passing everything
@@ -1105,7 +1105,7 @@ jobs:
           rm -rf /tmp/empty-corpus && mkdir -p /tmp/empty-corpus
           ARXIV_CORPUS=/tmp/empty-corpus ax audit -plane content -q | tee /tmp/audit-empty.txt
           grep -q "0 files over 0 papers, nothing to check" /tmp/audit-empty.txt
-          test "$(grep -cE '^[TMGX][0-9]+ +not run ' /tmp/audit-empty.txt)" = 31
+          test "$(grep -cE '^[TMFGX][0-9]+ +not run ' /tmp/audit-empty.txt)" = 42
       # Each rule fired by breaking the one thing it is about. A rule that has
       # only ever been watched passing is a rule nobody has tested.
       - name: a content file that is wrong fails the rule that is about it
@@ -1114,6 +1114,8 @@ jobs:
           intro=/tmp/broken-corpus/content/en/2501/2501.00001/01_introduction.md
           results=/tmp/broken-corpus/content/en/2501/2501.00001/02_results.md
           reg=/tmp/broken-corpus/tags/2501/2501.00001.tags
+          man=/tmp/broken-corpus/manifests/figures/2501.yaml
+          tab=/tmp/broken-corpus/tables/2501/2501.00001
           copy() { rm -rf /tmp/broken-corpus && cp -r /tmp/extract-corpus /tmp/broken-corpus; }
           # Appending to a body moves it away from its recorded hash, which is
           # T03's finding and not the one under test, so the cases that append
@@ -1189,6 +1191,40 @@ jobs:
           copy && sed -i 's/^tag: VIS1$/tag: ZZZZ/' $intro && fails G05
           copy && sed -i 's/ tag=VNYA//' $results && restamp && fails G06
           copy && sed -i 's/{#thm-1 .statement/{#thm-1 .theorem/' $results && restamp && fails X01
+          # The pictures and the tables. A figure is a decision in the
+          # manifest, bytes on disk and a line in a body, and these are the ways
+          # those three come apart. The first is the one that matters most: a
+          # body pointing back at arXiv is a paper ax figures has never been run
+          # over, which is how every one of these starts out.
+          copy && sed -i 's#](/figures/2501/2501.00001/nothing.svg)#](2501.00001v3/nothing.svg)#' $intro && restamp && fails F01
+          copy && sed -i 's/^      width: 384$/      width: 20/' $man && fails F02
+          copy && sed -i 's/^      bytes: 375$/      bytes: 999999/' $man && fails F03
+          copy && sed -i 's/^      page_fraction: 0.1283$/      page_fraction: 0.9/' $man && fails F06
+          copy && sed -i 's/^      caption: (\*\*Overview\*\*.) Nothing, drawn.$/      caption: ""/' $man && fails F07
+          copy && sed -i 's/^access: open$/access: record/' $front $intro $results && fails F08
+          copy && sed -i 's/^      third_party: owned$/      third_party: suspected/' $man && fails F09
+          copy && add $intro 'The proof is in Figure 9, which nobody drew.' && restamp && soft F10
+          copy && rm $tab/t01.tex && fails F11
+          copy && sed -i 's/0\.1/0.2/' $tab/t01.tex && fails F12
+          # F05 is the one that needs a second figure, because one picture
+          # committed twice is two entries and the corpus has two entries only
+          # when something went wrong. The copy points at the bytes that are
+          # already there, which is exactly the shape the rule is about.
+          copy
+          sum=$(grep -A2 'source: 2501.00001v3/nothing.svg' $man | grep sha256 | awk '{print $2}')
+          printf '%s\n' \
+            '    - paper: "2501.00001"' \
+            '      version: 3' \
+            '      number: "9"' \
+            '      source: 2501.00001v3/again.svg' \
+            '      file: /figures/2501/2501.00001/nothing.svg' \
+            "      sha256: $sum" \
+            '      bytes: 375' \
+            '      format: svg' \
+            '      third_party: owned' \
+            '      caption: The same picture, committed a second time.' \
+            '      licence: cc-by' >> $man
+          fails F05
       - name: the audit refuses the arguments it should refuse
         run: |
           for c in "audit --plane both" "audit -rules S99" "audit -rules" "audit -cap 0" "audit -shard 2113" "audit meta"; do
