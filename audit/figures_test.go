@@ -264,3 +264,75 @@ func TestF12ReportsANumberThatDiffers(t *testing.T) {
 		t.Errorf("the finding reads %q", f.What)
 	}
 }
+
+// F04, and the reason it reads the repository. The bytes are on disk and every
+// other rule in this group is happy with them, and nobody else has them.
+func TestAFigureNobodyCommittedIsReported(t *testing.T) {
+	root := paper(t, front(), section(1, "One", prose(8)))
+	committed(t, root)
+	if err := os.WriteFile(filepath.Join(root, "figures", "2501", "2501.00001", "two.svg"), []byte(drawing), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f := fires(t, root, "F04")
+	if f.Where() != "figures/2501/2501.00001/two.svg" {
+		t.Errorf("the finding is at %q", f.Where())
+	}
+	if f.ID != "2501.00001" {
+		t.Errorf("the finding is against %q", f.ID)
+	}
+	if !strings.Contains(f.What, "no commit records it") {
+		t.Errorf("the finding reads %q", f.What)
+	}
+	// And it goes away when the corpus is committed, which is the repair.
+	commit(t, root)
+	if got := audited(t, root)["F04"].Total; got != 0 {
+		t.Errorf("a committed figure was reported %d times", got)
+	}
+}
+
+// The worse of the two, because a directory git has been told to skip is a
+// directory this rule can never fail on again.
+func TestAFigureGitWasToldToIgnoreIsReported(t *testing.T) {
+	root := paper(t, front(), section(1, "One", prose(8)))
+	committed(t, root)
+	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte("*.png\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "figures", "2501", "2501.00001", "two.png"), []byte(drawing), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f := fires(t, root, "F04")
+	if !strings.Contains(f.What, "told to ignore it") {
+		t.Errorf("the finding reads %q", f.What)
+	}
+	if f.Where() != "figures/2501/2501.00001/two.png" {
+		t.Errorf("the finding is at %q", f.Where())
+	}
+}
+
+// ax figures is the only program that writes under figures/, so a file that is
+// not where a paper's pictures go was put there by hand and belongs to no paper.
+func TestAFileUnderFiguresThatBelongsToNoPaperIsReported(t *testing.T) {
+	root := paper(t, front(), section(1, "One", prose(8)))
+	committed(t, root)
+	if err := os.WriteFile(filepath.Join(root, "figures", "notes.txt"), []byte("what I was doing\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f := fires(t, root, "F04")
+	if !strings.Contains(f.What, "not where a paper's figures go") {
+		t.Errorf("the finding reads %q", f.What)
+	}
+	if f.ID != "" {
+		t.Errorf("the finding was put against %q, and no paper owns this file", f.ID)
+	}
+}
+
+// An unpacked archive is not a repository, and there is no version of this rule
+// that means anything over one. Not run rather than a pass, because a pass here
+// would be saying every picture in the corpus is in the repository.
+func TestACorpusThatIsNotARepositoryLeavesF04NotRun(t *testing.T) {
+	root := paper(t, front(), section(1, "One", prose(8)))
+	if got := audited(t, root)["F04"]; got.State() != NotRun {
+		t.Errorf("F04 is %s over a corpus that is not a repository", got.State())
+	}
+}
