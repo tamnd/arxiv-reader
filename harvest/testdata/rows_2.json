@@ -1,0 +1,275 @@
+{
+    "features": [
+        {
+            "feature_idx": 0,
+            "name": "id",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 1,
+            "name": "submitter",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 2,
+            "name": "authors",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 3,
+            "name": "title",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 4,
+            "name": "comments",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 5,
+            "name": "journal-ref",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 6,
+            "name": "doi",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 7,
+            "name": "report-no",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 8,
+            "name": "categories",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 9,
+            "name": "license",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 10,
+            "name": "abstract",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 11,
+            "name": "versions",
+            "type": {
+                "feature": {
+                    "version": {
+                        "dtype": "string",
+                        "_type": "Value"
+                    },
+                    "created": {
+                        "dtype": "string",
+                        "_type": "Value"
+                    }
+                },
+                "_type": "List"
+            }
+        },
+        {
+            "feature_idx": 12,
+            "name": "update_date",
+            "type": {
+                "dtype": "timestamp[s]",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 13,
+            "name": "authors_parsed",
+            "type": {
+                "feature": {
+                    "feature": {
+                        "dtype": "string",
+                        "_type": "Value"
+                    },
+                    "_type": "List"
+                },
+                "_type": "List"
+            }
+        }
+    ],
+    "rows": [
+        {
+            "row_idx": 2,
+            "row": {
+                "id": "1303.2033",
+                "submitter": "Vilnis Liepins",
+                "authors": "Vilnis Liepins",
+                "title": "Extended Fourier analysis of signals",
+                "comments": "52 pages, 11 figures",
+                "journal-ref": null,
+                "doi": null,
+                "report-no": null,
+                "categories": "cs.DS cs.IT cs.NA math.IT math.NA",
+                "license": "http://arxiv.org/licenses/nonexclusive-distrib/1.0/",
+                "abstract": "This summary of the doctoral thesis provides a comprehensive formulation of the Extended Discrete Fourier Transform (EDFT), derived directly from the Fourier integral and its orthogonality properties. The method is obtained by solving weighted least-squares estimators in both continuous and discrete domains, yielding an adaptive frequency-domain representation that remains fully consistent with the classical Fourier framework. In the special case of uniformly sampled data on a uniform frequency grid of the same size, the EDFT reduces exactly to the classical Discrete Fourier Transform (DFT). However, when the analysis grid exceeds the number of observed samples, EDFT circumvents conventional zero-padding by optimizing the transformation basis over the extended frequency set. This enables accurate spectral estimation from incomplete or nonuniformly sampled data. Consequently, the EDFT achieves enhanced frequency resolution in regions of strong spectral content while maintaining global resolution balance, thereby remaining consistent with the uncertainty principle. The inverse EDFT reconstructs the original signal and produces extrapolated or interpolated samples wherever spectral information is available. The EDFT requires no explicit separation of deterministic and stochastic components and accurately captures broadband, transient, and sinusoidal features simultaneously. Simulation studies confirm its robustness under nonuniform sampling, multiple Nyquist zones, missing-data conditions, and signals with mixed spectra comprising both line and continuous components. Although iterative computation of the EDFT entails higher numerical cost compared to the classical DFT, this limitation - significant in the 1990s - has been largely mitigated by modern computational resources, rendering the EDFT practical for contemporary signal analysis applications.",
+                "versions": [
+                    {
+                        "version": "v1",
+                        "created": "Fri, 08 Mar 2013 15:47:28 GMT"
+                    },
+                    {
+                        "version": "v2",
+                        "created": "Thu, 28 Mar 2013 14:58:43 GMT"
+                    },
+                    {
+                        "version": "v3",
+                        "created": "Fri, 31 May 2013 13:15:18 GMT"
+                    },
+                    {
+                        "version": "v4",
+                        "created": "Tue, 15 Oct 2013 08:47:43 GMT"
+                    },
+                    {
+                        "version": "v5",
+                        "created": "Thu, 23 Jan 2014 08:39:21 GMT"
+                    },
+                    {
+                        "version": "v6",
+                        "created": "Fri, 12 Sep 2014 11:43:40 GMT"
+                    },
+                    {
+                        "version": "v7",
+                        "created": "Mon, 23 Feb 2015 06:29:25 GMT"
+                    },
+                    {
+                        "version": "v8",
+                        "created": "Thu, 28 Sep 2017 07:26:38 GMT"
+                    },
+                    {
+                        "version": "v9",
+                        "created": "Tue, 12 Mar 2019 09:20:17 GMT"
+                    },
+                    {
+                        "version": "v10",
+                        "created": "Sun, 12 Feb 2023 07:42:20 GMT"
+                    },
+                    {
+                        "version": "v11",
+                        "created": "Wed, 15 Mar 2023 18:33:58 GMT"
+                    },
+                    {
+                        "version": "v12",
+                        "created": "Sat, 06 Jan 2024 12:59:29 GMT"
+                    },
+                    {
+                        "version": "v13",
+                        "created": "Tue, 23 Jan 2024 20:06:59 GMT"
+                    },
+                    {
+                        "version": "v14",
+                        "created": "Sat, 09 Mar 2024 19:45:58 GMT"
+                    },
+                    {
+                        "version": "v15",
+                        "created": "Sat, 16 Nov 2024 12:28:49 GMT"
+                    },
+                    {
+                        "version": "v16",
+                        "created": "Sun, 04 May 2025 15:51:11 GMT"
+                    },
+                    {
+                        "version": "v17",
+                        "created": "Sat, 17 Jan 2026 19:20:54 GMT"
+                    },
+                    {
+                        "version": "v18",
+                        "created": "Wed, 10 Jun 2026 13:13:25 GMT"
+                    },
+                    {
+                        "version": "v19",
+                        "created": "Thu, 10 Sep 2026 16:37:49 GMT"
+                    }
+                ],
+                "update_date": "2026-09-11T00:00:00",
+                "authors_parsed": [
+                    [
+                        "Liepins",
+                        "Vilnis",
+                        ""
+                    ]
+                ]
+            },
+            "truncated_cells": []
+        },
+        {
+            "row_idx": 3,
+            "row": {
+                "id": "1402.0690",
+                "submitter": "Julien Cortier",
+                "authors": "Julien Cortier and Vincent Minerbe",
+                "title": "On complete stationary vacuum initial data",
+                "comments": "11 pages",
+                "journal-ref": "Journal of Geometry and Physics 99 (2016) 20-27",
+                "doi": null,
+                "report-no": null,
+                "categories": "gr-qc math.DG",
+                "license": "http://arxiv.org/licenses/nonexclusive-distrib/1.0/",
+                "abstract": "We describe a proof of M.T. Anderson's result on the rigidity of complete stationary initial data for the Einstein vacuum equations in spacetime dimension 3 + 1, under an extra assumption on the norm of the stationary Killing vector field. The argument only involves basic comparison geometry along with some Bochner-Weitzenb\\\"ock formula techniques. We also discuss on the possibility to extend those techniques in higher dimensions.",
+                "versions": [
+                    {
+                        "version": "v1",
+                        "created": "Tue, 04 Feb 2014 11:03:59 GMT"
+                    }
+                ],
+                "update_date": "2026-09-11T00:00:00",
+                "authors_parsed": [
+                    [
+                        "Cortier",
+                        "Julien",
+                        ""
+                    ],
+                    [
+                        "Minerbe",
+                        "Vincent",
+                        ""
+                    ]
+                ]
+            },
+            "truncated_cells": []
+        }
+    ],
+    "num_rows_total": 3164528,
+    "num_rows_per_page": 100,
+    "partial": false
+}

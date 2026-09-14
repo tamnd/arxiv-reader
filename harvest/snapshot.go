@@ -208,6 +208,11 @@ type snapshotRow struct {
 	Categories string `json:"categories"`
 	Licence    string `json:"license"`
 	Abstract   string `json:"abstract"`
+	// UpdateDate is read and not used. It is when arXiv last touched the record
+	// and the versions already say when the paper changed, so nothing here has
+	// a use for it. It is a plain date in the Kaggle file and a timestamp in
+	// the Hugging Face rows API, which is the only field where the two surfaces
+	// disagree about a shape.
 	UpdateDate string `json:"update_date"`
 	// There is no msc_class and no acm_class in this file, which OAI-PMH does
 	// carry. It is a small gap and the catch up closes it for anything recent,

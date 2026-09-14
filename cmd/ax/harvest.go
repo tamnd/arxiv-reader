@@ -43,7 +43,7 @@ func runHarvest(args []string) error {
 	case "kaggle":
 		return harvestSnapshot(metadata.SourceKaggle, args[1:])
 	case "hf":
-		return fmt.Errorf("harvest hf is part of milestone M1 and is not written yet")
+		return harvestHF(args[1:])
 	default:
 		return fmt.Errorf("unknown harvest subcommand %q", args[0])
 	}
@@ -65,10 +65,19 @@ func harvestSnapshot(source metadata.Source, args []string) error {
 		return err
 	}
 	rest := fs.Args()
+	if err := onlyTheFile(rest); err != nil {
+		return err
+	}
 	if len(rest) != 1 {
 		return fmt.Errorf("usage: ax harvest %s [-n] [-q] <arxiv-metadata-oai-snapshot.json>", source)
 	}
-	if *batch < 1 {
+	return readSnapshotFile(source, rest[0], *dry, *quiet, *batch)
+}
+
+// readSnapshotFile is the file half of a snapshot harvest, shared by kaggle and
+// by hf because the bytes are the same and only the source differs.
+func readSnapshotFile(source metadata.Source, path string, dry, quiet bool, batch int) error {
+	if batch < 1 {
 		return errors.New("-batch has to be at least 1")
 	}
 
@@ -76,11 +85,11 @@ func harvestSnapshot(source metadata.Source, args []string) error {
 	// Kaggle and as parquet from most Hugging Face mirrors, and guessing at
 	// container formats is how a tool ends up with four of them and a bug in
 	// each. Unpack it first.
-	if strings.HasSuffix(rest[0], ".gz") || strings.HasSuffix(rest[0], ".zip") {
-		return fmt.Errorf("%s is still packed, and this reads the JSON inside it: unpack it first", rest[0])
+	if strings.HasSuffix(path, ".gz") || strings.HasSuffix(path, ".zip") {
+		return fmt.Errorf("%s is still packed, and this reads the JSON inside it: unpack it first", path)
 	}
 
-	f, err := os.Open(rest[0])
+	f, err := os.Open(path)
 	if err != nil {
 		return err
 	}
@@ -90,65 +99,113 @@ func harvestSnapshot(source metadata.Source, args []string) error {
 		Source: source,
 		Now:    time.Now,
 	}
-	if !*quiet {
+	if !quiet {
 		reader.Log = func(read, skipped int) {
 			fmt.Fprintf(os.Stderr, "%d records read\n", read)
 		}
 	}
 
-	plane := metadata.Plane{Root: corpusRoot()}
-	// Batched rather than all at once. The whole file is 3.17 million records
-	// and holding the parsed form of it costs more memory than most machines
-	// have, so records accumulate until the batch is full and then every month
-	// they touched is written and the map is dropped.
-	//
-	// Batched rather than one month at a time, too: the file is in identifier
-	// order and not in month order, so a paper from 1998 turns up next to one
-	// from 2024 and writing per record would rewrite every month file three
-	// million times.
-	pending := map[string][]metadata.Record{}
-	held := 0
-	var stats metadata.Stats
-
-	flush := func() error {
-		if *dry || held == 0 {
-			pending = map[string][]metadata.Record{}
-			held = 0
-			return nil
-		}
-		shards := make([]string, 0, len(pending))
-		for shard := range pending {
-			shards = append(shards, shard)
-		}
-		sort.Strings(shards)
-		for _, shard := range shards {
-			s, err := plane.Merge(shard, pending[shard])
-			if err != nil {
-				return fmt.Errorf("%s: %w", shard, err)
-			}
-			stats = stats.Add(s)
-		}
-		pending = map[string][]metadata.Record{}
-		held = 0
-		return nil
-	}
-
-	read, err := reader.Read(f, func(r metadata.Record) error {
-		shard, err := r.Shard()
-		if err != nil {
-			return err
-		}
-		pending[shard] = append(pending[shard], r)
-		held++
-		if held >= *batch {
-			return flush()
-		}
-		return nil
-	})
+	b := newBatcher(metadata.Plane{Root: corpusRoot()}, batch, dry)
+	read, err := reader.Read(f, b.add)
 	if err != nil {
 		return err
 	}
-	if err := flush(); err != nil {
+	if err := b.flush(); err != nil {
+		return err
+	}
+
+	if dry {
+		fmt.Printf("%s, nothing written\n", read)
+		return nil
+	}
+	fmt.Printf("%s from %s\n", b.stats, read)
+	if read.Skipped > 0 {
+		fmt.Fprintf(os.Stderr, "%d lines had an id this tool cannot place\n", read.Skipped)
+	}
+	return nil
+}
+
+// harvestHF reads the same records off Hugging Face.
+//
+// The fallback, and it has two ways in because the mirrors are not consistent.
+// Given a JSON lines file it reads the file, which is the Kaggle path with the
+// source changed. Given -rows it walks the datasets server instead, which is
+// the only surface in this whole tool that needs neither a login nor a five
+// gigabyte download, and the only one that will serve a dataset kept as
+// parquet.
+func harvestHF(args []string) error {
+	fs := flag.NewFlagSet("ax harvest hf", flag.ContinueOnError)
+	useRows := fs.Bool("rows", false, "read the datasets server instead of a file")
+	dataset := fs.String("dataset", harvest.Mirror, "the mirror to read, as owner/name")
+	offset := fs.Int("offset", 0, "row to start at, which is a resume point and not a date")
+	limit := fs.Int("limit", 0, "stop after about this many rows, rounded up to the end of a page")
+	all := fs.Int("all", 0, "read the whole split, which is this many rows and hours of requests")
+	dry := fs.Bool("n", false, "read and report, but write nothing")
+	quiet := fs.Bool("q", false, "no progress")
+	batch := fs.Int("batch", 200000, "records to hold before writing a round of months")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if err := onlyTheFile(fs.Args()); err != nil {
+		return err
+	}
+	if !*useRows {
+		// A flag that belongs to the other way in is a mistake worth naming.
+		// Ignoring it would run a harvest that quietly did something other than
+		// what was asked for, which on a command that writes to the corpus is
+		// the wrong kind of forgiving.
+		for _, name := range []string{"dataset", "offset", "limit", "all"} {
+			if set(fs, name) {
+				return fmt.Errorf("-%s only means something with -rows, and this is reading a file", name)
+			}
+		}
+		// No -rows and no file is the one case with nothing to do, and the
+		// message has to name both ways in or the second one is undiscoverable.
+		if len(fs.Args()) != 1 {
+			return errors.New("usage: ax harvest hf [-n] [-q] <arxiv-metadata-oai-snapshot.json>, or ax harvest hf -rows -limit N to read the datasets server")
+		}
+		return readSnapshotFile(metadata.SourceHF, fs.Args()[0], *dry, *quiet, *batch)
+	}
+	if len(fs.Args()) != 0 {
+		return fmt.Errorf("-rows reads the datasets server, so it takes no file: drop %s or drop -rows", fs.Args()[0])
+	}
+	if *batch < 1 {
+		return errors.New("-batch has to be at least 1")
+	}
+	if *offset < 0 {
+		return errors.New("-offset has to be at least 0")
+	}
+	// The split is about 3.17 million rows and the page is a hundred, so a full
+	// walk is over thirty thousand requests and most of nine hours. That should
+	// be a number somebody typed rather than what happens when a flag is
+	// forgotten, which is what -all is: it asks for the count out loud.
+	if *limit == 0 && *all == 0 {
+		return errors.New("a rows harvest with no -limit walks the whole split, which is over thirty thousand requests and most of a day, so say -all <rows> if that is what you meant")
+	}
+	if *limit == 0 {
+		*limit = *all
+	}
+
+	client := &harvest.Rows{
+		Dataset: *dataset,
+		Now:     time.Now,
+		// Hugging Face does not block anonymous readers the way arXiv does, but
+		// naming the project costs nothing and means somebody who wants this to
+		// stop has a person to write to.
+		UserAgent: "arxiv-reader/" + Version + " (+https://github.com/tamnd/arxiv-reader; tamnd87@gmail.com)",
+	}
+	if !*quiet {
+		client.Log = func(page, records, total int) {
+			fmt.Fprintf(os.Stderr, "page %d, %d of %d rows\n", page, records, total)
+		}
+	}
+
+	b := newBatcher(metadata.Plane{Root: corpusRoot()}, *batch, *dry)
+	read, err := client.List(context.Background(), harvest.RowsQuery{Offset: *offset, Limit: *limit}, b.add)
+	if err != nil {
+		return err
+	}
+	if err := b.flush(); err != nil {
 		return err
 	}
 
@@ -156,10 +213,98 @@ func harvestSnapshot(source metadata.Source, args []string) error {
 		fmt.Printf("%s, nothing written\n", read)
 		return nil
 	}
-	fmt.Printf("%s from %s\n", stats, read)
+	fmt.Printf("%s from %s\n", b.stats, read)
 	if read.Skipped > 0 {
-		fmt.Fprintf(os.Stderr, "%d lines had an id this tool cannot place\n", read.Skipped)
+		fmt.Fprintf(os.Stderr, "%d rows were truncated or had an id this tool cannot place\n", read.Skipped)
 	}
+	return nil
+}
+
+// onlyTheFile catches a flag written after the file name.
+//
+// Go's flag package stops looking for flags at the first argument that is not
+// one, so "ax harvest kaggle big.json -q" leaves -q as a second file name and
+// the harvest runs loud. That is a small thing to get wrong and a confusing one
+// to be told about as a usage line, so it gets its own sentence.
+func onlyTheFile(rest []string) error {
+	for _, arg := range rest[min(1, len(rest)):] {
+		if strings.HasPrefix(arg, "-") {
+			return fmt.Errorf("%s came after the file name, and flags have to come before it", arg)
+		}
+	}
+	return nil
+}
+
+// set reports whether a flag was given on the command line, as opposed to
+// sitting at its default.
+func set(fs *flag.FlagSet, name string) bool {
+	found := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			found = true
+		}
+	})
+	return found
+}
+
+// batcher holds records until there are enough of them to be worth writing.
+//
+// Batched rather than all at once, because the whole snapshot is 3.17 million
+// records and holding the parsed form of it costs more memory than most
+// machines have. Records accumulate until the batch is full, then every month
+// they touched is written and the map is dropped.
+//
+// Batched rather than one month at a time, too: the file is in identifier order
+// and not in month order, so a paper from 1998 turns up next to one from 2024
+// and writing per record would rewrite every month file three million times.
+type batcher struct {
+	plane   metadata.Plane
+	size    int
+	dry     bool
+	pending map[string][]metadata.Record
+	held    int
+	stats   metadata.Stats
+}
+
+func newBatcher(plane metadata.Plane, size int, dry bool) *batcher {
+	return &batcher{plane: plane, size: size, dry: dry, pending: map[string][]metadata.Record{}}
+}
+
+func (b *batcher) add(r metadata.Record) error {
+	shard, err := r.Shard()
+	if err != nil {
+		return err
+	}
+	b.pending[shard] = append(b.pending[shard], r)
+	b.held++
+	if b.held >= b.size {
+		return b.flush()
+	}
+	return nil
+}
+
+func (b *batcher) flush() error {
+	if b.dry || b.held == 0 {
+		b.pending = map[string][]metadata.Record{}
+		b.held = 0
+		return nil
+	}
+	// Sorted, so that two runs of the same input write the same months in the
+	// same order and a corpus can be compared against itself.
+	shards := make([]string, 0, len(b.pending))
+	for shard := range b.pending {
+		shards = append(shards, shard)
+	}
+	sort.Strings(shards)
+	for _, shard := range shards {
+		s, err := b.plane.Merge(shard, b.pending[shard])
+		if err != nil {
+			return fmt.Errorf("%s: %w", shard, err)
+		}
+		b.stats = b.stats.Add(s)
+	}
+	b.pending = map[string][]metadata.Record{}
+	b.held = 0
 	return nil
 }
 

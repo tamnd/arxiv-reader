@@ -1,0 +1,135 @@
+{
+    "features": [
+        {
+            "feature_idx": 0,
+            "name": "id",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 1,
+            "name": "submitter",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 2,
+            "name": "authors",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 3,
+            "name": "title",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 4,
+            "name": "comments",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 5,
+            "name": "journal-ref",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 6,
+            "name": "doi",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 7,
+            "name": "report-no",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 8,
+            "name": "categories",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 9,
+            "name": "license",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 10,
+            "name": "abstract",
+            "type": {
+                "dtype": "string",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 11,
+            "name": "versions",
+            "type": {
+                "feature": {
+                    "version": {
+                        "dtype": "string",
+                        "_type": "Value"
+                    },
+                    "created": {
+                        "dtype": "string",
+                        "_type": "Value"
+                    }
+                },
+                "_type": "List"
+            }
+        },
+        {
+            "feature_idx": 12,
+            "name": "update_date",
+            "type": {
+                "dtype": "timestamp[s]",
+                "_type": "Value"
+            }
+        },
+        {
+            "feature_idx": 13,
+            "name": "authors_parsed",
+            "type": {
+                "feature": {
+                    "feature": {
+                        "dtype": "string",
+                        "_type": "Value"
+                    },
+                    "_type": "List"
+                },
+                "_type": "List"
+            }
+        }
+    ],
+    "rows": [],
+    "num_rows_total": 3164528,
+    "num_rows_per_page": 100,
+    "partial": false
+}
