@@ -616,6 +616,87 @@ jobs:
             echo "a rendering with a piece of the paper missing exited zero"
             exit 1
           fi
+      # The fixtures are four real files and a drawing. Rule F06 is what
+      # separates a corpus from a mirror of copyrighted PDFs and rule F09 is
+      # what keeps somebody else's figure out of a repository that claims to be
+      # CC BY, so both are run here as well as in the unit tests.
+      - name: an ordinary figure is committed and a page is not
+        run: |
+          out=$(ax figures check figures/testdata/plot.png figures/testdata/drawing.svg)
+          echo "$out"
+          echo "$out" | grep -q "1200 by 900"
+          echo "$out" | grep -q "at 4.00 by 3.00 inches, from pHYs"
+          echo "$out" | grep -q "at 4.00 by 3.00 inches, from svg"
+          test "$(echo "$out" | grep -c 'verdict.*commit')" = 2
+          out=$(ax figures check figures/testdata/page.png 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "100.0% of a page"
+          echo "$out" | grep -q "F06"
+          if ax figures check figures/testdata/page.png; then
+            echo "a picture that covers a whole page was committed"
+            exit 1
+          fi
+          if ax figures check figures/testdata/spacer.png; then
+            echo "a twenty pixel spacer was committed as a figure"
+            exit 1
+          fi
+      # A resolution cannot be guessed from a pixel count, so a file that states
+      # none is not judged by F06 at all. A tall multi panel figure is exactly
+      # the picture a guessed resolution would throw away.
+      - name: a figure that states no resolution is not judged by F06
+        run: |
+          out=$(ax figures check figures/testdata/tall.png)
+          echo "$out"
+          echo "$out" | grep -q "the file states no resolution"
+          echo "$out" | grep -q "verdict.*commit"
+      - name: a caption that credits somebody else withholds the figure
+        run: |
+          out=$(ax figures check -caption 'Figure 4: the benchmark, reproduced from [Smith et al., 2019](#bib.bibx12).' figures/testdata/plot.png 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "F09"
+          if ax figures check -caption 'Figure 4: reproduced from [Smith et al., 2019](#bib.bibx12).' figures/testdata/plot.png; then
+            echo "a figure credited to somebody else was committed"
+            exit 1
+          fi
+          # The same word away from a citation is ordinary English, and
+          # withholding on the word alone takes a picture out of every paper
+          # that happens to use it.
+          ax figures check -caption 'Figure 5: our adapted architecture, with the gate in place.' figures/testdata/plot.png
+      # The captions are in the rendering and the pictures are not, so this half
+      # of rule F09 is answered before a byte of bandwidth is spent on them.
+      - name: the figure gate reads a paper before anything is downloaded
+        run: |
+          out=$(ARXIV_CORPUS=/tmp/extract-corpus ax figures -n 2501.00001v3)
+          echo "$out"
+          echo "$out" | grep -q "2 figures with a picture in it"
+          echo "$out" | grep -q "Figure 1.*owned.*nothing.svg"
+          echo "$out" | grep -q "Figure 3.*suspected"
+          echo "$out" | grep -q "1 figure withheld by rule F09"
+          echo "$out" | grep -q "the caption, the number and the tag are published anyway"
+      - name: the figure gate refuses the arguments it should refuse
+        run: |
+          if ax figures; then
+            echo "a figure gate with nothing to look at was allowed"
+            exit 1
+          fi
+          if ax figures check; then
+            echo "a check with no file was allowed"
+            exit 1
+          fi
+          if ax figures check /tmp/does-not-exist.png; then
+            echo "a check of a missing file exited zero"
+            exit 1
+          fi
+          if ax figures check .github/workflows/ci.yml; then
+            echo "a file that is not a picture was read as one"
+            exit 1
+          fi
+          # Committing is not written yet, and the reason it is not is that the
+          # rules above had to come first.
+          if ARXIV_CORPUS=/tmp/extract-corpus ax figures 2501.00001v3; then
+            echo "figures were committed by a command that cannot commit them"
+            exit 1
+          fi
       - name: the audit refuses the arguments it should refuse
         run: |
           for c in "audit --plane content" "audit --plane both" "audit -rules S99" "audit -rules" "audit -cap 0" "audit -shard 2113" "audit meta"; do
