@@ -200,6 +200,9 @@ func (c Content) Run(papers []axid.ID) (Report, error) {
 	if err := c.history(col, papers); err != nil {
 		return report, err
 	}
+	if err := c.untracked(col, papers); err != nil {
+		return report, err
+	}
 	report.Results = col.results(ContentRules)
 	return report, nil
 }

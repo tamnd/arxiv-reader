@@ -847,6 +847,12 @@ That is not a hypothetical. It is what this rule found on KAN the first time it 
 `F02`, `F03`, `F05` and `F06` read what `ax figures` measured rather than measuring again, since the command is what measures and a second opinion in the audit is a second answer to defend.
 `F07` is the rule that loads the manifest at all, the way `G01` loads the register, so a manifest that does not parse is one finding here rather than six across the group, and the caption is checked by the loader and not again by the rule.
 
+`F04` asks git rather than the corpus, which makes it the other half of the pair `G08` is in.
+A figure is the only part of the corpus that is bytes and not text, so a picture no commit records is a picture nobody else has, and the same directory is where `F09` takes bytes out, which means a figure withheld here and still sitting in somebody's working tree is exactly what this finds.
+Ignored is reported separately and is the worse of the two, because a rule that reads a directory git has been told to skip is a rule that cannot fail again.
+A file that is not where a paper's figures go is reported whatever the run was looking at, since `ax figures` is the only program that writes under `figures/` and a file anywhere else there belongs to no paper to scope it to.
+A corpus that is not a repository leaves it not run, the same way `G08` does, because a pass would be saying every picture in the corpus is in the repository and nothing has looked.
+
 `F11` and `F12` are the tables, and they run through the same package `ax tables check` runs through, because a rule and the command it checks that disagree about what agreeing means is worse than having neither.
 `F11` counts the tables in the sections against the pairs on disk in one direction only: more tables in the bodies than on disk is a paper `ax tables` has not been run over, and more on disk than in the bodies is a table the paper cut between versions, which `ax tables` sweeps itself.
 `F12` is the measurement, and it is the reason a table is written twice at all.
@@ -876,7 +882,7 @@ The register is the record and the content files are the copy, which is the shap
 
 `G07` and `G08` are the two that are about a revision rather than about one version of a paper, and neither is in the run above, which was taken before they existed.
 `G07` is the tombstone: a tag whose object is gone keeps its line, and the line has to say which version it went in, because a tombstone with no version answers the reader's question with the question.
-`G08` is the only rule in the audit that reads the repository rather than the corpus.
+`G08` is one of the two rules in the audit that read the repository rather than the corpus.
 A tag is assigned once and never changes, which is a promise about lines that are no longer in a file, and a file cannot show you what used to be in it.
 It reads every register line the history took out, and every one the working tree has taken out since the last commit, and a tag that went and never came back is the finding.
 A removal is repaired by a revert and not by putting the line back, because anything that cited the tag in the meantime needs the history to say so.
@@ -907,7 +913,6 @@ Three rules of group R are not here.
 `R08` reads a rendered reference section and nothing renders one yet.
 `R09` compares a paper's resolution rate against its category's median, which needs the same baselines `M06` needs, so the two arrive together in M6.
 `M04` and `M06` are not here: `M04` is every span parsing under KaTeX and the reader that carries KaTeX is M6, and `M06` compares a paper's displays per page with its category's median, which needs baselines computed over a corpus with more than two papers in it.
-`F04` is not here: it says nothing under `figures/` is untracked, which is a question for git, and the figure manifest has to be read against the working tree at the same time, so it arrives with the rest of the native figure work.
 Of group X only `X01` runs, because the other eight read a result, a concept or an artefact record and none of those three things exist yet.
 Every one of them is named in the source with what it needs, because a rule registered before it can run is a rule everybody believes is working.
 

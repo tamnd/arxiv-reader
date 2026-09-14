@@ -1648,12 +1648,12 @@ jobs:
         run: |
           ARXIV_CORPUS=/tmp/extract-corpus ax audit -plane content -q | tee /tmp/audit-content.txt
           grep -q "3 files over 1 paper, nothing found" /tmp/audit-content.txt
-          test "$(grep -cE '^[STMFRGX][0-9]+ +pass ' /tmp/audit-content.txt)" = 56
+          test "$(grep -cE '^[STMFRGX][0-9]+ +pass ' /tmp/audit-content.txt)" = 57
           if grep -q "not run" /tmp/audit-content.txt; then
             echo "a content rule had nothing to look at"
             exit 1
           fi
-      # And the same fifty six rules over nothing at all, which has to read as
+      # And the same fifty seven rules over nothing at all, which has to read as
       # not run rather than as a clean corpus. A green audit over an empty plane
       # is the single easiest way for this project to lie to itself.
       - name: an empty content plane runs nothing rather than passing everything
@@ -1661,7 +1661,7 @@ jobs:
           rm -rf /tmp/empty-corpus && mkdir -p /tmp/empty-corpus
           ARXIV_CORPUS=/tmp/empty-corpus ax audit -plane content -q | tee /tmp/audit-empty.txt
           grep -q "0 files over 0 papers, nothing to check" /tmp/audit-empty.txt
-          test "$(grep -cE '^[STMFRGX][0-9]+ +not run ' /tmp/audit-empty.txt)" = 56
+          test "$(grep -cE '^[STMFRGX][0-9]+ +not run ' /tmp/audit-empty.txt)" = 57
       # Each rule fired by breaking the one thing it is about. A rule that has
       # only ever been watched passing is a rule nobody has tested.
       - name: a content file that is wrong fails the rule that is about it
@@ -1760,6 +1760,11 @@ jobs:
           copy && sed -i 's#](/figures/2501/2501.00001/nothing.svg)#](2501.00001v3/nothing.svg)#' $intro && restamp && fails F01
           copy && sed -i 's/^      width: 384$/      width: 20/' $man && fails F02
           copy && sed -i 's/^      bytes: 375$/      bytes: 999999/' $man && fails F03
+          # F04 asks git rather than the corpus, so it is broken by putting bytes
+          # under figures/ and not committing them, and then by telling git to
+          # look away instead, which is the worse of the two.
+          copy && cp $tab/t01.md /tmp/broken-corpus/figures/2501/2501.00001/two.svg && fails F04
+          copy && echo '*.png' > /tmp/broken-corpus/.gitignore && cp $tab/t01.md /tmp/broken-corpus/figures/2501/2501.00001/two.png && fails F04
           copy && sed -i 's/^      page_fraction: 0.1283$/      page_fraction: 0.9/' $man && fails F06
           copy && sed -i 's/^      caption: (\*\*Overview\*\*.) Nothing, drawn.$/      caption: ""/' $man && fails F07
           copy && sed -i 's/^access: open$/access: record/' $front $intro $results && fails F08

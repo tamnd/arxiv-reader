@@ -24,10 +24,9 @@ import (
 // are not there, bytes that are there and should not be. A table is two files
 // and the rules are that both exist and that they say the same thing.
 //
-// F04 is in 2166-10 and is not here. It says nothing under figures/ is
-// untracked, which is a question for git, and this tool is run over a directory
-// that is a checkout on one machine and an unpacked archive on the next. It
-// goes with G08, the other rule that reads git history, in M4.
+// F04 is the odd one out. It asks git what it is carrying rather than reading
+// the corpus, so it lives in history.go next to G08, which is the other rule
+// that does.
 var figureRules = []Rule{
 	{
 		ID: "F01", Group: GroupFigures, Hard: true,
@@ -42,6 +41,11 @@ var figureRules = []Rule{
 	{
 		ID: "F03", Group: GroupFigures, Hard: true,
 		Says: "no figure over 500 KB",
+	},
+	{
+		ID: "F04", Group: GroupFigures, Hard: true,
+		Says: "nothing under figures/ is untracked",
+		Why:  "A figure is the only part of the corpus that is bytes rather than text, and bytes no commit records are bytes nobody else has. The same directory is where the third party rule takes bytes out, so a picture that is withheld here and still on disk somewhere else is exactly what this finds. It is also the one rule that says a file appeared under figures/ that no program here wrote, because ax figures is the only thing that writes there.",
 	},
 	{
 		ID: "F05", Group: GroupFigures, Hard: true,

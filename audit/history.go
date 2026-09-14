@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
 
 	"github.com/tamnd/arxiv-cli/pkg/axid"
@@ -83,6 +84,98 @@ func (c Content) history(col *collector, papers []axid.ID) error {
 		}
 	}
 	return nil
+}
+
+// untracked is F04, the other rule that asks git rather than the corpus.
+//
+// Every other figure rule reads a decision, a caption or a pixel count. This one
+// reads whether the bytes are in the repository at all, which is a different
+// question and the one that matters most for the only part of the corpus that is
+// not text: a picture no commit records is a picture nobody else has, and a
+// picture the third party rule withheld is supposed to be gone rather than
+// sitting in a working tree.
+//
+// Ignored is reported separately and is the worse of the two, because a rule
+// that reads a directory git has been told to skip is a rule that can never fail
+// again.
+func (c Content) untracked(col *collector, papers []axid.ID) error {
+	if !col.wanted("F04") {
+		return nil
+	}
+	if _, ok := repository(c.Root); !ok {
+		// Not a repository, so nothing is tracked and nothing is untracked, and
+		// there is no version of this rule that means anything over an unpacked
+		// archive. Not run rather than a pass.
+		return nil
+	}
+	col.checked("F04")
+	// One git process for each of the two answers, over the whole run, because the
+	// question is about a directory and not about a paper.
+	plain, err := git(c.Root, "ls-files", "--others", "--exclude-standard", "--", "figures")
+	if err != nil {
+		return err
+	}
+	skipped, err := git(c.Root, "ls-files", "--others", "--ignored", "--exclude-standard", "--", "figures")
+	if err != nil {
+		return err
+	}
+	audited := map[string]axid.ID{}
+	for _, id := range papers {
+		audited[corpus.FiguresDir("", id)] = id
+	}
+	for _, f := range append(strays(plain, false), strays(skipped, true)...) {
+		id, ok := audited[path.Dir(f.path)]
+		if !ok && f.paper() {
+			// A figure of a paper this run is not looking at. Auditing one paper
+			// and hearing about another one's pictures is noise.
+			continue
+		}
+		find := Finding{Rule: "F04", File: f.path, What: f.what()}
+		if ok {
+			find.Shard, find.ID = corpus.Shard(id), id.Canonical
+		}
+		col.add(find)
+	}
+	return nil
+}
+
+// stray is one file under figures/ that git is not carrying.
+type stray struct {
+	path    string
+	ignored bool
+}
+
+// paper says whether the path is where a paper's figures go, which is the shape
+// corpus.FiguresDir writes and nothing else. A file anywhere else under figures/
+// was put there by hand and belongs to no paper, so no run can decide it is
+// somebody else's problem.
+func (s stray) paper() bool {
+	return len(strings.Split(s.path, "/")) == 4
+}
+
+func (s stray) what() string {
+	if s.ignored {
+		return "is under figures/ and git has been told to ignore it, so it is in this corpus on this machine and in no other copy of it, and a rule that reads a directory git skips cannot fail twice"
+	}
+	if !s.paper() {
+		return "is under figures/ and no commit records it, and it is not where a paper's figures go either, so nothing here wrote it"
+	}
+	return "is under figures/ and no commit records it, so this copy of the corpus has a picture no other copy does"
+}
+
+// strays reads the file names git printed.
+//
+// ls-files prints paths relative to the directory it ran in, which is the corpus
+// root, so they arrive in the form a finding prints and need nothing done to
+// them.
+func strays(out []byte, ignored bool) []stray {
+	var files []stray
+	for _, line := range strings.Split(string(out), "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			files = append(files, stray{path: line, ignored: ignored})
+		}
+	}
+	return files
 }
 
 // removal is one register line a commit or the working tree took out.
