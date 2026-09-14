@@ -7,7 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tamnd/arxiv-reader/corpus"
 	"github.com/tamnd/arxiv-reader/extract"
+	"github.com/tamnd/arxiv-reader/figures"
 	"github.com/tamnd/arxiv-reader/tags"
 )
 
@@ -26,6 +28,14 @@ func paper(t *testing.T, docs ...extract.Document) string {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	// The last section is where the figure and the table go, because a paper in
+	// this corpus has been through ax figures and ax tables as well, and a
+	// fixture that has not is a fixture the F rules would all have something to
+	// say about. Before the objects are read rather than after, so the figure is
+	// tagged like every other object and the G rules have nothing to say either.
+	docs[len(docs)-1].Body += "\n\n" + picture + "\n\n" + tableMD
+	figured(t, root)
+	tabled(t, root)
 	var objects []tags.Object
 	for i, d := range docs {
 		if d.Front.LocalID != "" && d.Front.Kind != "front" {
@@ -43,7 +53,11 @@ func paper(t *testing.T, docs ...extract.Document) string {
 	}
 	for i, d := range docs {
 		d.Front.Paper = fixture
+		d.Front.Version = "v1"
 		d.Front.Lang = "en"
+		d.Front.Access = string(corpus.AccessOpen)
+		d.Front.Licence = corpus.LicenceCCBY.SPDX()
+		d.Front.LicenceOfSource = string(corpus.LicenceCCBY)
 		if tag, ok := plan.Assigned[d.Front.LocalID]; ok {
 			d.Front.Tag = string(tag)
 		}
@@ -61,6 +75,60 @@ func paper(t *testing.T, docs ...extract.Document) string {
 		t.Fatal(err)
 	}
 	return root
+}
+
+// picture is the image line the writer puts down for a committed figure, and
+// tableMD is the Markdown one table is laid out as.
+//
+// Both are in the fixture rather than in the tests that need them because they
+// are what a finished paper has. The pair on disk is the same table, written
+// the way ax tables writes it, so F12 is comparing the two representations the
+// tool produces rather than two the test made up.
+const (
+	picture  = "**Figure 1** {#fig-1 .figure}\n\n![A picture of nothing in particular.](/figures/2501/2501.00001/one.svg)"
+	tableMD  = "| Model | Accuracy |\n| :--- | :---: |\n| Nothing | 0.0 |"
+	tableTeX = `% Table 1 of 2501.00001, rebuilt from arXiv's own rendering.
+\begin{tabular}{lc}
+\textbf{Model} & \textbf{Accuracy} \\
+\hline
+Nothing & 0.0 \\
+\end{tabular}
+`
+	drawing = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"></svg>` + "\n"
+)
+
+// figured writes the bytes of one committed figure and the manifest entry
+// recording what was decided about it.
+func figured(t *testing.T, root string) {
+	t.Helper()
+	dir := filepath.Join(root, "figures", "2501", "2501.00001")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "one.svg"), []byte(drawing), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := (figures.Manifest{Figures: []figures.Figure{oneFigure()}}).Save(manifestPath(root)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// tabled writes the pair of files the one table in the fixture is kept as.
+func tabled(t *testing.T, root string) {
+	t.Helper()
+	dir := filepath.Join(root, "tables", "2501", "2501.00001")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{"t01.md": tableMD + "\n", "t01.tex": tableTeX} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func manifestPath(root string) string {
+	return filepath.Join(root, "manifests", "figures", "2501.yaml")
 }
 
 // fixture is the paper every test in this package builds.

@@ -510,6 +510,17 @@ M11   pass   26
 M12   pass   26
 M13   pass   26
 M14   pass   2
+F01   pass   40
+F02   pass   14
+F03   pass   14
+F05   pass   14
+F06   pass   14
+F07   pass   2
+F08   pass   2
+F09   pass   41
+F10   pass   2
+F11   pass   2
+F12   pass   21
 G01   pass   2
 G02   pass   26
 G03   pass   2
@@ -538,6 +549,19 @@ That is the whole design of the group: a rule that decides for itself where a fo
 The other eleven read the spans and ask whether they are right, which leaves the worst outcome unexamined: a paper whose formulas were dissolved into prose has no spans to read, so all eleven report that they had nothing to look at and the audit comes back green over a destroyed paper.
 It counts the characters that appear in mathematics and never in English, and a paper carrying three or more of them with not one math span is a paper something flattened.
 
+Group F reads the pictures and the tables, and the shape of it is that a figure is three things: a decision in the manifest, bytes on disk and a line in a body.
+Every way a corpus goes wrong here is two of those three disagreeing.
+`F01` is the one that goes to disk, from both sides, and it is also the rule that says `ax figures` has never been run: the extractor leaves arXiv's own path in the body until something decides about the picture, so a body still pointing at `2404.19756v5/kan_mlp.png` is a picture nobody has established the permission for.
+That is not a hypothetical. It is what this rule found on KAN the first time it ran, where the one figure still served off arXiv was the teaser above the abstract, because `ax figures` walked the sections and never the abstract.
+`F08` and `F09` are the two that are about permission rather than about quality, and both are deliberately blunt.
+`F09` treats suspected exactly as confirmed, because the cost of being wrong one way is a missing picture and the cost of being wrong the other way is republishing somebody else's copyrighted work under a licence they never granted.
+`F02`, `F03`, `F05` and `F06` read what `ax figures` measured rather than measuring again, since the command is what measures and a second opinion in the audit is a second answer to defend.
+`F07` is the rule that loads the manifest at all, the way `G01` loads the register, so a manifest that does not parse is one finding here rather than six across the group, and the caption is checked by the loader and not again by the rule.
+
+`F11` and `F12` are the tables, and they run through the same package `ax tables check` runs through, because a rule and the command it checks that disagree about what agreeing means is worse than having neither.
+`F11` counts the tables in the sections against the pairs on disk in one direction only: more tables in the bodies than on disk is a paper `ax tables` has not been run over, and more on disk than in the bodies is a table the paper cut between versions, which `ax tables` sweeps itself.
+`F12` is the measurement, and it is the reason a table is written twice at all.
+
 Group G reads the register against the bodies the tags in it were written into.
 The register is the record and the content files are the copy, which is the shape of the group: `G01`, `G03` and `G04` read the register on its own, `G06` reads the copy on its own, and `G05` is the two disagreeing, which is what a rewrite that stopped half way leaves behind and is the state that makes a tag resolve to the wrong object rather than to nothing.
 `G02` is the rule that pays for scoping tags to a paper: a bare `03QK` is not a reference here, because `03QK` exists in thousands of papers and means something different in each, and the reference is `2106.09685#03QK`.
@@ -549,7 +573,8 @@ That block still gets a tag, on purpose, because an anchor nothing can be writte
 
 The checked column is the point of the whole thing.
 A rule with no findings and nothing checked has not passed, it has not run, and the two are different states in the report and not the same green tick.
-`T04`, `T06`, `T07`, `M02`, `M14`, `G01`, `G03` and `G04` are about a paper rather than a file, which is why they say 2 where the rest say 26.
+`T04`, `T06`, `T07`, `M02`, `M14`, `F07`, `F08`, `F10`, `F11`, `G01`, `G03` and `G04` are about a paper rather than a file, which is why they say 2 where the rest say 26.
+The F rules that count figures say 40 and 14 and 41 because those are pictures and not files: 41 decisions in the two manifests, 14 of them committed, and 40 image lines across the bodies.
 `T08` says 24 because an abstract is as long as its author made it and is not a section that came out too short.
 
 Mathematics and code are masked out of a body before the T rules read it, delimiters and all, with every line kept exactly where it was so a finding still points at a line somebody can open.
@@ -560,6 +585,7 @@ Where the mathematics and the code are is the M group's splitter answering, and 
 It arrives with group R, because on the render path a link to `#bib.bib28` is a link `ax refs` has not resolved yet, and telling that apart from a leak means reading the bibliography.
 `M04` and `M06` are not here: `M04` is every span parsing under KaTeX and the reader that carries KaTeX is M6, and `M06` compares a paper's displays per page with its category's median, which needs baselines computed over a corpus with more than two papers in it.
 `G07` and `G08` are not here either: `G07` is about tombstones and nothing writes one until `ax tags diff`, and `G08` reads git history for a tag that used to be in a register and is not any more, which is the same milestone.
+`F04` is not here for the same reason as `G08`: it says nothing under `figures/` is untracked, which is a question for git, and this tool is run over a directory that is a checkout on one machine and an unpacked archive on the next.
 Of group X only `X01` runs, because the other eight read a result, a concept or an artefact record and none of those three things exist yet.
 Every one of them is named in the source with what it needs, because a rule registered before it can run is a rule everybody believes is working.
 

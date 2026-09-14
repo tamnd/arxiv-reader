@@ -192,7 +192,9 @@ func TestAPaperWithNoRegisterFailsOnItsObjectsAndRunsNoRegisterRule(t *testing.T
 		t.Fatal(err)
 	}
 	got := audited(t, root)
-	if got["G06"].Total != 2 {
+	// Three objects in that section: the section itself, the theorem and the
+	// figure the fixture lays out at the end of its last one.
+	if got["G06"].Total != 3 {
 		t.Errorf("G06 found %v", got["G06"].Findings)
 	}
 	for _, id := range []string{"G01", "G03", "G04"} {
