@@ -210,6 +210,16 @@ func SourcesPath(root string) string {
 	return path.Join(root, "manifests", "sources.yaml")
 }
 
+// SelectedPath is the manifest of which papers are in the content plane and why.
+//
+// One file for the corpus and not one per month, unlike the metadata plane. This is
+// the selection and not the census: it holds the papers that were chosen, which is
+// thousands and not three million, and what it is asked most often is a question
+// about the whole corpus at once.
+func SelectedPath(root string) string {
+	return path.Join(root, "manifests", "selected.yaml")
+}
+
 // FiguresPath is the manifest of what was decided about one month's figures.
 //
 // Sharded rather than one file for the corpus, for the same reason the metadata

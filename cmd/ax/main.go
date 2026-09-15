@@ -39,7 +39,7 @@ var commands = []command{
 	{"licence", "the licence gate: census, show, explain, recheck", "M0", runLicence},
 	{"harvest", "fill the metadata plane from Kaggle, Hugging Face and OAI-PMH", "M1", runHarvest},
 	{"fetch", "download what a paper needs for the path it is on", "M3", runFetch},
-	{"select", "choose what enters the content plane, and say why", "M5", nil},
+	{"select", "choose what enters the content plane, and say why", "M5", runSelect},
 	{"extract", "render, source, native or vision, to tagged Markdown", "M3", runExtract},
 	{"figures", "the figure gate, and then crop, convert and size cap", "M3", runFigures},
 	{"tables", "keep every table twice, as Markdown and as LaTeX", "M3", runTables},
