@@ -3303,6 +3303,188 @@ jobs:
               exit 1
             fi
           done
+      # 2166-08 is the point of all of it: a pile of papers is not connected and
+      # a corpus where a theorem links to the theorem it uses, in another paper,
+      # is. One paper cannot show that, so a second paper goes in here with a
+      # numbered theorem and a proof of it. The paper above already cites it by
+      # arXiv id and already names its Theorem 2.1 in a locator, so the two of
+      # them together are the whole of what the graph is for.
+      - name: a second paper goes in for the first one to point at
+        run: |
+          rm -rf /tmp/graph-corpus && cp -r /tmp/extract-corpus /tmp/graph-corpus
+          mkdir -p /tmp/graph-corpus/content/en/2401/2401.01234
+          cat > /tmp/graph-corpus/content/en/2401/2401.01234/00_front.md <<'EOF'
+          ---
+          paper: "2401.01234"
+          version: v1
+          title: A Paper With Something In It
+          section: 0
+          section_title: Front matter
+          kind: front
+          local_id: front
+          tag: ""
+          path: render
+          ---
+
+          Something, at some length.
+          EOF
+          cat > /tmp/graph-corpus/content/en/2401/2401.01234/01_results.md <<'EOF'
+          ---
+          paper: "2401.01234"
+          version: v1
+          title: A Paper With Something In It
+          section: 2
+          section_title: Results
+          kind: section
+          local_id: s2
+          tag: QQ10
+          path: render
+          ---
+
+          **Theorem 2.1** {#thm-2-1 .statement tag=QQ11 env=theorem}
+
+          Something is something.
+
+          **Proof** {#proof-u1 .proof tag=QQ12}
+
+          By [Theorem 2.1](#thm-2-1), immediately.
+          EOF
+      - name: the two planes become a graph of one month
+        run: |
+          ARXIV_CORPUS=/tmp/graph-corpus ax graph build -n 2501.00001 | tee /tmp/graph.txt
+          grep -q "2501           11 edges  1 paper  1 extracted" /tmp/graph.txt
+          grep -qE "^  cites +6$" /tmp/graph.txt
+          grep -qE "^  uses +1$" /tmp/graph.txt
+          grep -qE "^  authored-by +2$" /tmp/graph.txt
+          grep -qE "^  in-category +1$" /tmp/graph.txt
+          grep -qE "^  version-of +1$" /tmp/graph.txt
+          # A predicate the month has none of prints as a nought rather than
+          # being left out, for the same reason the object kinds do.
+          grep -qE "^  mentions +0$" /tmp/graph.txt
+          # Every predicate in the table is one of the seven the spec names.
+          test "$(grep -cE '^  [a-z-]+ +[0-9]+$' /tmp/graph.txt)" = 10
+          # A dry run writes nothing.
+          if [ -e /tmp/graph-corpus/graph ]; then
+            echo "a dry run wrote a shard"
+            exit 1
+          fi
+      # Every edge carries what it is worth, how it was found and when, because
+      # most of the edges in a corpus this size will never be found and the ones
+      # that are have to say how confident they are. Certain is a fact arXiv
+      # published, high is a structural match, medium is a reading.
+      - name: every edge says what it is worth and how it was found
+        run: |
+          ARXIV_CORPUS=/tmp/graph-corpus ax graph build 2501.00001 2>&1 | grep -q "11 edges in"
+          f=/tmp/graph-corpus/graph/2501.jsonl
+          test "$(grep -c '' $f)" = 11
+          # An arXiv id in a reference is certain, a DOI is a match against a
+          # field the submitting author typed so it is high, and a title match is
+          # a reading so it is medium.
+          grep -qF '"s":"ax://paper/2501.00001","p":"cites","o":"ax://paper/2401.01234","conf":"certain","via":"arxiv"' $f
+          grep -qF '"s":"ax://paper/2501.00001","p":"cites","o":"ax://paper/2303.00002","conf":"high","via":"doi"' $f
+          grep -qF '"s":"ax://paper/2501.00001","p":"cites","o":"ax://paper/2202.00003","conf":"medium","via":"title"' $f
+          # The metadata plane is the only place certain comes from for free.
+          grep -qF '"p":"authored-by","o":"ax://name/ada-first","conf":"certain","via":"metadata","stage":"harvest"' $f
+          grep -qF '"s":"ax://paper/2501.00001#v3","p":"version-of","o":"ax://paper/2501.00001"' $f
+          # Nothing is ever low, because an edge that would be low is not stored.
+          if grep -q '"conf":"low"' $f; then
+            echo "a low confidence edge was written"
+            exit 1
+          fi
+      # The thing a paper level citation graph does not know: which theorem
+      # needed the work, rather than which paper mentioned it.
+      - name: a citation inside a section runs from the section
+        run: |
+          f=/tmp/graph-corpus/graph/2501.jsonl
+          grep -qF '"s":"ax://paper/2501.00001#VIS1","p":"cites","o":"ax://paper/2401.01234","conf":"certain","via":"arxiv"' $f
+      # The one edge in the corpus that could not be read off either plane on its
+      # own. The section says "the argument is the one of [3, Theorem 2.1]",
+      # reference three resolves to 2401.01234, and 2401.01234 has an object
+      # numbered 2.1 that is a theorem. It is medium because all three of those
+      # steps can be wrong.
+      - name: a locator finds the theorem in the paper that was cited
+        run: |
+          grep -qF '"s":"ax://paper/2501.00001#VIS1","p":"uses","o":"ax://paper/2401.01234#QQ11","conf":"medium","via":"locator","locator":"theorem 2.1"' /tmp/graph-corpus/graph/2501.jsonl
+      # A locator nothing can resolve is not thrown away, it stays on the
+      # citation. A paper whose Lemma 4 is named by nine papers already here is
+      # worth extracting, and that is a better reason than a citation count
+      # because somebody used a specific result out of it.
+      - name: a locator nothing could resolve stays on the citation
+        run: |
+          grep -qF '"o":"ax://paper/2303.00002","conf":"high","via":"doi","locator":"lemma 4"' /tmp/graph-corpus/graph/2501.jsonl
+      # Inside one paper the link is mechanical, so it is high. It is still a
+      # reading, which is why the refers-to edge stays beside the uses edge
+      # rather than being replaced by it: a proof that says "unlike Lemma 2" is
+      # the proof this gets wrong.
+      - name: a proof that refers to a theorem uses it
+        run: |
+          ARXIV_CORPUS=/tmp/graph-corpus ax graph build 2401.01234 2>&1 | grep -q "6 edges in"
+          f=/tmp/graph-corpus/graph/2401.jsonl
+          grep -qF '"s":"ax://paper/2401.01234#QQ12","p":"uses","o":"ax://paper/2401.01234#QQ11","conf":"high","via":"proof"' $f
+          grep -qF '"s":"ax://paper/2401.01234#QQ12","p":"refers-to","o":"ax://paper/2401.01234#QQ11","conf":"high","via":"ref"' $f
+      - name: building the same month twice writes nothing
+        run: |
+          ARXIV_CORPUS=/tmp/graph-corpus ax graph build 2501.00001 2>&1 | grep -q "unchanged"
+      # Which is the question the whole thing was built to answer.
+      - name: a theorem knows what uses it
+        run: |
+          ARXIV_CORPUS=/tmp/graph-corpus ax graph node -in ax://paper/2401.01234#QQ11 | tee /tmp/graph-node.txt
+          grep -q "kind   object" /tmp/graph-node.txt
+          grep -q "title  On Everything Else" /tmp/graph-node.txt
+          grep -q "out    nothing" /tmp/graph-node.txt
+          grep -q "in     2 uses, 1 refers-to" /tmp/graph-node.txt
+      # A paper URI matches its objects too, so asking what a paper cites is
+      # everything the paper and everything inside it says.
+      - name: a query on a paper reads what its objects said too
+        run: |
+          ARXIV_CORPUS=/tmp/graph-corpus ax graph out -predicate cites -conf certain,high 2501.00001 | tee /tmp/graph-out.txt
+          test "$(grep -c '' /tmp/graph-out.txt)" = 4
+          grep -qE '^ax://paper/2501\.00001 +cites +ax://paper/2401\.01234 +certain' /tmp/graph-out.txt
+          grep -qE '^ax://paper/2501\.00001#VIS1 +cites +ax://paper/2303\.00002 +high +doi +lemma 4$' /tmp/graph-out.txt
+          # Nothing medium came through the filter.
+          if grep -q medium /tmp/graph-out.txt; then
+            echo "a filtered query returned a confidence it was not asked for"
+            exit 1
+          fi
+      # An edge lives in the shard of the paper that asserted it, so what points
+      # at a paper could have been asserted by anybody and the reverse pass reads
+      # every shard.
+      - name: what points at a paper comes from every month
+        run: |
+          ARXIV_CORPUS=/tmp/graph-corpus ax graph in 2401.01234 | tee /tmp/graph-in.txt
+          test "$(grep -c '' /tmp/graph-in.txt)" = 6
+          grep -qE '^ax://paper/2501\.00001#VIS1 +uses +ax://paper/2401\.01234#QQ11 +medium +locator +theorem 2\.1$' /tmp/graph-in.txt
+      - name: the whole plane builds a shard a month
+        run: |
+          ARXIV_CORPUS=/tmp/graph-corpus ax graph build -all 2>&1 | tee /tmp/graph-all.txt
+          test "$(grep -c '' /tmp/graph-all.txt)" = 5
+          # A paper nobody extracted still has its metadata edges, which is the
+          # ordinary case for all but a thousand papers and not a fault.
+          grep -q "3 edges in /tmp/graph-corpus/graph/1901.jsonl, 0 of 1 paper extracted" /tmp/graph-all.txt
+          grep -q "11 edges in /tmp/graph-corpus/graph/2501.jsonl, 1 of 1 paper extracted, unchanged" /tmp/graph-all.txt
+      - name: a corpus nobody has built a graph over says so
+        run: |
+          rm -rf /tmp/graph-empty && mkdir -p /tmp/graph-empty
+          if ARXIV_CORPUS=/tmp/graph-empty ax graph out 2501.00001; then
+            echo "a corpus with no edges answered a query"
+            exit 1
+          fi
+      - name: graph refuses the arguments it should refuse
+        run: |
+          for c in "graph" "graph nonsense" "graph build" "graph build not-an-arxiv-id" "graph build 2502.00002" "graph node" "graph node ax://surface/s10" "graph out" "graph in" "graph out -predicate depends-on 2501.00001" "graph out -conf low 2501.00001" "graph build -shard 251"; do
+            if ARXIV_CORPUS=/tmp/graph-corpus ax $c; then
+              echo "ax $c was allowed"
+              exit 1
+            fi
+          done
+          # The flags go in front of the id, because the flag package stops
+          # parsing at the first argument that is not one, and a query that
+          # quietly ignored the filter it was given would be worse than one that
+          # refused it.
+          if ARXIV_CORPUS=/tmp/graph-corpus ax graph out 2501.00001 -predicate cites; then
+            echo "a flag after the id was accepted"
+            exit 1
+          fi
       # Groups S, T, M, F, R, G and X over the paper the steps above built,
       # fetched, rendered, split, figured, tabled, referenced and tagged. Every
       # rule has to say pass and not "not run": a rule with nothing to look at

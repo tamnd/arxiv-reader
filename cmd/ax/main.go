@@ -49,7 +49,7 @@ var commands = []command{
 	{"split", "one file per top level section, with front matter", "M3", runSplit},
 	{"tags", "assign, diff and verify the permanent identifiers", "M3", runTags},
 	{"objects", "the sixteen object kinds, results and artefacts", "M6", runObjects},
-	{"graph", "build, query and verify the connected web", "M6", nil},
+	{"graph", "build, query and verify the connected web", "M6", runGraph},
 	{"glossary", "seed, extend and check the controlled vocabulary", "M7", nil},
 	{"translate", "vi, zh and ja, and any language with a profile", "M8", nil},
 	{"roundtrip", "back translate a sample and compare", "M8", nil},
