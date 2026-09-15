@@ -3,6 +3,8 @@ package audit
 import (
 	"strings"
 	"testing"
+
+	"github.com/tamnd/arxiv-reader/extract"
 )
 
 // maths builds a one section paper whose body is the mathematics under test.
@@ -238,5 +240,25 @@ func TestM14LeavesAPaperThatKeptOneSpan(t *testing.T) {
 	root := maths(t, "The step α is at most β whenever $\\gamma$ is small enough.")
 	if got := audited(t, root)["M14"]; got.Total != 0 {
 		t.Errorf("M14 found %v", got.Findings)
+	}
+}
+
+// A paper off the native path is not asked. The path reads the characters a
+// formula was printed as, so every paper on it has flattened mathematics by
+// construction, and a rule that reports a path for doing what it says it does is
+// a rule nobody can act on.
+func TestM14DoesNotAskAPaperReadOffAPrintedPage(t *testing.T) {
+	root := maths(t, "The step α is at most β whenever γ is small enough.")
+	for _, name := range []string{"00_front.md", "01_one.md"} {
+		statedAs(t, root, name, func(f *extract.Front) { f.Path = "native" })
+	}
+	got := audited(t, root)
+	if got["M14"].Total != 0 {
+		t.Errorf("M14 found %v", got["M14"].Findings)
+	}
+	// And it says it never ran rather than saying it passed, because a rule that
+	// reports a pass over a paper it stepped over is a rule everybody believes.
+	if state := got["M14"].State(); state != NotRun {
+		t.Errorf("M14 is %s over a paper it does not ask", state)
 	}
 }

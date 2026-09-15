@@ -887,6 +887,195 @@ jobs:
           echo "$out"
           echo "$out" | grep -q "was converted already"
           echo "$out" | grep -q "LaTeXML stopped partway through"
+      # There is no poppler on the runner, so pdftotext is a script that behaves
+      # the way pdftotext behaves, which is the same arrangement latexml and
+      # latex have. What that leaves under test is everything this project
+      # wrote, and on this path that is nearly all of it: the manifest lookup,
+      # the scan judgement, the margin stamp, the gutter, the headings, the
+      # paragraphs, the captions and the reference list.
+      #
+      # The page is a two column page laid out the way -layout lays one out,
+      # with a heading in each column, an indented paragraph in each, a caption
+      # under the left one and a reference list under the right one. It is one
+      # file rather than a heredoc inside the stub so that the alignment is
+      # visible and so that the wrong version case can be made by editing the
+      # stamp and nothing else.
+      - name: a PDF is read end to end with a stub pdftotext
+        run: |
+          mkdir -p /tmp/native-corpus/work/pdf/2501 /tmp/native-corpus/manifests /tmp/native-corpus/metadata
+          printf '%%PDF-1.5\n' > /tmp/native-corpus/work/pdf/2501/2501.00001v3.pdf
+          sum=$(sha256sum /tmp/native-corpus/work/pdf/2501/2501.00001v3.pdf | cut -d' ' -f1)
+          cat > /tmp/native-corpus/manifests/sources.yaml <<YAML
+          sources:
+            - id: "2501.00001"
+              version: 3
+              route: native
+              url: https://arxiv.org/pdf/2501.00001v3
+              path: work/pdf/2501/2501.00001v3.pdf
+              sha256: $sum
+              bytes: 9
+              fetched: 2026-09-14T00:00:00Z
+              licence: cc-by
+              licence_from: abs
+          YAML
+          cat > /tmp/native-page.txt <<'PAGE'
+          arXiv:2501.00001v3 [cs.DL] 5 Jan 2026
+                                                        A Paper About Nothing
+
+          1   INTRODUCTION                              2   METHOD
+             This paper is about nothing in par-           We did nothing at all and we did it
+          ticular, and it says so at some length        carefully, which is the whole of the
+          in a column narrow enough that every          method and wants no more words than
+          line of it wraps where a typesetter           these to describe, and the heading over
+          would have wrapped it on paper.               it has no gap under it anywhere.
+             The second paragraph is indented
+          the way the first one was, which is           ACKNOWLEDGMENTS
+          what says where a paragraph starts and
+          where the one above it ended.                    We thank nobody in particular.
+
+          FIG. 1. A caption that opens with the         [1] A. Author, A paper about nothing,
+          word figure and a number, which is the            Journal of Nothing 1, 1 (2001).
+          whole of what says it is a caption.           [2] B. Author, Another paper about
+                                                            nothing at all, Journal of Nothing
+                                                            2, 2 (2002).
+                                                        [3] C. Author, A third paper about
+                                                            nothing, J. Nothing 3, 3 (2003).
+          PAGE
+          # pdftotext prints its version banner on stderr and exits non-zero,
+          # which is how the program has always behaved, so the stub does too.
+          # A form feed ends every page, including the last.
+          cat > /tmp/stub-pdftotext <<'SH'
+          #!/bin/sh
+          case "$1" in -v) echo "a stub reader, and not pdftotext" >&2; exit 99;; esac
+          cat /tmp/native-page.txt
+          printf '\f'
+          SH
+          chmod +x /tmp/stub-pdftotext
+          ARXIV_CORPUS=/tmp/native-corpus ax extract native -n -pdftotext /tmp/stub-pdftotext 2501.00001v3 2>&1 | tee /tmp/native.txt
+          # Which poppler read a paper is recorded on every run, because poppler
+          # lays a page out differently between releases.
+          grep -q "a stub reader, and not pdftotext" /tmp/native.txt
+          grep -q "arXiv:2501.00001v3" /tmp/native.txt
+          # Three headings, and the third of them is the one with no gap under
+          # it in the right hand column, which is there because the left
+          # column's prose runs alongside it and the gap rule cannot see it.
+          grep -q "headings    3" /tmp/native.txt
+          grep -q "blocks      1 figure, 4 paragraph" /tmp/native.txt
+          # The reference list has no heading over it and is found by the three
+          # entries numbered one, two and three in the back half of the paper.
+          grep -q "references  3" /tmp/native.txt
+          grep -q "1 of them typeset" /tmp/native.txt
+      # The columns are the whole of this path. A two column page read without
+      # them is every sentence interleaved with a different sentence, so this
+      # asks the text rather than the counts.
+      - name: the columns of a two column page are kept apart
+        run: |
+          ARXIV_CORPUS=/tmp/native-corpus ax extract native -n -outline -pdftotext /tmp/stub-pdftotext 2501.00001v3 2>&1 | tee /tmp/native-outline.txt
+          grep -q "This paper is about nothing in particular, and it says so at some length" /tmp/native-outline.txt
+          grep -q "We did nothing at all and we did it carefully, which is the whole of the" /tmp/native-outline.txt
+          grep -q "ACKNOWLEDGMENTS" /tmp/native-outline.txt
+          if grep -q "in particular, and it says so at some We did nothing" /tmp/native-outline.txt; then
+            echo "the two columns came back interleaved"
+            exit 1
+          fi
+      - name: a paper read from the native path says so in its front matter
+        run: |
+          cp /tmp/extract-corpus/metadata/2501.jsonl /tmp/native-corpus/metadata/2501.jsonl
+          ARXIV_CORPUS=/tmp/native-corpus ax extract native -pdftotext /tmp/stub-pdftotext 2501.00001v3 | tee /tmp/native-write.txt
+          grep -q "4 written, 0 unchanged" /tmp/native-write.txt
+          dir=/tmp/native-corpus/content/en/2501/2501.00001
+          grep -q "^path: native" $dir/01_introduction.md
+          grep -q "^licence: CC-BY-4.0" $dir/01_introduction.md
+          # The title and the authors come from the metadata plane, because a
+          # PDF's text layer has a byline in it and no way to tell which of its
+          # lines is one.
+          grep -q "  - Ada First" $dir/01_introduction.md
+          # And the same paper read twice writes nothing, which is the test that
+          # this path is as idempotent as the two above it.
+          ARXIV_CORPUS=/tmp/native-corpus ax extract native -pdftotext /tmp/stub-pdftotext 2501.00001v3 | grep -q "0 written, 4 unchanged"
+      # A PDF with no text layer is a fact about the paper and not a failure of
+      # the command, the same way a submission that turned out to be a PDF is on
+      # the path above this one, so a batch of a hundred steps over one.
+      - name: a PDF holding a scan is on the vision path and does not stop the run
+        run: |
+          cat > /tmp/stub-scan <<'SH'
+          #!/bin/sh
+          case "$1" in -v) echo "a stub reader, and not pdftotext" >&2; exit 99;; esac
+          for p in 1 2 3 4 5; do echo "arXiv:2501.00001v3 [cs.DL] 5 Jan 2026"; printf '\f'; done
+          SH
+          chmod +x /tmp/stub-scan
+          out=$(ARXIV_CORPUS=/tmp/native-corpus ax extract native -n -pdftotext /tmp/stub-scan 2501.00001v3 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "beyond what arXiv stamped down the margin"
+          echo "$out" | grep -q "1 of 1 PDFs hold no text layer worth reading"
+          if ! ARXIV_CORPUS=/tmp/native-corpus ax extract native -n -pdftotext /tmp/stub-scan 2501.00001v3; then
+            echo "a scan stopped the run rather than being stepped over"
+            exit 1
+          fi
+          # The flag is for the paper that missed the threshold by a page and
+          # that somebody has actually looked at, so it has to read the file.
+          out=$(ARXIV_CORPUS=/tmp/native-corpus ax extract native -n -anyway -pdftotext /tmp/stub-scan 2501.00001v3 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "pages       1-5, 0 of them typeset"
+      # The margin stamp is the one statement inside a PDF about which version
+      # of a paper it holds. A corpus that decided it may publish v1 and then
+      # extracted v4 is publishing something nobody gave it, so this stops.
+      - name: a PDF of another version is not extracted
+        run: |
+          sed 's/2501.00001v3/2501.00001v7/' /tmp/native-page.txt > /tmp/native-page-v7.txt
+          cat > /tmp/stub-wrong-version <<'SH'
+          #!/bin/sh
+          case "$1" in -v) echo "a stub reader, and not pdftotext" >&2; exit 99;; esac
+          cat /tmp/native-page-v7.txt
+          printf '\f'
+          SH
+          chmod +x /tmp/stub-wrong-version
+          out=$(ARXIV_CORPUS=/tmp/native-corpus ax extract native -n -pdftotext /tmp/stub-wrong-version 2501.00001v3 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "says it is of v7"
+          if ARXIV_CORPUS=/tmp/native-corpus ax extract native -n -pdftotext /tmp/stub-wrong-version 2501.00001v3; then
+            echo "a PDF of v7 was extracted as v3"
+            exit 1
+          fi
+      # The honest record this path owes a reader. A PDF built with a Type 1
+      # font that carries its own character map has a text layer where the
+      # operators are not the characters they look like, and nothing here
+      # repairs it, because repairing it means guessing at one publisher's font
+      # map and getting it wrong on the next.
+      - name: a broken font map is reported rather than published quietly
+        run: |
+          sed 's/nothing in par-/M ¼ 1.188þ0.004 ¼ þ/' /tmp/native-page.txt > /tmp/native-page-broken.txt
+          cat > /tmp/stub-broken-map <<'SH'
+          #!/bin/sh
+          case "$1" in -v) echo "a stub reader, and not pdftotext" >&2; exit 99;; esac
+          cat /tmp/native-page-broken.txt
+          printf '\f'
+          SH
+          chmod +x /tmp/stub-broken-map
+          out=$(ARXIV_CORPUS=/tmp/native-corpus ax extract native -n -pdftotext /tmp/stub-broken-map 2501.00001v3 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "broken Type 1 font map"
+          echo "$out" | grep -q "worth reading on the vision path"
+      - name: the native extract refuses the arguments it should refuse
+        run: |
+          if ax extract native; then
+            echo "an extract with no paper was allowed"
+            exit 1
+          fi
+          # A file nobody recorded is a file nobody knows the licence of, so the
+          # manifest and not the disk says what may be read.
+          out=$(ARXIV_CORPUS=/tmp/native-corpus ax extract native -n -pdftotext /tmp/stub-pdftotext 2501.00002v1 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "ax fetch native 2501.00002v1"
+          # A PDF is of one version of a paper and there is no such thing as the
+          # PDF of a paper.
+          out=$(ARXIV_CORPUS=/tmp/native-corpus ax extract native -n -pdftotext /tmp/stub-pdftotext 2501.00001 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "names no version"
+          # And a machine with no poppler gets one line it can act on.
+          out=$(ARXIV_CORPUS=/tmp/native-corpus ax extract native -n -pdftotext pdftotext-that-is-not-installed 2501.00001v3 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "install it with brew install poppler or apt install poppler-utils"
       # The fixtures are four real files and a drawing. Rule F06 is what
       # separates a corpus from a mirror of copyrighted PDFs and rule F09 is
       # what keeps somebody else's figure out of a repository that claims to be

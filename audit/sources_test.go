@@ -207,3 +207,87 @@ func TestS01ReportsTextForAPaperTheCorpusMayNotPublish(t *testing.T) {
 		t.Errorf("the finding reads %q", f.What)
 	}
 }
+
+// S08 and S09 are the two halves of asking whether the file that was read was
+// the paper. They are the only rules in this package that measure how much text
+// a file holds, and they only run on a file that says how many pages it was read
+// off, which is a file off the native path.
+
+func TestS08ReportsAFileHoldingMoreThanItsPagesCouldCarry(t *testing.T) {
+	root := paper(t, front(), section(1, "One", prose(8)))
+	statedAs(t, root, "01_one.md", func(f *extract.Front) { f.SourcePages = "3" })
+	rewrite(t, root, "01_one.md", func(d *extract.Document) { d.Body = prose(400) })
+	f := fires(t, root, "S08")
+	if !strings.Contains(f.What, "says it was read off 1 page") {
+		t.Errorf("the finding reads %q", f.What)
+	}
+	// The number it holds and the number a page holds both, because a finding
+	// that says the file is too long and not by how much is one nobody can act on.
+	if !strings.Contains(f.What, "no page carries more than 12000") {
+		t.Errorf("the finding does not say what the ceiling is: %q", f.What)
+	}
+}
+
+func TestS09ReportsAPdfWhoseTextLayerWasACoverSheet(t *testing.T) {
+	root := paper(t, front(), section(1, "One", prose(8)))
+	statedAs(t, root, "01_one.md", func(f *extract.Front) { f.SourcePages = "1-20" })
+	f := fires(t, root, "S09")
+	if !strings.Contains(f.What, "says they were read off 20 pages") {
+		t.Errorf("the finding reads %q", f.What)
+	}
+	if !strings.Contains(f.What, "at least 200") {
+		t.Errorf("the finding does not say what the floor is: %q", f.What)
+	}
+	// The finding is about the paper, so it is reported against the paper's
+	// directory and not against whichever of its files was read first.
+	if strings.HasSuffix(f.File, ".md") {
+		t.Errorf("the finding is against a file rather than the paper: %q", f.File)
+	}
+}
+
+// The case that says why S09 is asked of the paper. A paper that prints "The
+// authors declare no competing interests." under a heading of its own has a
+// section of forty characters on a page that holds the rest of the paper as
+// well, and the same is true of any acknowledgment, any funding note and any
+// data availability statement, so a per file density would report a finding
+// about every paper in a whole publisher's house style.
+func TestS09DoesNotReportAShortSectionSharingAPageWithTheRest(t *testing.T) {
+	root := paper(t, front(), section(1, "One", prose(30)), section(2, "Competing interests", "The authors declare no competing interests."))
+	statedAs(t, root, "01_one.md", func(f *extract.Front) { f.SourcePages = "1-2" })
+	statedAs(t, root, "02_two.md", func(f *extract.Front) { f.SourcePages = "2" })
+	got := audited(t, root)
+	if got["S09"].Total != 0 {
+		t.Errorf("S09 found %v", got["S09"].Findings)
+	}
+	if got["S09"].State() != Pass {
+		t.Errorf("S09 is %s over a paper it had every field it needs for", got["S09"].State())
+	}
+}
+
+// Neither rule runs on a paper read off markup, and neither of them passes it
+// either. A rule that reports a pass on a corpus it never looked at is a rule
+// everybody believes is working.
+func TestS08AndS09DoNotRunOnAPaperWithNoPageCount(t *testing.T) {
+	root := paper(t, front(), section(1, "One", prose(8)))
+	statedAs(t, root, "01_one.md", func(f *extract.Front) { f.SourcePages = "" })
+	got := audited(t, root)
+	for _, id := range []string{"S08", "S09"} {
+		if state := got[id].State(); state != NotRun {
+			t.Errorf("%s is %s and it had nothing to look at", id, state)
+		}
+	}
+}
+
+// A page range nobody can read is not a finding of its own. The two rules are
+// about the paper and not about the punctuation in the front matter, and a field
+// somebody typed by hand is F02's business.
+func TestAPageRangeNobodyCanReadIsNotMeasured(t *testing.T) {
+	root := paper(t, front(), section(1, "One", prose(8)))
+	statedAs(t, root, "01_one.md", func(f *extract.Front) { f.SourcePages = "7-3" })
+	got := audited(t, root)
+	for _, id := range []string{"S08", "S09"} {
+		if got[id].Total != 0 {
+			t.Errorf("%s found %v", id, got[id].Findings)
+		}
+	}
+}

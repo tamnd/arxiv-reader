@@ -40,6 +40,12 @@ func Files(p *Paper, base Front, pics Pictures) ([]File, error) {
 	front.Kind = "front"
 	front.SectionTitle = "Front matter"
 	front.LocalID = "front"
+	// Which pages of the PDF this file was read off, which is empty on the two
+	// paths that read markup and is set on the ones that read a printed page. It
+	// is written here rather than by the caller because it differs per file, and a
+	// file that named the whole paper's pages would be a file audit rules S08 and
+	// S09 measured against twenty pages when it holds one section off two.
+	front.SourcePages = p.FrontPages
 	w := &body{names: n, pics: pics}
 	w.objects++ // The front itself, which is one of the sixteen kinds.
 	w.blocks(p.Abstract, within{})
@@ -54,6 +60,9 @@ func Files(p *Paper, base Front, pics Pictures) ([]File, error) {
 		f.Kind = "section"
 		f.SectionTitle = "Body"
 		f.LocalID = "s1"
+		// The one file is the whole paper, so the pages it was read off are all
+		// of them.
+		f.SourcePages = p.Pages
 		w := &body{names: n, pics: pics}
 		out = append(out, File{Name: "01_body.md", Doc: Document{Front: count(f, w), Body: w.String()}})
 		return out, nil
@@ -67,6 +76,7 @@ func Files(p *Paper, base Front, pics Pictures) ([]File, error) {
 			f.Kind = "appendix"
 		}
 		f.SectionTitle = s.Title
+		f.SourcePages = s.Pages
 		f.Tag = "" // The section's permanent tag, filled in by ax tags assign.
 		w := &body{names: n, pics: pics}
 		w.objects++ // The section itself, whose heading lives in the front matter.

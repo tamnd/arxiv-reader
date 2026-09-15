@@ -8,7 +8,7 @@ It is not called `arxiv` because [tamnd/arxiv-cli](https://github.com/tamnd/arxi
 
 ## Status
 
-M5, which is the first thousand papers in English, and the part of it that is written is the native path's half of the fetch.
+M5, which is the first thousand papers in English, and the part of it that is written is the native path: the PDF fetch, `pdftotext`, and the structure recovered from the shape of a printed page.
 M4 before it was the source path: the papers arXiv never rendered, which is everything announced before December 2023.
 M3 before it was one paper end to end down the render path, and the seed paper is Mamba.
 M2 before that was the licence census: counting what the corpus is permitted to do with what it holds.
@@ -360,6 +360,78 @@ A paper read off the render path has none, and that is not a fault: it means the
 The front matter records which of the two surfaces the file came from, in `path: render` or `path: source`.
 A rendering is what arXiv made of a submission and a conversion is what this project made of the same submission, and they are not always the same document, so a reader comparing two papers has nothing else to go on.
 Figures on this path are still undecided: they come out of the conversion as local files next to the document, and putting them through the figure gate is the next piece of work.
+
+`ax extract native` is the third path and the first one that guesses.
+The two above it read a document that says where its sections and its theorems are, and this one reads the characters that were printed on a page and works out the rest from the shape they were printed in.
+
+```
+$ ax extract native -n 2006.10256v1
+pdftotext version 26.09.0
+2006.10256v1  arXiv:2006.10256v1 [cs.MS] 18 Jun 2020
+  abstract    1 block
+  headings    15
+  blocks      4 figure, 91 paragraph
+  references  58
+  faults      none
+  pages       1-19, 19 of them typeset, read in 48ms
+  characters  55877
+```
+
+That is the NumPy paper, which arXiv has no rendering of and whose submission is a PDF the authors produced themselves, so it is on this path for both of the reasons a paper lands here.
+A paper also lands here when its conversion came back too broken to use.
+
+Everything above a sentence comes from the layout and nothing comes from markup, because there is none.
+A heading is a short line with a gap over it, a paragraph ends where the next one is indented, a caption is a line that opens with the word Figure and a number, and a reference is a line that opens with a bracketed number in the back half of the paper.
+Each of those is a guess and each of them is wrong sometimes, which is what `path: native` in the front matter is for.
+
+The thing that had to be measured rather than assumed is what `-layout` does to two columns.
+It reads a two column page as one sequence of lines, each line holding the left column's text and then the right column's, so the naive read of a physics paper is every sentence interleaved with a different sentence.
+The columns are found by counting, per character column, how many lines have text on both sides of it and how many have a character at it, and the column is quiet where the second number is under a third of the first.
+The cut is a single column in the middle of the longest quiet run, not a band, and a page that cannot find its own cut uses the median of the cuts the rest of the paper found.
+
+Two smaller things fall out of that and both were found on real papers rather than reasoned about.
+A row whose gutter moved, which is what an italic first word or a wide equation does, is cut at the nearest quiet column within four of the paper's cut rather than left whole, because a reference list row left whole is two entries printed on one line.
+And a heading in the right hand column has the left column's prose running alongside it, so there is no gap anywhere near it and the gap rule cannot see it, which is why a line that reads like a heading ends the paragraph above it whether or not the typesetter left a gap.
+
+```
+$ ax extract native -n 1710.05832v1
+1710.05832v1
+  abstract    1 block
+  headings    11
+  blocks      6 figure, 2 note, 166 paragraph, 1 table
+  references  190
+  pages       1-18, 18 of them typeset, read in 102ms
+  characters  73561
+1710.05832v1: the text layer holds 80 characters out of 72018 that are what a broken Type 1 font map prints instead of an operator, so the mathematics in this paper is mojibake and not just flattened, and this one is worth reading on the vision path
+```
+
+That is the GW170817 discovery paper, in two columns, with a thousand authors and a reference list of a hundred and ninety entries, and its six sections come back with the numerals the journal printed them with.
+
+The last line is the honest record this path owes a reader, and it is the reason the table above says this path produces no mathematics.
+`pdftotext` gives back the characters a PDF asks for, and a formula in a PDF is not a formula: it is glyphs positioned on a page, so a fraction arrives as a numerator, a rule of hyphens and a denominator on three lines.
+Displayed mathematics is kept as the shape it was printed in rather than joined into a sentence, so a reader sees what the page said, and nothing on this path is ever published as LaTeX, because there is no LaTeX to publish and inventing some would be worse than admitting there is none.
+Where the font map is broken as well the glyphs are not even the right characters, and that is a paper for the vision path, so the count of odd characters is reported rather than quietly published.
+
+The reference list is recovered and is not written out yet.
+`ax extract native` finds 58 of the NumPy paper's 73 entries and all 190 of the LIGO paper's, and `ax refs build` reads a rendering, so on this path those entries reach the paper and not `refs/`.
+Teaching that command to read a PDF is the next piece of work on this path, and the reason the count is 58 and not 73 is worth writing down: `pdftotext` squeezes some reference rows down to a one space gutter, which cannot be told from a word space, so those entries come back joined to the one above them.
+
+A PDF holding a scan is refused here rather than read.
+
+```
+$ ax extract native -n 1802.00001v1
+1802.00001v1 holds no text on any of its 14 pages beyond what arXiv stamped down the margin, so it is a scan or a submission made of page images, and it is on the vision path
+1 of 1 PDFs hold no text layer worth reading, so those papers are on the vision path
+```
+
+It is its own kind of error so that a batch of a hundred steps over one and carries on, which is the same arrangement the source path has for a submission that turned out to be a PDF.
+`-anyway` reads it regardless, for the paper that missed the threshold by a page and that somebody has actually looked at.
+
+The margin stamp gets one further use.
+It is the only statement inside a PDF about which version of a paper the file holds, so a file whose stamp says v4 when the corpus decided it may publish v1 stops the command rather than being reported, because extracting it would mean publishing something nobody was given.
+
+Which `pdftotext` is on the PATH changes what comes out, since poppler lays a page out differently between releases, so the version is printed on every run and `-pdftotext` names another one.
+There is no poppler on the CI runner, so what runs there is a script that behaves the way `pdftotext` behaves, the same arrangement `latexml` and `latex` already have.
 
 Figures have their own gate, because a `cc-by` article licenses what the authors own and not the plot they reprinted from somebody else's paper with permission.
 There is no metadata for that and there never will be, so `ax figures` reads the signals that are actually in the source.
@@ -792,6 +864,8 @@ rule  state    checked  findings
 S01   pass     26
 S04   pass     2
 S07   pass     26
+S08   not run  0
+S09   not run  0
 S10   pass     26
 S12   pass     26
 T01   pass     26
@@ -860,6 +934,9 @@ It reads the access line and the licence the article carries against each other 
 A paper relicensed at v3 still has a v1 under the old terms, so a corpus that reads the licence off the paper and publishes the version it extracted has published one version under another version's permission, and when the finding sees that shape it says so.
 `S04` is a paper with content and no record behind it, and it is the floor the other four stand on: every question here is asked of the record, so a paper it reports is a paper the rest of the group steps over rather than four findings about one missing line.
 `S07` is the version the file names, which the plane has to hold, because a licence checked against a version that does not exist has not been checked.
+`S08` and `S09` are the two halves of asking whether the file that was read was the paper, and they say not run over this corpus because only the native path knows how many pages a file came off and neither of these two papers is on it.
+`S08` is a file longer than its own pages could carry, which is a page numbering that was lost or two papers in one file, and `S09` is a paper that came back as a handful of characters over twenty pages, which is a PDF whose text layer was a cover sheet.
+The second of the two is asked of the paper and the first of a file, because a short section shares its page with the rest of the paper and a section of one sentence is ordinary.
 
 Group T is the one that says a content file is a content file: it parses, its fields are known and typed, its recorded hash matches the body under it, its sections run from 0 with no gaps, its headings skip no level, and it has a front matter file with an abstract in it.
 The three that catch what a bad extraction actually leaves behind are the last ones.
@@ -877,6 +954,8 @@ That is the whole design of the group: a rule that decides for itself where a fo
 `M14` is the rule that decides whether the extraction was usable at all.
 The other eleven read the spans and ask whether they are right, which leaves the worst outcome unexamined: a paper whose formulas were dissolved into prose has no spans to read, so all eleven report that they had nothing to look at and the audit comes back green over a destroyed paper.
 It counts the characters that appear in mathematics and never in English, and a paper carrying three or more of them with not one math span is a paper something flattened.
+A paper off the native path is not asked, because a PDF's text layer holds the characters a formula was printed as and not the formula, so that path flattens every formula it reads and says so in `path: native`.
+A rule that reports a path for doing the one thing it states it does is a rule that fires on a thousand papers and means nothing on any of them.
 
 Group F reads the pictures and the tables, and the shape of it is that a figure is three things: a decision in the manifest, bytes on disk and a line in a body.
 Every way a corpus goes wrong here is two of those three disagreeing.
@@ -943,10 +1022,10 @@ Mathematics and code are masked out of a body before the T rules read it, delimi
 Without it `$a<b>c$` is an HTML tag, a listing that shows a table is raw markup, and a shell session with a number on a line is a page number.
 Where the mathematics and the code are is the M group's splitter answering, and not a second reading of the same body, so the two groups cannot end up with different opinions about which lines are a fence.
 
-Seven rules of group S are not here, and five of those seven are the ones that read the metadata plane rather than a file, which is where they run.
+Five rules of group S are not here.
+`S05` is the one that reads a record rather than a file, so it runs over the metadata plane and is in that report instead.
 `S02` and `S06` are the two about translated files, one saying a no-derivatives paper has none and the other holding a translation to the licence the propagation table gives it, and nothing is translated yet, so both arrive with M8.
 `S03` and `S11` are git and the takedown manifest, neither of which this tool has to read yet.
-`S08` and `S09` measure a body against the pages it was read off, and a page count is something only the native path has, so the two of them arrive with it in M4.
 
 Three rules of group R are not here.
 `R07` is the acquire selection report, which is a paper three or more papers in the content plane cite and which is not in the plane itself, and nothing writes that report yet.
