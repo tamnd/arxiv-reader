@@ -137,11 +137,11 @@ jobs:
             echo "graph exited zero without building anything"
             exit 1
           fi
-          # A command that is written but has only one of its reports so far
+          # A command that is written but has only two of its reports so far
           # says which report it does not have rather than writing an empty one.
-          out=$(ax report coverage 2>&1 || true)
+          out=$(ax report usage 2>&1 || true)
           echo "$out"
-          echo "$out" | grep -q "with coverage, usage, graph and licence to come"
+          echo "$out" | grep -q "usage, graph and licence are still to come"
       # These reach no further than the argument check, which is the point. CI
       # does not talk to arXiv: a job that harvests on every push is a job that
       # gets this project blocked.

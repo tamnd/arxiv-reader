@@ -31,7 +31,7 @@ func runReport(args []string) error {
 	case "coverage":
 		return reportCoverage(args[1:])
 	default:
-		return fmt.Errorf("unknown report %q, which is paths or coverage for now, with usage, graph and licence to come", args[0])
+		return fmt.Errorf("unknown report %q, which is paths or coverage for now, and usage, graph and licence are still to come", args[0])
 	}
 }
 
