@@ -3199,6 +3199,110 @@ jobs:
               exit 1
             fi
           done
+      # 2166-06 says a paper here is a set of objects rather than a document
+      # with sections, and this is the step that says what that set is for a
+      # paper the tools above built end to end. Everything after M6 joins on it,
+      # so the counts are asserted kind by kind: an object that stops coming out
+      # of a paper is a link the reading app loses and an edge the graph never
+      # draws, and neither of those shows up as a failure anywhere else.
+      - name: a paper is read back out of the content plane as objects
+        run: |
+          rm -rf /tmp/objects-corpus && cp -r /tmp/extract-corpus /tmp/objects-corpus
+          ARXIV_CORPUS=/tmp/objects-corpus ax objects count 2501.00001 | tee /tmp/objects.txt
+          grep -q "2501.00001 v3  21 objects  3 files" /tmp/objects.txt
+          grep -qE "^  section +4$" /tmp/objects.txt
+          grep -qE "^  equation +3$" /tmp/objects.txt
+          grep -qE "^  figure +3$" /tmp/objects.txt
+          grep -qE "^  reference +6$" /tmp/objects.txt
+          grep -qE "^  front +1$" /tmp/objects.txt
+          # A kind the paper has none of is printed as a nought rather than left
+          # out, because a paper with no equations in it is easier to see in a
+          # column than in a shorter list.
+          grep -qE "^  result +0$" /tmp/objects.txt
+          # Every kind in the table is one of the sixteen the spec names.
+          test "$(grep -cE '^  [a-z]+ +[0-9]+$' /tmp/objects.txt)" = 16
+      # The four things an object record has to get right, each one broken in a
+      # different place. Reading order, the section an object sits in, the
+      # heading the paper printed, and the two halves of the links.
+      - name: the objects come out in reading order and know where they sit
+        run: |
+          ARXIV_CORPUS=/tmp/objects-corpus ax objects list 2501.00001 | tee /tmp/objects-list.txt
+          # The file's own section is the first object in it and the front matter
+          # is the first object in the paper.
+          head -1 /tmp/objects-list.txt | grep -q "front"
+          grep -qE "^1 +section +s1 +VIS1 +Introduction" /tmp/objects-list.txt
+          # A run-in heading loses the word that names its kind and keeps its
+          # number, and a subsection heading keeps both halves of its own.
+          grep -qE "^13 +statement/theorem +thm-1 +VNYA +1 " /tmp/objects-list.txt
+          grep -qE "^3 +section +s1-1 +HT4R +1\.1 What Nothing Is" /tmp/objects-list.txt
+          # A heading that starts with an article is not numbered by it.
+          grep -qE "^7 +section +su1-1-1 +8C8D +A Run-in Heading\." /tmp/objects-list.txt
+          # The bibliography is the one kind of object that is not in the content
+          # plane, and it comes last because it is read out of the manifest.
+          tail -1 /tmp/objects-list.txt | grep -qE "^20 +reference +bib\\.bibx6"
+      - name: an object record is written and says what every object is
+        run: |
+          ARXIV_CORPUS=/tmp/objects-corpus ax objects build 2501.00001 2>&1 | grep -q "21 objects in"
+          f=/tmp/objects-corpus/work/objects/2501/2501.00001.jsonl
+          test "$(grep -c '' $f)" = 21
+          # The front matter is the metadata record arXiv published, so it is the
+          # one object in a paper whose recognition is certain. Everything read
+          # off a rendering is high.
+          grep -q '"kind":"front".*"confidence":"certain"' $f
+          grep -q '"kind":"statement","subkind":"theorem".*"local":"thm-1".*"confidence":"high"' $f
+          # A display equation takes the display above its block, and the object
+          # above the display does not also take it.
+          grep '"local":"eq-1a"' $f | grep -qF '"math":["h^{\\prime}(t) =\\bm{A}h(t)"]'
+          grep -q '"local":"s1-1".*"body_md":"Nothing is defined by the following two equations."' $f
+          if grep '"local":"s1-1"' $f | grep -q '"math"'; then
+            echo "the subsection above a display took the display as well"
+            exit 1
+          fi
+          # A link inside the paper and a citation are different edges, because
+          # 2166-08 makes different predicates of them.
+          grep -q '"local":"s1".*"cites":\["bib.bibx1","bib.bibx3","bib.bibx4","bib.bibx5"\]' $f
+          # A reference carries what it resolved to, how it was matched and what
+          # that match is worth, which is what the citation half of the graph is
+          # built out of.
+          grep -q '"local":"bib.bibx3".*"resolved":"2401.01234","via":"arxiv","path":"render","confidence":"certain"' $f
+          # An entry that resolved to nothing is still an object and still gets
+          # published as a bibliography line.
+          grep -q '"local":"bib.bibx6"' $f
+          if grep '"local":"bib.bibx6"' $f | grep -q '"resolved"'; then
+            echo "an entry the plane does not have resolved to something"
+            exit 1
+          fi
+      - name: building the same paper twice writes nothing
+        run: |
+          ARXIV_CORPUS=/tmp/objects-corpus ax objects build 2501.00001 2>&1 | grep -q "unchanged"
+      # The record is a build artefact and the Markdown is the truth, so a
+      # correction made in the content file has to turn up in the next build
+      # without anybody telling the tool that it did.
+      - name: a correction in the Markdown is what the next build says
+        run: |
+          f=/tmp/objects-corpus/content/en/2501/2501.00001/02_results.md
+          perl -pi -e 's/^Nothing is nothing\.$/Nothing is still nothing./' $f
+          ARXIV_CORPUS=/tmp/objects-corpus ax objects build 2501.00001 2>&1 | tee /tmp/objects-again.txt
+          if grep -q "unchanged" /tmp/objects-again.txt; then
+            echo "a corrected paper rebuilt to the same record"
+            exit 1
+          fi
+          grep -q '"local":"thm-1".*"body_md":"Nothing is still nothing."' /tmp/objects-corpus/work/objects/2501/2501.00001.jsonl
+      - name: a paper nobody has extracted has no objects rather than none
+        run: |
+          rm -rf /tmp/objects-empty && mkdir -p /tmp/objects-empty
+          if ARXIV_CORPUS=/tmp/objects-empty ax objects build 2501.00001; then
+            echo "a paper with no content files was accepted"
+            exit 1
+          fi
+      - name: objects refuses the arguments it should refuse
+        run: |
+          for c in "objects" "objects nonsense" "objects build" "objects count" "objects list" "objects list 2501.00001 2501.00002" "objects build not-an-arxiv-id" "objects build 2502.00002" "objects list -lang vi 2501.00001"; do
+            if ARXIV_CORPUS=/tmp/objects-corpus ax $c; then
+              echo "ax $c was allowed"
+              exit 1
+            fi
+          done
       # Groups S, T, M, F, R, G and X over the paper the steps above built,
       # fetched, rendered, split, figured, tabled, referenced and tagged. Every
       # rule has to say pass and not "not run": a rule with nothing to look at
