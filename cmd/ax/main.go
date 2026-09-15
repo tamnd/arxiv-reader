@@ -55,7 +55,7 @@ var commands = []command{
 	{"roundtrip", "back translate a sample and compare", "M8", nil},
 	{"build", "the intermediate representation, then web, EPUB, TeX and PDF", "M6", nil},
 	{"audit", "the numbered rules, hard and soft", "M1", runAudit},
-	{"report", "coverage, usage, paths, graph and licence", "M5", nil},
+	{"report", "coverage, usage, paths, graph and licence", "M5", runReport},
 	{"routes", "configure and probe the model fleet", "M8", nil},
 	{"doctor", "probe every route and every rate limited surface", "M8", nil},
 }

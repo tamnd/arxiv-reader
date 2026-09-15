@@ -1403,6 +1403,38 @@ The category comes from the metadata plane and never from a content file, and th
 A paper the plane has no record of is named on stderr and left out, because that is group S's finding and not this command's, and counting it under an empty category would give the empty category a baseline of its own.
 `ax audit -baselines -n` prints the same table and writes nothing.
 
+The reports are the other half of that.
+A rule is a question asked of one paper and answered pass or fail; a report is a question asked of the corpus, and the answer is a file that gets committed and regenerated so that the diff between last month's and this month's is the news.
+`reports/paths.md` is the first of them, and it is the running answer to whether the cheap paths are doing the work the economics of this project assume they do.
+
+```
+$ ax report paths
+render	3	42.9%	extracted
+source	1	14.3%	selected
+native	2	28.6%	extracted
+vision	0	0.0%	nowhere yet
+undecided	1	14.3%	selected
+  papers	7
+  months	7
+  demoted	0, from the render path to the source path
+written to reports/paths.md
+```
+
+The committed file says the same thing with the tables the terminal leaves out: one row per path with what the spec says that path is for, one column per rung, and one row per month.
+The month table is by month and not by year because the month the vision column starts growing is the month the budget needs rewriting, and a year table would find that out a quarter late.
+
+The `Furthest` column is the rung every paper on a path has reached and not the rung the best of them has, so a path where one paper of forty is tagged has not been tagged.
+The rung counts underneath it are counted as reached rather than as stopped at, so a paper that is tagged is counted under extracted as well, because the question somebody has about a path is how many of its papers have been read and a paper that has been read and tagged has been read.
+
+The demoted line is the one number in the file that a run can change without anybody deciding anything.
+Every other path in the corpus was decided by `ax path decide` off facts that are cheap to gather, but about a quarter of arXiv's own conversions carry a LaTeXML error, and a rendering with an error inside a section body is only found to be unusable once it is on disk and parsed.
+So a paper can start on the render path and finish on the source path, the run writes down that it happened, and this is the line that counts it.
+A corpus where that number climbs is a corpus whose render share is not what the table above it says.
+
+The last section is what is holding the undecided papers up, rolled up by the sentence rather than listed per paper, most papers first.
+A paper with no path is not a paper on the vision path: it is a fact nobody has gathered yet, the sentence says which fact, and the order says which one is standing in front of the most papers and is therefore worth clearing.
+`ax report paths -n` prints the terminal table and writes nothing.
+
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
 
