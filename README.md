@@ -1595,6 +1595,91 @@ A paper is counted once per year however many languages hold it, because a split
 `ax size -hard` exits non-zero once either half of the trigger has been reached, which is what makes this a watch rather than a printout.
 Nothing here writes a report file, because a committed report of the checkout size changes the checkout size and would never settle.
 
+`ax objects` is a paper read back out of the content plane as objects.
+
+```
+$ ax objects count 2312.00752
+2312.00752 v2  276 objects  12 files
+  section      111
+  statement    1
+  definition   0
+  remark       2
+  problem      0
+  exercise     0
+  proof        1
+  equation     8
+  figure       26
+  table        8
+  code         2
+  result       0
+  artefact     0
+  reference    116
+  note         0
+  front        1
+```
+
+That is Mamba, and the counts are the shape of the paper rather than a summary of it.
+2166-06 says a paper in this corpus is not a document with sections but a set of objects, each with a kind, a permanent tag, a position, a body and a set of edges to other objects, and that the sections are one of the sixteen kinds.
+This is the command that produces that set, and the graph, the four emitters and the reading app all join on what it writes.
+
+Every kind is printed even when the count is nought, because what this is read for is whether a paper came out of extraction looking like a paper, and a paper with no equations in it is easier to see in a column of noughts than in a shorter list.
+
+```
+$ ax objects list 2312.00752
+0    front              front              Mamba: Linear-Time Sequence Modeling with...        Foundation models, now powering most of the exciting...
+1    section            s1           C9NQ  Introduction                                        Foundation models (FMs), or large models pretrained on...
+2    section            su1-1        OJFV  Selection Mechanism.                                First, we identify a key limitation of prior models: the...
+5    figure             fig-1        2TPF  1                                                   *The image is withheld because it covers 100 per cent of a...
+6    section            s2           TRGM  State Space Models                                  Structured state space sequence models (S4) are a recent...
+7    equation           eq-1a        24EY                                                      $$ h^{\prime}(t) =\bm{A}h(t)+\bm{B}x(t) $$
+13   section            su2-1        DILO  Discretization.                                     The first stage transforms the “continuous parameters”...
+33   statement/theorem  thm-1        3KH2  1                                                   *When $N=1,\bm{A}=-1,\bm{B}=1,s_{\Delta}=...
+112  proof              proof-u1     O3RU  of [Theorem 1](#thm-1)                              Consider a selective SSM ([Algorithm 2](#lst-2)) with...
+160  reference          bib.bibx1          Arjovsky et al. (2016) Unitary Evolution...         Martin Arjovsky, Amar Shah and Yoshua Bengio “Unitary...
+```
+
+The columns are the position, the kind, the name the object has inside its own paper, its tag, what the paper printed in front of it, and the first part of its body.
+The heading is split into a number and a title, and the word that names the kind is dropped because it is already in the kind column, so `**Theorem 1**` gives number 1 and `## 3.1 Motivation` gives number 3.1 and a title.
+A heading with no number keeps the whole of itself, which is what stops `### A Run-in Heading` being read as section A.
+
+The one shape that is not read forwards is the display equation.
+Every other kind carries its attribute block on the line it starts and the block is followed by the object, and an equation carries its block on the line after the closing dollars, because a block between the display and the paragraph under it would split the display in two.
+So an equation's body is the paragraph its block sits at the bottom of, and the object above the equation stops where that paragraph starts.
+Read the other way round, a section would come out holding an equation it does not contain and the equation would come out holding none of its own mathematics, which is the sort of thing nothing downstream can notice and everything downstream is wrong about.
+
+The bibliography is the one kind of object that is not in the content plane at all.
+A reference is read out of `manifests/refs/<shard>/<id>.yaml`, because it is parsed by pattern from the printed bibliography and then resolved against the metadata plane, and both of those are facts about the corpus rather than prose in the paper.
+It is an object all the same: it carries a tag, and it is what the citation half of the graph hangs off.
+
+```
+$ ax objects build 2312.00752
+276 objects in /Users/apple/github/tamnd/arxiv/work/objects/2312/2312.00752.jsonl
+```
+
+```json
+{"tag":"3KH2","kind":"statement","subkind":"theorem","paper":"2312.00752","version":"v2","local":"thm-1","file":"03_selective_state_space_models.md","number":"1","section":"s3-5-1","order":33,"body_md":"...","math":["N=1,\\bm{A}=-1,\\bm{B}=1,s_{\\Delta}=\\mathsf{Linear}(x)"],"refs_out":["lst-2"],"path":"render","confidence":"high"}
+```
+
+The record is under `work/` and is not committed, because it derives.
+The Markdown is the truth, some of it has been corrected by hand, and rebuilding the record from it takes a second, so a record that disagrees with the content files loses.
+That direction is the opposite of what a database first design would do and it is the one every prior project here arrived at the hard way: a corpus whose truth is a JSON file is a corpus nobody can fix with a text editor, and the fixing is most of the work.
+A rebuild of a paper nobody has touched writes nothing, which is what keeps a rebuild of the whole corpus out of the working tree.
+
+`refs_out` and `cites` are the same Markdown links split by where they point.
+A link to a bibliography anchor is a citation and becomes an edge from this object to a paper, and a link to anything else in the file is a cross reference inside the paper, and 2166-08 makes different predicates of the two.
+`math` is every piece of mathematics in the object with the display first and the inline after it, deduplicated, because the same symbol is written five times in a paragraph about it and a list that says so five times is a list nothing can join on.
+
+`confidence` follows the path the file was read on.
+The render and source paths are structural, so an object is a theorem there because LaTeXML said `ltx_theorem` or because the source said `\begin{theorem}`, and that is a match against markup rather than a reading of prose.
+The native path finds a theorem by the word Theorem followed by a number on a printed page and the vision path finds one by asking a model, and both of those can be wrong about a sentence, so they are medium.
+Nothing read off a path is ever certain, and the one object in a paper that is, is the front matter, because that is the metadata record arXiv published.
+A reference is the exception that is not read off a path at all: its confidence is the confidence of the match, which is certain for an arXiv id or a DOI and medium for a title.
+
+Two of the sixteen kinds are always nought here, and will be until the model passes that fill them are written.
+A result is a claim with a number in it and an artefact is a dataset or a repository the paper published, and both of those are readings of prose rather than shapes in the markup.
+`concepts` is empty for the same reason and the field exists anyway, so that the pass which fills it writes into a record every reader already knows the shape of.
+
+
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
 

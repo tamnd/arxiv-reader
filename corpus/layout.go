@@ -205,6 +205,21 @@ func VisionDir(root string, id axid.ID, version int) string {
 	return path.Join(root, "work", "vision", Shard(id), fmt.Sprintf("%sv%d", PathID(id), version))
 }
 
+// ObjectsPath is one paper's object record.
+//
+// Under work/ and not committed, because it is derived from the Markdown and
+// the Markdown is the thing a person reads and corrects. That direction is the
+// opposite of what a database first design would do, and it is the one this
+// project keeps: a corpus whose truth is a JSON file is a corpus nobody can fix
+// with a text editor.
+//
+// One file per paper, like the references and unlike the figures. The record is
+// read a paper at a time by every emitter, and a month of them in one file would
+// be rewritten by every extraction in that month.
+func ObjectsPath(root string, id axid.ID) string {
+	return path.Join(root, "work", "objects", Shard(id), PathID(id)+".jsonl")
+}
+
 // SourcesPath is the manifest recording where every fetched byte came from.
 func SourcesPath(root string) string {
 	return path.Join(root, "manifests", "sources.yaml")

@@ -68,9 +68,9 @@ func Objects(file, body string) []Object {
 // This is what a reader of the object model walks, because a footnote is still
 // an object and its kind is still one of the sixteen.
 func Blocks(file, body string) []Object {
-	ms := block.FindAllStringSubmatchIndex(body, -1)
-	out := make([]Object, 0, len(ms))
-	for i, m := range ms {
+	ss := Spans(body)
+	out := make([]Object, 0, len(ss))
+	for i, s := range ss {
 		// An object's text is everything from the end of its own attribute block
 		// to the line the next one starts on. That is not a parse of the
 		// Markdown and it does not need to be: what pass three and pass four
@@ -78,18 +78,58 @@ func Blocks(file, body string) []Object {
 		// other, in the same order every time, and the span between two anchors
 		// is exactly that.
 		end := len(body)
-		if i+1 < len(ms) {
-			end = lineStart(body, ms[i+1][0])
+		if i+1 < len(ss) {
+			end = LineStart(body, ss[i+1].Start)
 		}
-		if end < m[1] {
-			end = m[1] // Two blocks on one line, so this one has no text.
+		if end < s.End {
+			end = s.End // Two blocks on one line, so this one has no text.
 		}
 		out = append(out, Object{
 			File:  file,
+			Local: s.Local,
+			Class: s.Class,
+			Label: s.Attrs["label"],
+			Text:  strings.TrimSpace(body[s.End:end]),
+		})
+	}
+	return out
+}
+
+// Span is one attribute block and where it sits in the body.
+//
+// Blocks is the reading most of this package wants and it throws away two things
+// the object model needs: where the block is, and every attribute except the
+// label. An object record has to say what the paper printed in front of the
+// block, which is the line the block is on, and it has to carry the env and the
+// tag. Both readings run off this one so that there is one idea of what an
+// attribute block is in the corpus rather than two regular expressions drifting
+// apart in two packages.
+type Span struct {
+	Local string
+	Class string
+	// Attrs is every key value pair in the block, so label, env and tag.
+	Attrs map[string]string
+	// Start and End bracket the block itself, not the object. The text in front
+	// of Start on the same line is what the paper printed as the object's
+	// heading, and what follows End belongs to the object until the next block.
+	Start int
+	End   int
+}
+
+// Spans reads every attribute block in a body, in reading order.
+func Spans(body string) []Span {
+	ms := block.FindAllStringSubmatchIndex(body, -1)
+	out := make([]Span, 0, len(ms))
+	for _, m := range ms {
+		out = append(out, Span{
 			Local: body[m[4]:m[5]],
 			Class: firstClass(body[m[6]:m[7]]),
-			Label: value(body[m[8]:m[9]], "label"),
-			Text:  strings.TrimSpace(body[m[1]:end]),
+			Attrs: values(body[m[8]:m[9]]),
+			// m[0] is the character in front of the block, which the pattern
+			// captures so that a brace escaped in mathematics is not read as the
+			// start of one. The block itself starts after it.
+			Start: m[3],
+			End:   m[1],
 		})
 	}
 	return out
@@ -103,13 +143,13 @@ func Blocks(file, body string) []Object {
 // inside the section.
 func Lead(body string) string {
 	if m := block.FindStringIndex(body); m != nil {
-		return strings.TrimSpace(body[:lineStart(body, m[0])])
+		return strings.TrimSpace(body[:LineStart(body, m[0])])
 	}
 	return strings.TrimSpace(body)
 }
 
-// lineStart is the index of the beginning of the line index i is on.
-func lineStart(s string, i int) int {
+// LineStart is the index of the beginning of the line index i is on.
+func LineStart(s string, i int) int {
 	if j := strings.LastIndexByte(s[:i], '\n'); j >= 0 {
 		return j + 1
 	}
@@ -119,14 +159,18 @@ func lineStart(s string, i int) int {
 // pairs matches the key value pairs of an attribute block.
 var pairs = regexp.MustCompile(`\s+([A-Za-z_][A-Za-z0-9_-]*)=("(?:[^"\\]|\\.)*"|[^\s"}]*)`)
 
-// value is one pair's value, or empty when the block does not carry that key.
-func value(block, key string) string {
+// values is every pair in a block.
+//
+// A repeated key keeps the first one, and a block with a key twice in it is
+// malformed either way.
+func values(block string) map[string]string {
+	out := map[string]string{}
 	for _, p := range pairs.FindAllStringSubmatch(block, -1) {
-		if p[1] == key {
-			return strings.Trim(p[2], `"`)
+		if _, held := out[p[1]]; !held {
+			out[p[1]] = strings.Trim(p[2], `"`)
 		}
 	}
-	return ""
+	return out
 }
 
 // Taggable says whether an object of this class gets a tag.
