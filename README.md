@@ -244,8 +244,44 @@ The counts are over the whole file and not over whatever `-reason`, `-status` or
 A takedown is somebody exercising a right over a paper that was published, it deletes the files and leaves a tombstone, and it belongs to the licence gate.
 This is for a paper that was chosen and should not have been, so it refuses a paper that has reached `extracted`: there are files for it in the corpus, and taking the row out would leave them with nothing saying why they are there.
 
-Two halves of this are not written yet and say so rather than succeeding quietly.
-`ax select seed` proposing a list off the licence census needs a person to edit what it proposes, and `ax select suggest` is the citation closure over `manifests/refs`, so it arrives with the reference work.
+The first thousand papers come out of `ax select seed`, which is two commands and not one.
+
+```
+$ ax select seed --propose -top 2
+records     5  scanned in the metadata plane
+unresolved  1  20.0%, nobody has run ax licence resolve over them
+refused     1  20.0%, the corpus may publish the record and nothing else
+eligible    3  60.0%, open, share-alike and verbatim
+offered     3  the top 2 of each archive and year, over 3 groups
+
+cs    2 papers  2017 to 2021  from 2 eligible papers
+math  1 paper   2002          from 1 eligible paper
+
+This is a candidate list and not a selection.
+Every row is a paper the licence gate says this corpus may publish, which is the only claim the file makes.
+Three of the score's four terms are nought at seed time, so the order inside a group is oldest first and is not a ranking of anything.
+Delete the rows that do not belong, and then run ax select seed --commit.
+```
+
+The counts come first because the number that matters most about a proposal is not how many papers it offers but how much of arXiv it drew them from.
+A thousand candidates out of a plane where nobody has resolved a licence is a thousand candidates out of the handful of papers somebody happened to look at, and that is a different file from the same thousand out of three million.
+
+`--propose` writes `manifests/seed.yaml`, a person edits it, and `--commit` records who edited it and when.
+The two are separate commands rather than one command with a confirmation, because the editing is the point.
+What a program can do here is narrow three million papers down to a pool that is legal to publish and spread across the archives and the years, and what it cannot do is say which of those papers are worth reading.
+
+The score orders the candidates inside a group and decides nothing else, and three of its four terms are nought at seed time.
+There is no inside citation count because the content plane is empty, which is the situation a seed exists to get out of.
+There is no outside one because the metadata plane carries none: the Cornell snapshot does not have citation counts and arXiv does not publish them.
+The vision penalty is nought because the extraction path is decided by `ax path decide`, which runs after selection rather than before it.
+What is left is the age of the paper, so the order inside a group is oldest first, and that is why the pool is grouped by year as well as by archive: without the year the top of an archive is its oldest papers and a seed is all 1992.
+
+The licence gate is asked twice and the second time is the one that counts.
+`--commit` re-asks it against the metadata plane for every row rather than trusting the file, because the file is one a person has edited by hand and this is the one decision the project cannot afford to get wrong.
+A row somebody pasted in, or a licence that has been resolved differently since the proposal was built, is caught there and nowhere else.
+The weights live in the `selection` section of `manifests/selection.yaml`, and a corpus whose policy file says nothing about them is run with the defaults.
+
+`ax select suggest`, the citation closure over `manifests/refs`, is not written yet and says so rather than succeeding quietly, so it arrives with the reference work.
 
 Once a paper is chosen, `ax path decide` works out which of the four paths it goes down and writes that next to the reason it was chosen.
 

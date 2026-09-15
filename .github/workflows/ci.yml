@@ -1620,14 +1620,164 @@ jobs:
           out=$(ARXIV_CORPUS=/tmp/select-corpus ax select add -reason seed 2501.09999v1 2>&1 || true)
           echo "$out"
           echo "$out" | grep -q "is not in the plane"
-          # The two halves that are not written yet say so rather than succeeding
+          # The half that is not written yet says so rather than succeeding
           # quietly.
-          out=$(ax select seed 2>&1 || true)
-          echo "$out"
-          echo "$out" | grep -q "needs a person to edit it"
           out=$(ax select suggest 2>&1 || true)
           echo "$out"
           echo "$out" | grep -q "citation closure"
+      # The seed, which is where the first thousand papers come from. It is two
+      # commands and not one on purpose: a program can narrow three million papers
+      # down to a pool that is legal to publish and spread across the archives and
+      # the years, and it cannot say which of them are worth reading.
+      #
+      # Five famous papers, four archives and three decades, because a proposal
+      # that only ever sees one month of one archive never exercises the grouping
+      # that stops a seed being a thousand machine learning papers.
+      - name: a candidate list is proposed out of the metadata plane
+        run: |
+          rm -rf /tmp/seed-corpus && mkdir -p /tmp/seed-corpus/metadata
+          cat > /tmp/seed-corpus/metadata/1706.jsonl <<'JSONL'
+          {"id":"1706.03762","title":"Attention Is All You Need","abstract":"The dominant sequence transduction models are based on complex recurrent or convolutional neural networks.","authors":[{"surname":"Vaswani","forename":"Ashish"}],"categories":["cs.CL","cs.LG"],"versions":[{"version":7,"created":"2017-06-12T00:00:00Z","licence":"cc-by","licence_from":"abs"}],"source":"kaggle","harvested":"2026-09-14"}
+          JSONL
+          cat > /tmp/seed-corpus/metadata/2106.jsonl <<'JSONL'
+          {"id":"2106.09685","title":"LoRA: Low-Rank Adaptation of Large Language Models","abstract":"An important paradigm of natural language processing consists of large scale pre-training.","authors":[{"surname":"Hu","forename":"Edward"}],"categories":["cs.CL"],"versions":[{"version":2,"created":"2021-06-17T00:00:00Z","licence":"cc-by","licence_from":"abs"}],"source":"kaggle","harvested":"2026-09-14"}
+          {"id":"2106.00001","title":"A Paper Under The Default Licence","abstract":"Nothing.","authors":[{"surname":"Second","forename":"Bo"}],"categories":["cs.LG"],"versions":[{"version":1,"created":"2021-06-01T00:00:00Z","licence":"arxiv-1.0","licence_from":"abs"}],"source":"kaggle","harvested":"2026-09-14"}
+          {"id":"2106.00002","title":"A Paper Nobody Has Looked At","abstract":"Nor us.","authors":[{"surname":"Third","forename":"Cy"}],"categories":["cs.LG"],"versions":[{"version":1,"created":"2021-06-01T00:00:00Z"}],"source":"kaggle","harvested":"2026-09-14"}
+          JSONL
+          cat > /tmp/seed-corpus/metadata/0211.jsonl <<'JSONL'
+          {"id":"math/0211159","title":"The entropy formula for the Ricci flow and its geometric applications","abstract":"We present a monotonic expression for the Ricci flow.","authors":[{"surname":"Perelman","forename":"Grisha"}],"categories":["math.DG"],"versions":[{"version":1,"created":"2002-11-11T00:00:00Z","licence":"cc-by-sa","licence_from":"abs"}],"source":"kaggle","harvested":"2026-09-14"}
+          JSONL
+          ARXIV_CORPUS=/tmp/seed-corpus ax select seed --propose -top 2 | tee /tmp/seed.txt
+          # The counts first, because the number that matters most about a proposal
+          # is not how many papers it offers but how much of arXiv it drew them
+          # from. Two of these five are out, and for two different reasons.
+          grep -q "records     5" /tmp/seed.txt
+          grep -q "unresolved  1" /tmp/seed.txt
+          grep -q "refused     1" /tmp/seed.txt
+          grep -q "eligible    3" /tmp/seed.txt
+          grep -q "the top 2 of each archive and year" /tmp/seed.txt
+          grep -q "This is a candidate list and not a selection." /tmp/seed.txt
+          m=/tmp/seed-corpus/manifests/seed.yaml
+          grep -q "# The seed: a candidate list, not a selection." $m
+          grep -q "the judgement is yours" $m
+          grep -q "1706.03762" $m
+          grep -q "math/0211159" $m
+          # The two that did not pass the gate are not in the file at all, which is
+          # the whole of what licence first means.
+          if grep -q "2106.00001" $m; then
+            echo "a paper the corpus may publish nothing of was offered as a candidate"
+            exit 1
+          fi
+          if grep -q "2106.00002" $m; then
+            echo "a paper nobody has resolved a licence for was offered as a candidate"
+            exit 1
+          fi
+      # The grouping. Without it the top N of an archive is its oldest N papers,
+      # because age is the only term the score has at seed time, and a candidate
+      # pool that is all 2002 is not a pool anybody can build a corpus out of.
+      - name: the pool is spread across the archives and the years
+        run: |
+          ARXIV_CORPUS=/tmp/seed-corpus ax select seed --propose -top 1 -n | tee /tmp/seed-groups.txt
+          grep -q "over 3 groups" /tmp/seed-groups.txt
+          grep -q "cs " /tmp/seed-groups.txt
+          grep -q "math " /tmp/seed-groups.txt
+          grep -q "2017 to 2021" /tmp/seed-groups.txt
+          # A dry run prints and writes nothing, and the file from the step before
+          # still says what it said.
+          grep -q "top: 2" /tmp/seed-corpus/manifests/seed.yaml
+      - name: a person edits the list and committing it records who
+        run: |
+          # The edit is the point of the file, so the smoke job makes one: the LoRA
+          # row comes out, which is a judgement no program here is entitled to make.
+          perl -0pi -e 's/    - id: "2106\.09685"\n(      .*\n)+//' /tmp/seed-corpus/manifests/seed.yaml
+          if grep -q "2106.09685" /tmp/seed-corpus/manifests/seed.yaml; then
+            echo "the edit did not take"
+            exit 1
+          fi
+          ARXIV_CORPUS=/tmp/seed-corpus ax select seed --commit -by "A Developer <dev@example.com>" -n | tee /tmp/seed-dry.txt
+          grep -q "2 papers on the list, 2 added" /tmp/seed-dry.txt
+          if [ -f /tmp/seed-corpus/manifests/selected.yaml ]; then
+            echo "a dry run wrote the selection"
+            exit 1
+          fi
+          ARXIV_CORPUS=/tmp/seed-corpus ax select seed --commit -by "A Developer <dev@example.com>"
+          ARXIV_CORPUS=/tmp/seed-corpus ax select list | tee /tmp/seed-list.txt
+          grep -q "1706.03762v7" /tmp/seed-list.txt
+          grep -q "math/0211159v1" /tmp/seed-list.txt
+          grep -q "put it on the seed list" /tmp/seed-list.txt
+          grep -q "by: A Developer <dev@example.com>" /tmp/seed-corpus/manifests/seed.yaml
+          grep -q "kept: 2" /tmp/seed-corpus/manifests/seed.yaml
+      # The licence gate is asked twice, and the second time is the one that counts.
+      # The file between the two commands is one a person has edited by hand, so a
+      # row somebody pasted in, or a licence that has been resolved differently
+      # since the proposal was built, is caught here and nowhere else.
+      - name: the licence gate is re-asked against the plane at commit time
+        run: |
+          rm -rf /tmp/seed-pasted && mkdir -p /tmp/seed-pasted/manifests
+          cp -r /tmp/seed-corpus/metadata /tmp/seed-pasted/metadata
+          cat > /tmp/seed-pasted/manifests/seed.yaml <<'YAML'
+          built: "2026-09-14"
+          top: 2
+          seed:
+              - id: "2106.00001"
+                version: 1
+                archive: cs
+                category: cs.LG
+                year: 2021
+                rank: 1
+          YAML
+          out=$(ARXIV_CORPUS=/tmp/seed-pasted ax select seed --commit -by tamnd 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "may publish its record and nothing else"
+          # And a paper nobody has looked at is a separate refusal, because empty is
+          # not unknown.
+          perl -pi -e 's/2106\.00001/2106.00002/' /tmp/seed-pasted/manifests/seed.yaml
+          out=$(ARXIV_CORPUS=/tmp/seed-pasted ax select seed --commit -by tamnd 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "run ax licence resolve"
+          # And a row for a paper the plane has never heard of.
+          perl -pi -e 's/2106\.00002/2106.09999/' /tmp/seed-pasted/manifests/seed.yaml
+          out=$(ARXIV_CORPUS=/tmp/seed-pasted ax select seed --commit -by tamnd 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "not in the metadata plane"
+      - name: select seed refuses the arguments it should refuse
+        run: |
+          out=$(ax select seed 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "usage: ax select seed"
+          out=$(ax select seed --propose --commit 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "would commit a list nobody has looked at"
+          # A second proposal on top of a committed one would leave a file whose
+          # commit block describes rows that are no longer in it.
+          out=$(ARXIV_CORPUS=/tmp/seed-corpus ax select seed --propose 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "move it aside before proposing over it"
+          out=$(ARXIV_CORPUS=/tmp/seed-corpus ax select seed --commit 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "credit the second person with the first one's edits"
+          # A record class paper is not a candidate for the content plane at all.
+          out=$(ARXIV_CORPUS=/tmp/seed-corpus ax select seed --propose -class record 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "the metadata of and nothing else"
+          out=$(ARXIV_CORPUS=/tmp/seed-corpus ax select seed --propose -class invented 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "not one of the access classes"
+          out=$(ARXIV_CORPUS=/tmp/seed-corpus ax select seed --propose -top 0 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "at least 1"
+          # A seed of nothing is an edit somebody should undo rather than commit.
+          rm -rf /tmp/seed-empty && mkdir -p /tmp/seed-empty/manifests
+          cp -r /tmp/seed-corpus/metadata /tmp/seed-empty/metadata
+          printf 'built: "2026-09-14"\ntop: 2\nseed: []\n' > /tmp/seed-empty/manifests/seed.yaml
+          out=$(ARXIV_CORPUS=/tmp/seed-empty ax select seed --commit -by tamnd 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "a seed of nothing"
+          # And committing a file nobody has proposed yet.
+          rm -rf /tmp/seed-none && mkdir -p /tmp/seed-none
+          out=$(ARXIV_CORPUS=/tmp/seed-none ax select seed --commit -by tamnd 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "run ax select seed --propose first"
       # The other half of the selection. The reasons say why a paper is in the
       # content plane and the path says what reading it will cost, which is the
       # difference between a corpus of a thousand papers and a bill: three of the

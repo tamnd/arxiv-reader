@@ -121,6 +121,58 @@ func TestLoadOfAFileThatSaysNothingAboutTheAuditIsTheDefault(t *testing.T) {
 	}
 }
 
+func TestLoadOfAFileThatSaysNothingAboutTheWeightsIsTheDefault(t *testing.T) {
+	// The corpus this was written against has a selection.yaml with an audit
+	// section and nothing else in it, so the weights have to arrive without
+	// anybody editing that file.
+	path := filepath.Join(t.TempDir(), "selection.yaml")
+	if err := os.WriteFile(path, []byte("audit:\n  skip:\n    native: [M01]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Selection != DefaultSelection() {
+		t.Fatalf("a file with no weights in it was read as a set of weights that are all nought: %+v", m.Selection)
+	}
+}
+
+func TestWeightsInTheFileAreKept(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "selection.yaml")
+	body := "selection:\n  inside: 4\n  outside: 0.5\n  age: 2\n  age_cap: 10\n  vision: -3\n"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Selection{Inside: 4, Outside: 0.5, Age: 2, AgeCap: 10, Vision: -3}
+	if m.Selection != want {
+		t.Fatalf("got %+v", m.Selection)
+	}
+}
+
+func TestACitationInsideTheCorpusIsWorthMoreThanOneOutsideIt(t *testing.T) {
+	// The default weights are an opinion and worth stating as one. A paper the
+	// corpus already cites is a hole in what it holds, and a paper the rest of
+	// the world cites is a paper somebody else has already read.
+	s := DefaultSelection()
+	if !(s.Inside > s.Outside) {
+		t.Fatalf("got %+v", s)
+	}
+	if !(s.Vision < 0) {
+		t.Fatal("a paper that can only be read off page images is not cheaper than one that cannot")
+	}
+	if s.AgeCap <= 0 {
+		t.Fatal("an uncapped age term makes the whole of a seed 1991")
+	}
+	if s.Zero() {
+		t.Fatal("the default weights are indistinguishable from no weights at all")
+	}
+}
+
 func TestLoadRefusesAPathThatIsNotOneOfTheFour(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "selection.yaml")
 	if err := os.WriteFile(path, []byte("audit:\n  skip:\n    ocr: [M01]\n"), 0o644); err != nil {
@@ -160,6 +212,9 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 		if strings.Join(a, ",") != strings.Join(b, ",") {
 			t.Fatalf("%s survived as %v and was %v", p, a, b)
 		}
+	}
+	if got.Selection != want.Selection {
+		t.Fatalf("the weights survived as %+v and were %+v", got.Selection, want.Selection)
 	}
 	body, err := os.ReadFile(path)
 	if err != nil {
