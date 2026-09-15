@@ -250,17 +250,27 @@ func (r *Resolver) Misses() []Miss {
 	return out
 }
 
-// Confidence is how much an edge built on this match is worth.
+// Confidence is how much an edge built on this match is worth, in the
+// vocabulary 08-graph.md section 3 defines.
 //
-// An identifier is an identifier and prose is a reading of prose, so the two
-// identifier steps are certain and the title step is medium. It is derived
-// rather than stored, because a stored confidence is a second field that can
-// disagree with the first one.
+// The three steps get the three values and they are not the same. An arXiv id
+// printed in the reference is certain, because the paper itself says which
+// paper it means and arXiv published the id. A DOI is high rather than certain,
+// because the DOI in a reference is matched against a DOI field the submitting
+// author typed into arXiv, and a structural match against a field somebody typed
+// is not a fact arXiv published. A title match is a reading of prose and is
+// medium.
+//
+// It is derived rather than stored, because a stored confidence is a second
+// field that can disagree with the first one.
 func Confidence(via string) string {
-	if via == ViaTitle {
-		return "medium"
+	switch via {
+	case ViaArXiv:
+		return "certain"
+	case ViaDOI:
+		return "high"
 	}
-	return "certain"
+	return "medium"
 }
 
 func rank(via string) int {

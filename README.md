@@ -1673,12 +1673,57 @@ A link to a bibliography anchor is a citation and becomes an edge from this obje
 The render and source paths are structural, so an object is a theorem there because LaTeXML said `ltx_theorem` or because the source said `\begin{theorem}`, and that is a match against markup rather than a reading of prose.
 The native path finds a theorem by the word Theorem followed by a number on a printed page and the vision path finds one by asking a model, and both of those can be wrong about a sentence, so they are medium.
 Nothing read off a path is ever certain, and the one object in a paper that is, is the front matter, because that is the metadata record arXiv published.
-A reference is the exception that is not read off a path at all: its confidence is the confidence of the match, which is certain for an arXiv id or a DOI and medium for a title.
+A reference is the exception that is not read off a path at all: its confidence is the confidence of the match, which is certain for an arXiv id, high for a DOI and medium for a title.
+A DOI is high rather than certain because the DOI in a reference is matched against a DOI field the submitting author typed into arXiv, so it is a structural match and not a fact arXiv published.
 
 Two of the sixteen kinds are always nought here, and will be until the model passes that fill them are written.
 A result is a claim with a number in it and an artefact is a dataset or a repository the paper published, and both of those are readings of prose rather than shapes in the markup.
 `concepts` is empty for the same reason and the field exists anyway, so that the pass which fills it writes into a record every reader already knows the shape of.
 
+`ax graph build` turns the two planes into edges.
+
+```
+$ ax graph build 2312.00752
+142 edges in /Users/apple/github/tamnd/arxiv/graph/2312.jsonl, 1 of 1 paper extracted
+```
+
+```json
+{"s":"ax://paper/2312.00752#3KH2","p":"refers-to","o":"ax://paper/2312.00752#ZYR5","conf":"high","via":"ref","stage":"objects","at":"2026-09-15"}
+```
+
+A pile of three million papers is not connected, and a corpus where a theorem links to the definition it uses, in another paper, by another author, is.
+The edges are the difference, most of the edges in a corpus this size will never be found, and the ones that are have to say how confident they are.
+So every edge carries a confidence, the way it was found, the stage that found it and the day it was written, and there are only three confidences because an edge that would be a fourth one is not stored at all.
+Certain is a fact arXiv published, so it is the metadata edges and a reference that carried an arXiv id.
+High is a structural match, so it is a link in the markup and a reference matched on a DOI.
+Medium is a reading, and everything that crosses from one paper into another object of another paper is medium however it was found.
+
+The seven predicates are `cites`, `uses`, `refers-to`, `mentions`, `authored-by`, `in-category` and `version-of`, and both ends of each one are fixed.
+An edge that points at the wrong kind of node is refused on the way to disk rather than stored, because it joins to nothing later and a missing join reads as missing data.
+The node space is the one arxiv-cli already mints, so a paper is `ax://paper/2312.00752` and a name is `ax://name/albert-gu` and a version is `ax://paper/2312.00752#v2`, and this repo adds the object, which is a paper and a tag.
+A tag is four characters of digits and capitals and a version fragment is a v and a number, so the two fragment spaces never collide.
+
+The interesting edge is the one neither plane has on its own.
+A section says the argument is the one of `[3, Theorem 2.1]`, reference three resolves to another paper, and that paper has an object numbered 2.1 that is a theorem, so the section uses that theorem.
+That is three steps that can each be wrong, which is why it is medium, and it is also the only thing in the corpus that says which theorem needed the work rather than which paper was mentioned.
+When the locator cannot be resolved it is not thrown away, it stays on the citation edge, because a paper whose Lemma 4 is named by nine papers already here is a paper worth extracting and that is a better reason than a citation count.
+
+```
+$ ax graph node -in ax://paper/2312.00752#3KH2
+uri    ax://paper/2312.00752#3KH2
+kind   object
+title  Mamba: Linear-Time Sequence Modeling with Selective State Spaces
+out    1 refers-to
+in     9 refers-to
+```
+
+Theorem 1 of Mamba is referred to by nine other objects in its own paper, and that is the question the whole thing was built to answer.
+`ax graph out` and `ax graph in` print the edges rather than counting them, and both take `-predicate` and `-conf` and `-top` in front of the id.
+An outgoing query reads one shard, because an edge lives in the file of the paper that asserted it, and an incoming one reads them all.
+A paper URI matches its objects too, so asking what a paper cites is everything the paper and everything inside it says.
+
+A shard is a month, a rebuild is a paper, and rebuilding one paper drops that paper's stored edges and leaves every other paper in the month exactly as it was.
+An edge that was already there keeps the day it was first written, because a build that stamped today on everything it saw would turn every rebuild into a diff on every line.
 
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.

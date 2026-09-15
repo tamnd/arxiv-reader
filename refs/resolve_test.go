@@ -244,7 +244,7 @@ func TestAnEntryThatMatchesNothingIsNotAFailure(t *testing.T) {
 }
 
 func TestConfidence(t *testing.T) {
-	for via, want := range map[string]string{ViaArXiv: "certain", ViaDOI: "certain", ViaTitle: "medium"} {
+	for via, want := range map[string]string{ViaArXiv: "certain", ViaDOI: "high", ViaTitle: "medium"} {
 		if got := Confidence(via); got != want {
 			t.Errorf("%s is %q, want %q", via, got, want)
 		}
