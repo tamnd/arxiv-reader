@@ -229,6 +229,16 @@ func BaselinesPath(root string) string {
 	return path.Join(root, "manifests", "baselines.yaml")
 }
 
+// PolicyPath is the file this corpus is run by rather than described by.
+//
+// Separate from selected.yaml, which is one letter away and is the opposite
+// thing. That one records decisions already made, one row per paper. This one
+// holds the numbers and the lists that change what the next run does, so a diff
+// to it is a decision somebody should read before it lands.
+func PolicyPath(root string) string {
+	return path.Join(root, "manifests", "selection.yaml")
+}
+
 // ReportPath is one of the committed reports, named without its extension.
 //
 // Committed, and in the corpus rather than in this repository, because a report

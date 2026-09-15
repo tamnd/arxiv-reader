@@ -267,6 +267,29 @@ type collector struct {
 	checks   map[string]int
 	findings map[string][]Finding
 	totals   map[string]int
+	// expects says whether the thing being read now is expected to satisfy a
+	// rule, and skips counts the times it was not. Nil on the metadata plane,
+	// where a record has no extraction path and every rule applies to all of
+	// them.
+	expects func(rule string) bool
+	skips   map[string]int
+}
+
+// asked says whether the rule should be shown what is being read now.
+//
+// The gate is here rather than at each of the seventy five places a rule is run,
+// and that is the right place for it rather than the convenient one. Not
+// applicable means the thing the rule checks cannot exist for this paper, so
+// anything the rule thinks it found is an artefact of a path that cannot produce
+// the thing: M03 asks that no character is stranded out of its TeX, and over the
+// flattened prose a printed page leaves behind it would fire on every backslash
+// in the paper. Those findings are exactly the noise the third state exists to
+// remove, so they are refused here and counted as a skip.
+func (c *collector) asked(rule string) bool {
+	if c.expects == nil {
+		return true
+	}
+	return c.expects(rule)
 }
 
 func (c *collector) wanted(rule string) bool {
@@ -285,6 +308,13 @@ func (c *collector) checked(rule string) {
 	if !c.wanted(rule) {
 		return
 	}
+	if !c.asked(rule) {
+		if c.skips == nil {
+			c.skips = map[string]int{}
+		}
+		c.skips[rule]++
+		return
+	}
 	if c.checks == nil {
 		c.checks = map[string]int{}
 	}
@@ -292,7 +322,7 @@ func (c *collector) checked(rule string) {
 }
 
 func (c *collector) add(f Finding) {
-	if !c.wanted(f.Rule) {
+	if !c.wanted(f.Rule) || !c.asked(f.Rule) {
 		return
 	}
 	if c.totals == nil {
@@ -322,6 +352,7 @@ func (c *collector) results(rules []Rule) []Result {
 		out = append(out, Result{
 			Rule:     rule,
 			Checked:  c.checks[rule.ID],
+			Skipped:  c.skips[rule.ID],
 			Findings: found,
 			Total:    c.totals[rule.ID],
 		})

@@ -13,6 +13,7 @@ import (
 	"github.com/tamnd/arxiv-reader/audit"
 	"github.com/tamnd/arxiv-reader/corpus"
 	"github.com/tamnd/arxiv-reader/metadata"
+	"github.com/tamnd/arxiv-reader/policy"
 )
 
 // runAudit runs the numbered rules and exits non-zero if a hard one found
@@ -128,7 +129,16 @@ func auditMeta(shard string, limit int, only []string, quiet bool) (audit.Report
 
 // auditContent reads one language of the content plane.
 func auditContent(lang, shard string, limit int, only []string, quiet bool) (audit.Report, error) {
-	c := audit.Content{Root: corpusRoot(), Lang: lang, Cap: limit, Only: only}
+	root := corpusRoot()
+	// The corpus's own policy, falling back to the built in one when it has
+	// none. Read here rather than in the audit package, because that package
+	// knows nothing about where a corpus lives and a rule stays testable against
+	// papers held in memory.
+	pol, err := policy.Load(corpus.PolicyPath(root))
+	if err != nil {
+		return audit.Report{}, err
+	}
+	c := audit.Content{Root: root, Lang: lang, Cap: limit, Only: only, Policy: pol.Audit}
 	papers, err := c.Papers()
 	if err != nil {
 		return audit.Report{}, err

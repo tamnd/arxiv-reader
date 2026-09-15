@@ -1290,6 +1290,8 @@ The other eleven read the spans and ask whether they are right, which leaves the
 It counts the characters that appear in mathematics and never in English, and a paper carrying three or more of them with not one math span is a paper something flattened.
 A paper off the native path is not asked, because a PDF's text layer holds the characters a formula was printed as and not the formula, so that path flattens every formula it reads and says so in `path: native`.
 A rule that reports a path for doing the one thing it states it does is a rule that fires on a thousand papers and means nothing on any of them.
+That exemption is not written into `M14` itself, and neither is the same exemption the other eleven need.
+It lives in `manifests/selection.yaml`, which is the file the corpus is run by, because a rule that quietly excuses itself for a path is a rule nobody counts, and the share of the corpus each rule has stopped applying to is a number worth being able to read off a report.
 
 Group F reads the pictures and the tables, and the shape of it is that a figure is three things: a decision in the manifest, bytes on disk and a line in a body.
 Every way a corpus goes wrong here is two of those three disagreeing.
@@ -1347,6 +1349,37 @@ That block still gets a tag, on purpose, because an anchor nothing can be writte
 
 The checked column is the point of the whole thing.
 A rule with no findings and nothing checked has not passed, it has not run, and the two are different states in the report and not the same green tick.
+There is a third way to have no findings, which is a rule that was shown papers and was not asked about them, and that one reads n/a with the number it stepped over in the skipped column.
+The three are different questions: pass is a rule that looked, not run is a rule that had nothing to look at, and n/a is a rule nobody asked.
+
+Here is the same audit over two papers read off their printed pages, `1710.05832` and `2006.10256`.
+
+```
+$ ARXIV_CORPUS=/tmp/native-demo ax audit -plane content -q
+rule  state    checked  skipped  findings
+...
+M01   n/a      0        28
+M02   n/a      0        2
+M03   n/a      0        28
+M05   pass     28
+M07   n/a      0        28
+M08   n/a      0        28
+M09   n/a      0        28
+M10   n/a      0        28
+M11   n/a      0        28
+M12   n/a      0        28
+M13   pass     28
+M14   n/a      0        2
+F10   n/a      0        2
+...
+
+28 files over 2 papers, 2 findings
+```
+
+Ten of the twelve M rules read TeX and this path writes none, so they step over the papers and say how many they stepped over.
+`M05` is the replacement character a file read with the wrong encoding brings with it and `M13` is the file's own Markdown, and the native path writes both of those like any other path, so those two are asked and pass over all twenty eight files.
+`F10` is the table rule, and a path that records a float's number and its caption with no rows in between has nothing for it to read.
+No rule of group S is ever skipped on any path, whatever it produced, because a licence rule marked not applicable is a licence breach with a label on it.
 `S04`, `T04`, `T06`, `T07`, `M02`, `M14`, `F07`, `F08`, `F10`, `F11`, `R03`, `G01`, `G03` and `G04` are about a paper rather than a file, which is why they say 2 where the rest say 26.
 The F rules that count figures say 40 and 14 and 41 because those are pictures and not files: 41 decisions in the two manifests, 14 of them committed, and 40 image lines across the bodies.
 `T08` says 24 because an abstract is as long as its author made it and is not a section that came out too short.

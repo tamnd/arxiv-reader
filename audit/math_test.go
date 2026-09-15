@@ -256,9 +256,15 @@ func TestM14DoesNotAskAPaperReadOffAPrintedPage(t *testing.T) {
 	if got["M14"].Total != 0 {
 		t.Errorf("M14 found %v", got["M14"].Findings)
 	}
-	// And it says it never ran rather than saying it passed, because a rule that
-	// reports a pass over a paper it stepped over is a rule everybody believes.
-	if state := got["M14"].State(); state != NotRun {
+	// And it says not applicable rather than pass, because a rule reporting a
+	// pass over a paper it stepped over is a rule everybody believes is working.
+	// Not applicable rather than not run either: this rule was shown a paper and
+	// was not asked about it, which is a different thing from having had nothing
+	// to look at.
+	if state := got["M14"].State(); state != NotApplicable {
 		t.Errorf("M14 is %s over a paper it does not ask", state)
+	}
+	if got["M14"].Skipped != 1 {
+		t.Errorf("one paper was stepped over, and the count says %d", got["M14"].Skipped)
 	}
 }
