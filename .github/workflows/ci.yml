@@ -1412,7 +1412,7 @@ jobs:
           # A path that spends money on every page has no default reader, and a
           # page read by a model the corpus cannot name is a page nobody can read
           # again.
-          out=$(ARXIV_CORPUS=/tmp/vision-corpus ax extract vision -n -model stub-model-1 -pdftotext /tmp/stub-thin-layer 2501.00001v3 2>&1 || true)
+          out=$(ARXIV_CORPUS=/tmp/vision-corpus ax extract vision -n -model stub-model-1 -pdftotext /tmp/stub-thin-layer -pdftoppm /tmp/stub-pdftoppm 2501.00001v3 2>&1 || true)
           echo "$out"
           echo "$out" | grep -q -- "-reader"
           out=$(ARXIV_CORPUS=/tmp/vision-corpus ax extract vision -n -reader /tmp/stub-reader -pdftotext /tmp/stub-thin-layer -pdftoppm /tmp/stub-pdftoppm 2501.00001v3 2>&1 || true)
