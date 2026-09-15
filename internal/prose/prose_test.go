@@ -40,7 +40,7 @@ func TestPercent(t *testing.T) {
 
 func TestBytes(t *testing.T) {
 	for _, tc := range []struct {
-		n    int
+		n    int64
 		want string
 	}{
 		{0, "0 bytes"},
@@ -53,6 +53,12 @@ func TestBytes(t *testing.T) {
 		{(500 << 10) + 1, "500 KB"},
 		{1 << 20, "1.0 MB"},
 		{3 << 20, "3.0 MB"},
+		// The split trigger in the spec is twenty gigabytes, which is the other
+		// number this has to be able to print, and two decimal places because a
+		// corpus creeping up on it moves in tenths of a percent.
+		{1 << 30, "1.00 GB"},
+		{20 << 30, "20.00 GB"},
+		{(20 << 30) - (1 << 28), "19.75 GB"},
 	} {
 		if got := Bytes(tc.n); got != tc.want {
 			t.Errorf("Bytes(%d) is %q, want %q", tc.n, got, tc.want)

@@ -415,7 +415,7 @@ func figuresCheck(args []string) error {
 			return err
 		}
 		d := figures.Decide(*caption, im)
-		fmt.Fprintf(tw, "%s\t%s\t%d by %d\t%s\n", path, im.Format, im.Width, im.Height, prose.Bytes(im.Bytes))
+		fmt.Fprintf(tw, "%s\t%s\t%d by %d\t%s\n", path, im.Format, im.Width, im.Height, prose.Bytes(int64(im.Bytes)))
 		if im.Measured() {
 			fmt.Fprintf(tw, "  page\t%s of a page\tat %.2f by %.2f inches, from %s\n", prose.Percent(d.PageFraction), im.WidthIn, im.HeightIn, im.Stated)
 		} else {
