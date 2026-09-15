@@ -1468,6 +1468,50 @@ The last section is what is holding the undecided papers up, rolled up by the se
 A paper with no path is not a paper on the vision path: it is a fact nobody has gathered yet, the sentence says which fact, and the order says which one is standing in front of the most papers and is therefore worth clearing.
 `ax report paths -n` prints the terminal table and writes nothing.
 
+`reports/coverage.md` is the second one, and it is the report that stops the paper count being a number anybody can move.
+A corpus can reach a thousand papers with a clean audit and have got there by asking fewer and fewer questions of them, one rule at a time, and every one of those decisions is defensible on its own.
+
+```
+$ ax report coverage
+render	3	60.0%	59 of 59 rules	100.0%
+native	2	40.0%	46 of 59 rules	78.0%
+  papers	7
+  extracted	5, which is the content plane
+  languages	1
+  quiet rules	13, asked of under 80.0% of the content plane
+written to reports/coverage.md
+```
+
+It reads the selection and the policy and it does not run the audit.
+What a rule found is an answer that changes with every run and what a rule is asked is an answer that changes when somebody edits a file, and only the second of those is a report rather than a log.
+
+The committed file has three tables.
+The first is what exists per language at each of four depths, where full is body text, stub is the title and the abstract, record is a paper whose licence lets this corpus hold the metadata and the structure and nothing else, and none is a paper that should have more and does not yet.
+Four words and not a percentage, because a `record` paper is done rather than forgotten, and a coverage number that counted it as missing would say this project has failed on most of arXiv when the licence is what decided it.
+Stub and record are both nought until the join with the metadata plane lands, which is `reports/licence.md`.
+
+The second is per path, and it is the M5 question: what fraction of the corpus landed on each path, and how much of the rule set each of those paths is still asked.
+The denominator is the content plane and not the selection, because a rule cannot have been asked of a paper nothing has read yet.
+
+The third is the one to read before believing a green audit.
+
+```
+| Rule | Papers | Share | Paths | What it says |
+| --- | ---: | ---: | --- | --- |
+| F10 | 2 | 40.0% | native | every figure the paper numbers is present |
+| M01 | 2 | 40.0% | native | every math span is closed |
+| M14 | 2 | 40.0% | native | a paper with mathematics in its prose has mathematics in its markup |
+```
+
+Every rule that has stopped applying to more than a fifth of the content plane, most of the corpus first, with the paths responsible and the rule's own sentence next to it.
+A fifth is a threshold and not a measurement: under it is a rule that does not fit a corner of the corpus, which is ordinary and is what the policy file is for, and over it is a rule most of the corpus is no longer checked by.
+A rule in this table is not wrong and it is not broken, and none of these thirteen is a mistake.
+It is a question most of this corpus is not being asked, and the way a corpus gets quietly worse is one more row appearing here every quarter and nobody counting them.
+
+There is a fourth section that is usually absent.
+A rule the policy file names that this project does not have is a typo, and a typo there is silent by construction: it excuses nothing, so nothing changes, and the rule somebody meant to excuse goes on firing over the path they wanted it off.
+`ax report coverage -n` prints the terminal table and writes nothing.
+
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
 
