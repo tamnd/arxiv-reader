@@ -14,13 +14,20 @@ import (
 func (r Report) Text() string {
 	var b strings.Builder
 	tw := tabwriter.NewWriter(&b, 0, 4, 2, ' ', 0)
-	fmt.Fprintf(tw, "rule\tstate\tchecked\tfindings\t\n")
+	fmt.Fprintf(tw, "rule\tstate\tchecked\tskipped\tfindings\t\n")
 	for _, res := range r.Results {
 		found := ""
 		if res.Total > 0 {
 			found = fmt.Sprint(res.Total)
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%d\t%s\t\n", res.Rule.ID, res.State(), res.Checked, found)
+		// Skipped is printed only where there is one, because a column of
+		// noughts down every rule of a corpus with no native papers in it is a
+		// column nobody reads and this one is worth noticing.
+		skipped := ""
+		if res.Skipped > 0 {
+			skipped = fmt.Sprint(res.Skipped)
+		}
+		fmt.Fprintf(tw, "%s\t%s\t%d\t%s\t%s\t\n", res.Rule.ID, res.State(), res.Checked, skipped, found)
 	}
 	tw.Flush()
 
@@ -56,11 +63,11 @@ func (r Report) Markdown() string {
 	}
 
 	b.WriteString("\n## The rules\n\n")
-	b.WriteString("| ID | State | Checked | Findings | Rule |\n")
-	b.WriteString("| --- | --- | ---: | ---: | --- |\n")
+	b.WriteString("| ID | State | Checked | Skipped | Findings | Rule |\n")
+	b.WriteString("| --- | --- | ---: | ---: | ---: | --- |\n")
 	for _, res := range r.Results {
-		fmt.Fprintf(&b, "| %s | %s | %d | %d | %s |\n",
-			res.Rule.ID, res.State(), res.Checked, res.Total, res.Rule.Says)
+		fmt.Fprintf(&b, "| %s | %s | %d | %d | %d | %s |\n",
+			res.Rule.ID, res.State(), res.Checked, res.Skipped, res.Total, res.Rule.Says)
 	}
 
 	if r.Findings() == 0 {

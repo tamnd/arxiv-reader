@@ -9,6 +9,7 @@ import (
 
 	"github.com/tamnd/arxiv-cli/pkg/axid"
 	"github.com/tamnd/arxiv-reader/corpus"
+	"github.com/tamnd/arxiv-reader/selection"
 )
 
 // mathRules read the mathematics.
@@ -172,35 +173,46 @@ func (c Content) maths(col *collector, id axid.ID, files []content) {
 		col.add(Finding{Rule: "M02", File: s.file, Shard: shard, Line: s.line, ID: id.Canonical, What: s.what})
 	}
 
-	// A paper off the native path is not asked, because the answer is known and is
-	// the path's own account of itself. A PDF's text layer holds the characters a
-	// formula was printed as and not the formula, so every paper read this way has
-	// flattened mathematics in it by construction, and a rule that reports what a
-	// path says it does in its own front matter is a rule that fires on a thousand
+	// A paper off the native path is not asked, and it is the policy rather than
+	// this rule that says so now. A PDF's text layer holds the characters a
+	// formula was printed as and not the formula, so every paper read that way
+	// has flattened mathematics in it by construction, and a rule that reports
+	// what a path says it does in its own front matter fires on a thousand
 	// papers and means nothing on any of them. The question this rule exists to
 	// ask, which is whether something destroyed the mathematics of a paper that
-	// had it in markup, is only a question on the two paths that read markup.
-	if !nativePaper(files) {
-		col.checked("M14")
-		if spanCount == 0 && len(prose) >= flattenedPaper {
-			col.add(Finding{Rule: "M14", File: dir, Shard: shard, ID: id.Canonical,
-				What: fmt.Sprintf("uses %d characters in its prose that only mathematics uses, and carries not one math span in the whole paper, so its formulas were flattened rather than extracted", len(prose))})
-		}
+	// had it in markup, is only a question on the paths that read markup.
+	//
+	// The skip lives in manifests/selection.yaml with the rest of them, because
+	// a rule that quietly excuses itself for a path is a rule nobody counts, and
+	// the share of the corpus each rule has stopped applying to is the thing the
+	// coverage report is for.
+	col.checked("M14")
+	if spanCount == 0 && len(prose) >= flattenedPaper {
+		col.add(Finding{Rule: "M14", File: dir, Shard: shard, ID: id.Canonical,
+			What: fmt.Sprintf("uses %d characters in its prose that only mathematics uses, and carries not one math span in the whole paper, so its formulas were flattened rather than extracted", len(prose))})
 	}
 }
 
-// nativePaper says every file of this paper was read off a printed page.
+// paperPath is the path every file of this paper says it was read off.
 //
 // Asked of all of them rather than of the first, because a paper whose files
 // disagree about where they came from is a paper somebody assembled by hand, and
-// that one is worth asking the question of.
-func nativePaper(files []content) bool {
+// that one is worth asking every question of. So is a paper whose front matter
+// says nothing, which is why disagreement and silence both come back empty and
+// an empty path expects every rule.
+func paperPath(files []content) selection.Path {
+	var out selection.Path
 	for _, f := range files {
-		if f.doc.Front.Path != "native" {
-			return false
+		p := selection.Path(f.doc.Front.Path)
+		if !selection.KnownPath(p) {
+			return ""
 		}
+		if out != "" && out != p {
+			return ""
+		}
+		out = p
 	}
-	return len(files) > 0
+	return out
 }
 
 // flattenedPaper is how many mathematical characters in the prose make a paper

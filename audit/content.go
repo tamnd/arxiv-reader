@@ -14,6 +14,7 @@ import (
 	"github.com/tamnd/arxiv-cli/pkg/axid"
 	"github.com/tamnd/arxiv-reader/corpus"
 	"github.com/tamnd/arxiv-reader/extract"
+	"github.com/tamnd/arxiv-reader/policy"
 )
 
 // ContentRules are the rules that read a content file.
@@ -118,6 +119,13 @@ type Content struct {
 	// empty meaning all of them.
 	Cap  int
 	Only []string
+	// Policy is which rules each extraction path is expected to satisfy, so the
+	// rules a path cannot answer come back not applicable rather than passed.
+	//
+	// The zero value expects every rule of every path, which is what a caller
+	// that has not read the corpus's policy should get. Nothing here reads a
+	// file, so a rule is still testable against papers in memory.
+	Policy policy.Audit
 	// Log is called once per paper, for progress.
 	Log func(paper string, files int)
 }
@@ -256,6 +264,13 @@ func (c Content) read(id axid.ID) ([]content, error) {
 // paper runs every rule over one paper.
 func (c Content) paper(col *collector, id axid.ID, files []content, hold *pending) error {
 	shard := corpus.Shard(id)
+	// The path this paper was read off, for as long as this paper is the one
+	// being read. Set here and cleared on the way out, because the rules that
+	// run after every paper has been read are about the corpus rather than about
+	// a paper, and the corpus is not on a path.
+	p := paperPath(files)
+	col.expects = func(rule string) bool { return c.Policy.Expects(p, rule) }
+	defer func() { col.expects = nil }()
 	for _, f := range files {
 		at := func(rule string, line int, what string, args ...any) {
 			col.add(Finding{Rule: rule, File: f.path, Shard: shard, Line: line, ID: id.Canonical, What: fmt.Sprintf(what, args...)})

@@ -12,6 +12,7 @@ import (
 	"github.com/tamnd/arxiv-reader/extract"
 	"github.com/tamnd/arxiv-reader/figures"
 	"github.com/tamnd/arxiv-reader/metadata"
+	"github.com/tamnd/arxiv-reader/policy"
 	"github.com/tamnd/arxiv-reader/refs"
 	"github.com/tamnd/arxiv-reader/tags"
 )
@@ -247,9 +248,14 @@ func prose(n int) string {
 }
 
 // audited audits the corpus at root and returns the results by rule id.
+//
+// Under the default policy rather than under the empty one, because the empty
+// policy expects every rule of every path and that is a state no corpus is ever
+// audited in. A test that asserted against it would be asserting against a
+// configuration nobody runs.
 func audited(t *testing.T, root string) map[string]Result {
 	t.Helper()
-	c := Content{Root: root, Cap: 50}
+	c := Content{Root: root, Cap: 50, Policy: policy.Default().Audit}
 	papers, err := c.Papers()
 	if err != nil {
 		t.Fatal(err)

@@ -1026,6 +1026,43 @@ jobs:
             echo "S09 did not fire on a paper of 700 characters off forty pages"
             exit 1
           fi
+      # The other direction. A paper read off a printed page holds what a formula
+      # was printed as and not the formula, so the rules that read TeX have
+      # nothing here to be right or wrong about, and a pass from them would be a
+      # rule everybody believes is working. manifests/selection.yaml is where
+      # that is said, and the audit says n/a with a count rather than a pass.
+      - name: the rules a printed page cannot answer come back not applicable
+        run: |
+          ARXIV_CORPUS=/tmp/native-corpus ax audit -plane content -q | tee /tmp/native-state.txt
+          for rule in M01 M02 M03 M07 M08 M09 M10 M11 M12 M14; do
+            grep -qE "^$rule +n/a +0 +[1-9]" /tmp/native-state.txt || {
+              echo "$rule was asked of a paper that holds no TeX, or was skipped without counting what it skipped"
+              exit 1
+            }
+          done
+          # M05 reads the replacement character a file read with the wrong
+          # encoding brings with it and M13 reads the file's own Markdown, and
+          # this path writes both of those like any other, so they are asked.
+          grep -qE '^M05 +pass +[1-9]' /tmp/native-state.txt
+          grep -qE '^M13 +pass +[1-9]' /tmp/native-state.txt
+          # And no licence rule is ever excused, whatever the path produced,
+          # because a licence rule marked not applicable is a licence breach
+          # with a label on it.
+          if grep -qE '^S[0-9]+ +n/a ' /tmp/native-state.txt; then
+            echo "a licence rule was marked not applicable"
+            exit 1
+          fi
+      - name: a policy file naming a fifth path is refused
+        run: |
+          rm -rf /tmp/native-policy && cp -r /tmp/native-corpus /tmp/native-policy
+          mkdir -p /tmp/native-policy/manifests
+          printf 'audit:\n  skip:\n    ocr: [M01]\n' > /tmp/native-policy/manifests/selection.yaml
+          out=$(ARXIV_CORPUS=/tmp/native-policy ax audit -plane content -q 2>&1) && {
+            echo "a path that is not one of the four was accepted"
+            exit 1
+          }
+          echo "$out"
+          echo "$out" | grep -q "not one of the four paths"
       # A PDF with no text layer is a fact about the paper and not a failure of
       # the command, the same way a submission that turned out to be a PDF is on
       # the path above this one, so a batch of a hundred steps over one.

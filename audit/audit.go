@@ -153,6 +153,13 @@ type Result struct {
 	// Checked is how many things the rule looked at, which is what separates a
 	// pass from a rule that quietly had no work.
 	Checked int
+	// Skipped is how many things were not shown to the rule because the path
+	// they were read off is not expected to satisfy it.
+	//
+	// Counted separately from Checked and never added to it. The two together
+	// are what the coverage report divides, and a rule whose Skipped is most of
+	// the corpus is a rule this corpus has stopped applying.
+	Skipped int
 	// Findings is what it found, capped. Held is the number kept and Total is
 	// the number there were.
 	Findings []Finding
@@ -161,14 +168,26 @@ type Result struct {
 
 // State is the rule's state, worked out rather than stored, so it cannot
 // disagree with the findings next to it.
+//
+// Not applicable and not run are both a rule with no checks behind it, and the
+// difference is why. Not run is a rule that had nothing to look at, so an empty
+// corpus or a plane nobody has built. Not applicable is a rule that was shown
+// papers and was not asked about them, because the path they were read off
+// cannot produce the thing the rule is about.
+//
+// A rule that ran over some papers and was skipped over others passes or fails
+// on the ones it ran over. The share it was skipped for is a number the
+// coverage report carries, and it is not a state.
 func (r Result) State() State {
 	switch {
 	case r.Total > 0:
 		return Fail
-	case r.Checked == 0:
-		return NotRun
-	default:
+	case r.Checked > 0:
 		return Pass
+	case r.Skipped > 0:
+		return NotApplicable
+	default:
+		return NotRun
 	}
 }
 
