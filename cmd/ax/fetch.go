@@ -98,7 +98,7 @@ func fetchDownload(route fetch.Route, args []string) error {
 	// fetched nothing writes nothing, so a refused fetch leaves no trace in the
 	// corpus at all.
 	tally, err := fetchEach(ctx, f, route, plane, &manifest, refs, *all, text, fetch.Order{Accept: *accept, Anyway: *anyway})
-	if tally.fetched > 0 {
+	if tally.fetched > 0 || tally.learnt > 0 {
 		if werr := manifest.Save(path); werr != nil {
 			return werr
 		}
@@ -117,6 +117,9 @@ func fetchDownload(route fetch.Route, args []string) error {
 // tally is what a run of fetches came to.
 type tally struct {
 	fetched, cached int
+	// learnt is the entries that gained a fact about their bytes, which is what a
+	// cached run can still change about the manifest.
+	learnt int
 	// absent is the versions arXiv does not serve this route for, which is a
 	// fact about those papers rather than a fault in the run.
 	absent []string
@@ -185,11 +188,20 @@ func fetchEach(ctx context.Context, f *fetch.Fetcher, route fetch.Route, plane m
 				t.fetched++
 			}
 			fmt.Printf("%-22s %-8s %-12s %9d  %s\n", res.Entry.Ref(), res.Outcome, res.Entry.Licence, res.Entry.Bytes, res.Entry.Path)
+			// The two facts the path decision runs on are learnt here for nothing
+			// and written into the manifest, because work/ is gitignored and a fact
+			// printed and thrown away is a fact the next machine has to download the
+			// file again to learn.
+			entry := res.Entry
 			if route == fetch.RouteSource {
-				reportMain(plane.Root, res.Entry.Path)
+				entry.Holds = reportMain(plane.Root, res.Entry.Path)
 			}
 			if text != nil {
-				reportText(ctx, text, plane.Root, res.Entry.Path)
+				entry.Text = reportText(ctx, text, plane.Root, res.Entry.Path)
+			}
+			if entry.Holds != res.Entry.Holds || entry.Text != res.Entry.Text {
+				m.Put(entry)
+				t.learnt++
 			}
 		}
 	}
@@ -203,18 +215,24 @@ func fetchEach(ctx context.Context, f *fetch.Fetcher, route fetch.Route, plane m
 // a hundred papers wants to know which of them are PDF only before they start
 // the extraction rather than after. Nothing here fails the run: a submission
 // this tool cannot read is a paper for another path and not a broken download.
-func reportMain(root, rel string) {
+func reportMain(root, rel string) fetch.Holding {
 	bundle, err := source.Read(filepath.Join(root, filepath.FromSlash(rel)))
+	var pdfOnly *source.PDFOnly
+	if errors.As(err, &pdfOnly) {
+		fmt.Fprintf(os.Stderr, "  %v\n", err)
+		return fetch.HoldsPDF
+	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "  %v\n", err)
-		return
+		return ""
 	}
 	main, err := bundle.Main()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "  %v\n", err)
-		return
+		return fetch.HoldsTeX
 	}
 	fmt.Printf("%-22s %s of %d files\n", "", main, len(bundle.Files))
+	return fetch.HoldsTeX
 }
 
 // reportText says whether the PDF that just arrived has a text layer.
@@ -228,13 +246,17 @@ func reportMain(root, rel string) {
 // Nothing here fails the run. A PDF pdftotext will not open is a fact about that
 // paper, the bytes are on disk either way, and a download that threw itself away
 // over a report would be the wrong trade at fifteen seconds a request.
-func reportText(ctx context.Context, r *pdftext.Reader, root, rel string) {
+func reportText(ctx context.Context, r *pdftext.Reader, root, rel string) fetch.Answer {
 	doc, err := r.Read(ctx, filepath.Join(root, filepath.FromSlash(rel)))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "  %v\n", err)
-		return
+		return ""
 	}
 	fmt.Printf("%-22s %s\n", "", doc.Why())
+	if doc.Born() {
+		return fetch.Yes
+	}
+	return fetch.No
 }
 
 // record reads one paper out of the metadata plane.

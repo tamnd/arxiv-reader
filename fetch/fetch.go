@@ -439,7 +439,10 @@ type request struct {
 	url string
 	// ref is what a failure is reported against, so it reads like 2312.00752v2.
 	ref string
-	cap int64
+	// method is empty for a GET, which is every fetch. The probe in Rendered is
+	// the one caller that sets it, because it wants the status and not the file.
+	method string
+	cap    int64
 	// what names the thing being fetched, for the error an answer that is too
 	// big fails with.
 	what    string
@@ -463,7 +466,11 @@ func (f *Fetcher) do(ctx context.Context, r request) ([]byte, error) {
 	}
 	f.last = time.Now()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	method := r.method
+	if method == "" {
+		method = http.MethodGet
+	}
+	req, err := http.NewRequestWithContext(ctx, method, url, nil)
 	if err != nil {
 		return nil, err
 	}
