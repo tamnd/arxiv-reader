@@ -1885,13 +1885,13 @@ jobs:
         run: |
           ARXIV_CORPUS=/tmp/extract-corpus ax audit -plane content -q | tee /tmp/audit-content.txt
           grep -q "3 files over 1 paper, nothing found" /tmp/audit-content.txt
-          test "$(grep -cE '^[STMFRGX][0-9]+ +pass ' /tmp/audit-content.txt)" = 55
+          test "$(grep -cE '^[STMFRGX][0-9]+ +pass ' /tmp/audit-content.txt)" = 57
           if grep "not run" /tmp/audit-content.txt | grep -qvE '^S0[89] '; then
             echo "a content rule had nothing to look at"
             exit 1
           fi
           test "$(grep -c 'not run' /tmp/audit-content.txt)" = 2
-      # And the same fifty seven rules over nothing at all, which has to read as
+      # And the same fifty nine rules over nothing at all, which has to read as
       # not run rather than as a clean corpus. A green audit over an empty plane
       # is the single easiest way for this project to lie to itself.
       - name: an empty content plane runs nothing rather than passing everything
@@ -1899,7 +1899,7 @@ jobs:
           rm -rf /tmp/empty-corpus && mkdir -p /tmp/empty-corpus
           ARXIV_CORPUS=/tmp/empty-corpus ax audit -plane content -q | tee /tmp/audit-empty.txt
           grep -q "0 files over 0 papers, nothing to check" /tmp/audit-empty.txt
-          test "$(grep -cE '^[STMFRGX][0-9]+ +not run ' /tmp/audit-empty.txt)" = 57
+          test "$(grep -cE '^[STMFRGX][0-9]+ +not run ' /tmp/audit-empty.txt)" = 59
       # Each rule fired by breaking the one thing it is about. A rule that has
       # only ever been watched passing is a rule nobody has tested.
       - name: a content file that is wrong fails the rule that is about it
