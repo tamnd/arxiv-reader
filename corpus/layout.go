@@ -178,6 +178,33 @@ func ConvertedPath(root string, id axid.ID, version int) string {
 	return path.Join(ConvertedDir(root, id, version), "paper.html")
 }
 
+// PagesDir is where the pictures of one submission's pages go.
+//
+// Under work rather than under the corpus proper, because a picture of a page is
+// not part of the corpus. It is scaffolding the vision path needs while it reads,
+// it is a megabyte a page at six hundred dots, and a paper whose reading has been
+// accepted can have its pictures deleted without the corpus losing anything it
+// publishes.
+//
+// Kept rather than written to a temporary directory, though, and that is the
+// point of giving it a home. A page that came back badly is asked again at a
+// higher resolution, a run that stopped halfway through is started again, and both
+// of those are free when the pictures from last time are still on the disk.
+func PagesDir(root string, id axid.ID, version int) string {
+	return path.Join(root, "work", "pages", Shard(id), fmt.Sprintf("%sv%d", PathID(id), version))
+}
+
+// VisionDir is where one submission's readings and the record of them go.
+//
+// The readings are one Markdown file per page and the record is what was asked of
+// which model with which prompt. Beside the pictures rather than in with them
+// because the two have different lifetimes: the pictures are worth deleting once
+// the reading is accepted, and the reading is the only evidence of how the paper
+// came to say what it says.
+func VisionDir(root string, id axid.ID, version int) string {
+	return path.Join(root, "work", "vision", Shard(id), fmt.Sprintf("%sv%d", PathID(id), version))
+}
+
 // SourcesPath is the manifest recording where every fetched byte came from.
 func SourcesPath(root string) string {
 	return path.Join(root, "manifests", "sources.yaml")

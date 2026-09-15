@@ -20,7 +20,7 @@ import (
 
 func runExtract(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: ax extract <render|source|native> -n <id>v<n> [...]")
+		return errors.New("usage: ax extract <render|source|native|vision> -n <id>v<n> [...]")
 	}
 	switch args[0] {
 	case "render":
@@ -29,8 +29,10 @@ func runExtract(args []string) error {
 		return extractSource(args[1:])
 	case "native":
 		return extractNative(args[1:])
+	case "vision":
+		return extractVision(args[1:])
 	default:
-		return fmt.Errorf("unknown extract subcommand %q, and the paths are render, source and native", args[0])
+		return fmt.Errorf("unknown extract subcommand %q, and the paths are render, source, native and vision", args[0])
 	}
 }
 
@@ -98,7 +100,14 @@ func extractRender(args []string) error {
 }
 
 // writePaper runs the gate, builds the front matter and puts the files down.
-func writePaper(plane metadata.Plane, id axid.ID, p *extract.Paper, entry fetch.Source, lang string, force bool) error {
+//
+// The marks are for what a path knows about itself and the shared front matter
+// cannot work out. Three of the four paths have nothing to add, because the route
+// the bytes were fetched by is the path that read them. The vision path is the
+// exception: it reads the PDF the native path reads, so the route says native, and
+// what actually produced the text is a model and a prompt that only that command
+// can name.
+func writePaper(plane metadata.Plane, id axid.ID, p *extract.Paper, entry fetch.Source, lang string, force bool, marks ...func(*extract.Front)) error {
 	rec, err := record(plane, id)
 	if err != nil {
 		return err
@@ -106,6 +115,9 @@ func writePaper(plane metadata.Plane, id axid.ID, p *extract.Paper, entry fetch.
 	front, err := frontMatter(rec, id, p, entry, lang)
 	if err != nil {
 		return err
+	}
+	for _, mark := range marks {
+		mark(&front)
 	}
 	pics, err := decided(plane.Root, id, p.Version)
 	if err != nil {

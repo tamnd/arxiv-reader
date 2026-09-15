@@ -275,11 +275,23 @@ func (s span) String() string {
 
 // add widens a span to hold a chunk.
 func (s span) add(c chunk) span {
-	if s.first == 0 || c.first < s.first {
-		s.first = c.first
+	return s.widen(span{first: c.first, last: c.last})
+}
+
+// widen is the smallest span holding both of these.
+//
+// A zero span is nothing read yet rather than page zero, so widening by one is
+// the other one. That is what lets a caller start with a zero value and feed it
+// pages in whatever order they arrive.
+func (s span) widen(o span) span {
+	if o.first == 0 && o.last == 0 {
+		return s
 	}
-	if c.last > s.last {
-		s.last = c.last
+	if s.first == 0 || o.first < s.first {
+		s.first = o.first
+	}
+	if o.last > s.last {
+		s.last = o.last
 	}
 	return s
 }
@@ -1014,7 +1026,7 @@ func build(p *Paper, chunks []chunk) {
 					p.Bibliography[n-1].Blocks = append(p.Bibliography[n-1].Blocks, l.text)
 					continue
 				}
-				p.Bibliography = append(p.Bibliography, bibitem(n+1, l.text))
+				p.Bibliography = append(p.Bibliography, bibitem("native", n+1, l.text))
 			}
 			continue
 		}
@@ -1368,7 +1380,7 @@ func blockOf(c chunk, text string) Block {
 	return Block{Kind: KindParagraph, Text: unmarked(text)}
 }
 
-// escaped puts a backslash in front of a first character Markdown would read as
+// unmarked puts a backslash in front of a first character Markdown would read as
 // the start of a block.
 //
 // The paths above this one hand the writer Markdown, because they read a
@@ -1471,8 +1483,13 @@ func operator(r rune) bool {
 // Parsed no further than the number the paper printed in front of it. What the
 // rest of the line means depends on the style the author used, and ax refs build
 // is what reads it, exactly as it does for the two paths above this one.
-func bibitem(n int, text string) Bibitem {
-	b := Bibitem{ID: fmt.Sprintf("native.bib%d", n)}
+//
+// The prefix is the path that read it, which goes into the identifier because the
+// two paths that read a printed page share this function and an entry that called
+// itself native in a paper read off pictures would be an entry saying a thing that
+// is not so.
+func bibitem(prefix string, n int, text string) Bibitem {
+	b := Bibitem{ID: fmt.Sprintf("%s.bib%d", prefix, n)}
 	if m := bibLabel.FindStringSubmatch(text); m != nil {
 		b.Label = "[" + m[1] + "]"
 		b.Blocks = []string{m[2]}

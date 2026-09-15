@@ -8,7 +8,7 @@ It is not called `arxiv` because [tamnd/arxiv-cli](https://github.com/tamnd/arxi
 
 ## Status
 
-M5, which is the first thousand papers in English, and the part of it that is written is the native path: the PDF fetch, `pdftotext`, and the structure recovered from the shape of a printed page.
+M5, which is the first thousand papers in English, and the parts of it that are written are the native path and the vision path: the PDF fetch, `pdftotext`, the structure recovered from the shape of a printed page, and the page images a model reads when there is no text on the page to read.
 M4 before it was the source path: the papers arXiv never rendered, which is everything announced before December 2023.
 M3 before it was one paper end to end down the render path, and the seed paper is Mamba.
 M2 before that was the licence census: counting what the corpus is permitted to do with what it holds.
@@ -432,6 +432,105 @@ It is the only statement inside a PDF about which version of a paper the file ho
 
 Which `pdftotext` is on the PATH changes what comes out, since poppler lays a page out differently between releases, so the version is printed on every run and `-pdftotext` names another one.
 There is no poppler on the CI runner, so what runs there is a script that behaves the way `pdftotext` behaves, the same arrangement `latexml` and `latex` already have.
+
+`ax extract vision` is the fourth path and the last one.
+A paper gets here when arXiv never rendered it, its submission is not TeX this project can convert, and its PDF has no text layer worth reading, which is a scan or a PDF whose glyphs carry no characters.
+Most of those are from the 1990s, and before this path existed they were simply missing.
+The LIGO paper above is the milder version of the same problem: it has a text layer, and 80 characters of that layer are what a broken font map prints instead of an operator.
+
+The reader is a program and not a client library.
+
+```
+$ ax extract vision -reader ~/bin/read-page -model claude-opus-5 1802.00001v1
+```
+
+It is run once per page with the picture as its only argument, the prompt on standard input and the model in `AX_VISION_MODEL`, and whatever it writes to standard output is the reading of that page.
+That is three lines of shell for anybody who wants to point this at another service, it keeps every credential out of this repository, and it means the half of the path that costs money is a file a person can read before spending any.
+It is also the reason CI exercises this path at all: what runs there is a script that writes back a page of Markdown, which is the arrangement `pdftotext`, `latexml` and `latex` already have.
+There is no default reader, because a path that spends money on every page should make somebody write down what it is spending it on.
+
+Then the ladder, which is 300, 400 and 600 dots an inch.
+300 is what text wants, 400 is for a paper set in small type, and 600 is for a photocopy of a photocopy.
+Above 600 the picture stops getting better and only gets bigger.
+A page is drawn at 300 and read, and it is only drawn again at the next rung if the acceptance rules refused what came back, so the common case pays for one picture and one reading.
+
+Those rules are the whole of the trust in this path, and they are deliberately not part of the audit's seven groups: the audit reads a corpus, and these decide whether text is allowed into one.
+V01 is an empty reading, V02 is a model talking about the page instead of reading it, V03 is a line that came back four times or more, V04 is the prompt read back, V05 is a page identical to the page before it, V06 is more than 12000 characters, V07 is a reading that is 2 per cent replacement or unprintable characters, and V08 is an unclosed fence, display or environment.
+V06's ceiling is audit rule S08's ceiling, and there is a test that says so, because a reading accepted here becomes a file the audit then reads and two different numbers would mean this path admits pages the corpus fails on.
+V09 is the only one that compares the reading against the page rather than against itself: it takes twenty consecutive words of the PDF's own thin text layer and refuses the reading when none of their content words appears anywhere in it.
+It took two attempts to write, because a first version that asked for any word in common fires on every page of English ever printed, on `the` and `of` alone.
+
+A page that every rung refused is a page nothing read, and the paper is then not written at all.
+
+```
+$ ax extract vision -reader ~/bin/read-page -model claude-opus-5 1802.00001v1
+page 7 at 300 dots: V01: nothing came back for this page
+page 7 at 400 dots: V01: nothing came back for this page
+page 7 at 600 dots: V01: nothing came back for this page
+1802.00001v1: page 7 could not be read at 300,400,600, so the paper is short of those pages and is not being written
+```
+
+A corpus with a paper missing from it is honest and a corpus with a paragraph nobody printed in it is not, so there is no option that publishes the paper with a note where the page should be.
+`-anyway` keeps a refused page, which is what a genuinely blank page needs, since V01 cannot tell a blank page from a reader that failed quietly, and the record keeps both the refusal and the decision to override it.
+
+What the run did is written next to the readings, in `work/vision/<shard>/<id>v<n>/read.yaml`.
+
+```
+# What one vision run read, page by page, and what the rules said about it.
+paper: "1710.05832"
+version: 1
+model: demo-stub
+prompt_sha256: 13d548c649a3e319054ca1f230d40cda8b9f2add69f612b6649ef24043116282
+painter: pdftoppm version 26.09.0
+pages:
+    - page: 1
+      dpi: 300
+      file: p001.md
+      sha256: 13afb02ba44df75492f537f1882b1dab50f853ad8d380aeda4b7238130e7f234
+      chars: 7599
+      tried:
+        - 300
+      read: 2026-09-15T05:18:39Z
+```
+
+That file is what makes the path resumable, and it is saved after every page rather than at the end, because a run interrupted on page thirty of forty has to leave thirty pages behind that the next run does not pay for again.
+A reading is reused when the model is the same, the hash of the prompt is the same, and the file still hashes to what the entry says.
+Change the model or the prompt and the paper is read again, since a reading made under different instructions is a different reading even when it looks the same.
+
+```
+$ ax extract vision -reader /tmp/stub-reader -model demo-stub 1710.05832v1
+  pages    18, 18 read now, 0 already read
+  asks     18
+  painter  pdftoppm version 26.09.0
+  took     27s
+$ ax extract vision -reader /tmp/stub-reader -model demo-stub 1710.05832v1
+  pages    18, 0 read now, 18 already read
+  took     0s
+```
+
+That is the GW170817 paper again, eighteen pages, and the reader there is the stub: it hands back the paper's own text layer for each page.
+So the pictures, the ladder, the rules, the record and the 27 seconds are real and the structure is not, because a stub that returns flat text has no headings in it for the Markdown reader to find.
+The two counts are separate on purpose: pages are pages and asks are what the model was asked, which differ as soon as one page needs a second rung, and it is the asks that were paid for.
+
+`-recheck` puts the rules to the readings already on disk and wakes no model up.
+
+```
+$ ax extract vision -recheck 1710.05832v1
+page 4 has been edited since it was read, so the record no longer speaks for it
+page 4: V06: the reading holds 13328 characters, which is more than a printed page can hold
+1710.05832v1: page 4 no longer passes the rules, so the paper as it stands is short of those pages
+```
+
+Everything the rules ask about is text that is already there, so a new rule is written, this is run over every paper already read, and what comes out is the list of pages the new rule objects to.
+That costs nothing, which is the point: a rule that is expensive to try out is a rule nobody adds.
+
+Two fields in the front matter exist only for this path.
+`extraction_model` is the model that read the pages and `prompt_sha256` is the hash of the instructions it read them under, and both are in every file the path produced rather than in a log somewhere.
+A page read by a model nobody can name under a prompt nobody kept is a page nobody can read again.
+`path: vision` says the reading was made by looking, while the `route` in the sources manifest still says `native`, because this path reads the same PDF the native path reads.
+
+The pictures are working state and they are large: eighteen pages at 300 dots an inch is 37 MB, which is about two megabytes a page and several times the PDF.
+They live under `work/pages/` next to the readings, they are never published, and they are kept rather than deleted so that a page can be looked at again without drawing it again.
 
 Figures have their own gate, because a `cc-by` article licenses what the authors own and not the plot they reprinted from somebody else's paper with permission.
 There is no metadata for that and there never will be, so `ax figures` reads the signals that are actually in the source.
