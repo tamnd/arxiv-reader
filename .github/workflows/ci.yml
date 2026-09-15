@@ -1427,6 +1427,165 @@ jobs:
           out=$(ARXIV_CORPUS=/tmp/vision-corpus ax extract vision -n -dpi none -reader /tmp/stub-reader -model stub-model-1 -pdftotext /tmp/stub-thin-layer -pdftoppm /tmp/stub-pdftoppm 2501.00001v3 2>&1 || true)
           echo "$out"
           echo "$out" | grep -q "is not a resolution"
+      # The selection manifest, which is the answer to why a paper is in the
+      # content plane at all. Three million papers cannot be extracted and should
+      # not be, so the plane is a selection, and the selection is a committed file
+      # with a reason on every row rather than whatever list somebody ran the
+      # extractor over.
+      #
+      # Three records with three licences, because the licence gate is asked here
+      # and not later: the seed is licence first and subject second, and this is
+      # the step where that is either enforced or abandoned.
+      - name: a paper is chosen and the reason is recorded beside it
+        run: |
+          mkdir -p /tmp/select-corpus/metadata
+          cat > /tmp/select-corpus/metadata/2501.jsonl <<'JSONL'
+          {"id":"2501.00001","title":"A Paper About Nothing","abstract":"We say nothing.","authors":[{"surname":"First","forename":"Ada"}],"categories":["cs.LG"],"versions":[{"version":3,"created":"2025-02-02T00:00:00Z","licence":"cc-by","licence_from":"abs"}],"source":"oai","harvested":"2026-09-14"}
+          {"id":"2501.00002","title":"A Paper Under The Default Licence","abstract":"We say nothing either.","authors":[{"surname":"Second","forename":"Bo"}],"categories":["cs.LG"],"versions":[{"version":1,"created":"2025-02-02T00:00:00Z","licence":"arxiv-1.0","licence_from":"abs"}],"source":"oai","harvested":"2026-09-14"}
+          {"id":"2501.00003","title":"A Paper Nobody Has Looked At","abstract":"Nor us.","authors":[{"surname":"Third","forename":"Cy"}],"categories":["cs.LG"],"versions":[{"version":1,"created":"2025-02-02T00:00:00Z"}],"source":"oai","harvested":"2026-09-14"}
+          JSONL
+          ARXIV_CORPUS=/tmp/select-corpus ax select add -reason requested -issue 214 -by tamnd 2501.00001v3 | tee /tmp/select.txt
+          grep -q "2501.00001v3  requested  tamnd asked for it in issue 214" /tmp/select.txt
+          m=/tmp/select-corpus/manifests/selected.yaml
+          grep -q "# Every paper in the content plane" $m
+          grep -q "reason: requested" $m
+          grep -q "issue: 214" $m
+          grep -q "by: tamnd" $m
+          grep -q "status: selected" $m
+      # The licence first rule, at the moment it is decided. A paper the corpus may
+      # publish nothing of but its record cannot be in the content plane, and a
+      # paper nobody has resolved a licence for is a separate refusal: empty is not
+      # unknown, and choosing on the strength of a field nobody filled in is how a
+      # corpus republishes something it may not.
+      - name: the licence gate refuses a paper before it can be chosen
+        run: |
+          out=$(ARXIV_CORPUS=/tmp/select-corpus ax select add -reason seed 2501.00002v1 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "may publish its record and nothing else"
+          out=$(ARXIV_CORPUS=/tmp/select-corpus ax select add -reason seed 2501.00003v1 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "ax licence resolve"
+          if grep -q "2501.0000[23]" /tmp/select-corpus/manifests/selected.yaml; then
+            echo "a paper the licence gate refused is in the selection anyway"
+            exit 1
+          fi
+      # A reason on its own is a word. cited-by-corpus with no count could be two
+      # papers, and two is not the reason, so each reason has to carry the evidence
+      # that makes it checkable.
+      - name: a reason without its evidence is refused
+        run: |
+          out=$(ARXIV_CORPUS=/tmp/select-corpus ax select add -reason cited-by-corpus -cited 2 2501.00001v3 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "the reason is not true under 3"
+          out=$(ARXIV_CORPUS=/tmp/select-corpus ax select add -reason category-canon -category cs.LG 2501.00001v3 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "says neither category nor rank"
+          out=$(ARXIV_CORPUS=/tmp/select-corpus ax select add -reason requested -issue 214 2501.00001v3 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "needs both an issue and a name"
+          # And the six are the six.
+          out=$(ARXIV_CORPUS=/tmp/select-corpus ax select add -reason because-i-like-it 2501.00001v3 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "is not one of the six reasons"
+          ARXIV_CORPUS=/tmp/select-corpus ax select reasons | tee /tmp/select-reasons.txt
+          test "$(grep -c . /tmp/select-reasons.txt)" -ge 6
+          grep -q "cited-by-corpus" /tmp/select-reasons.txt
+          grep -q "Six reasons and no seventh" /tmp/select-reasons.txt
+      # The sentence behind the word, which is what a person asking why this paper
+      # is in the corpus actually wants.
+      - name: a chosen paper explains itself with its own numbers
+        run: |
+          ARXIV_CORPUS=/tmp/select-corpus ax select add -reason cited-by-corpus -cited 7 -score 0.91 -languages en,vi 2501.00001v3
+          ARXIV_CORPUS=/tmp/select-corpus ax select explain 2501.00001 | tee /tmp/select-explain.txt
+          grep -q "because     cited by 7 papers already in the content plane" /tmp/select-explain.txt
+          grep -q "means       cited by at least 3 papers already in the content plane" /tmp/select-explain.txt
+          grep -q "score       0.91" /tmp/select-explain.txt
+          grep -q "languages   en, vi" /tmp/select-explain.txt
+          # One entry per paper and not one per version, because the content plane
+          # holds the one version the licence gate decided may be published.
+          test "$(grep -c 'id:' /tmp/select-corpus/manifests/selected.yaml)" = 1
+          out=$(ARXIV_CORPUS=/tmp/select-corpus ax select explain 2501.00099 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "is not in the content plane"
+      - name: the selection counts every reason including the empty ones
+        run: |
+          ARXIV_CORPUS=/tmp/select-corpus ax select list | tee /tmp/select-list.txt
+          grep -q "2501.00001v3  cited-by-corpus  selected  cited by 7 papers" /tmp/select-list.txt
+          # A reason nothing is under is a fact about the selection and not an
+          # absence, so it is printed at zero rather than left out.
+          grep -q "^seed *0$" /tmp/select-list.txt
+          grep -q "^collection *0$" /tmp/select-list.txt
+          grep -q "1 paper in the content plane: 1 selected" /tmp/select-list.txt
+          ARXIV_CORPUS=/tmp/select-corpus ax select list -reason seed | tee /tmp/select-none.txt
+          grep -q "and 0 shown" /tmp/select-none.txt
+      # The status is a rung and not a flag, so a paper cannot be translated and not
+      # extracted, and asking for everything extracted includes everything further
+      # on.
+      - name: how far a paper has got is a rung and it does not go backwards
+        run: |
+          ARXIV_CORPUS=/tmp/select-corpus ax select status extracted 2501.00001 | tee /tmp/select-status.txt
+          grep -q "2501.00001v3  extracted, which was selected" /tmp/select-status.txt
+          ARXIV_CORPUS=/tmp/select-corpus ax select list -at-least fetched | grep -q "2501.00001v3"
+          out=$(ARXIV_CORPUS=/tmp/select-corpus ax select status fetched 2501.00001 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "pass -back if it is being read again"
+          ARXIV_CORPUS=/tmp/select-corpus ax select status -back fetched 2501.00001 | grep -q "which was extracted"
+          out=$(ARXIV_CORPUS=/tmp/select-corpus ax select status halfway 2501.00001 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "is not a status"
+      # Dropping a paper is not a takedown. A takedown deletes what was published
+      # and leaves a tombstone, and it belongs to the licence gate. This is for a
+      # paper that was chosen and should not have been.
+      - name: a paper can be dropped until there are files that need it
+        run: |
+          ARXIV_CORPUS=/tmp/select-corpus ax select status extracted 2501.00001
+          out=$(ARXIV_CORPUS=/tmp/select-corpus ax select drop 2501.00001 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "files for it are in the corpus"
+          ARXIV_CORPUS=/tmp/select-corpus ax select status -back selected 2501.00001
+          ARXIV_CORPUS=/tmp/select-corpus ax select drop 2501.00001 | grep -q "dropped, which was cited-by-corpus"
+          ARXIV_CORPUS=/tmp/select-corpus ax select list -q | grep -q "0 paper"
+      # The file says do not edit by hand, and this is what backs that up.
+      - name: an entry typed in by hand with no evidence stops the next read
+        run: |
+          rm -rf /tmp/select-edited && mkdir -p /tmp/select-edited/manifests
+          cp -r /tmp/select-corpus/metadata /tmp/select-edited/metadata
+          cat > /tmp/select-edited/manifests/selected.yaml <<'YAML'
+          selected:
+            - id: 2501.00001
+              version: 3
+              reason: requested
+              status: selected
+          YAML
+          out=$(ARXIV_CORPUS=/tmp/select-edited ax select list 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "needs both an issue and a name"
+          echo "$out" | grep -q "selected.yaml"
+      - name: select refuses the arguments it should refuse
+        run: |
+          if ax select; then
+            echo "select with no subcommand was allowed"
+            exit 1
+          fi
+          out=$(ax select invent 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "unknown select subcommand"
+          # The content plane holds one version of a paper, so choosing a paper
+          # without saying which version is choosing nothing in particular.
+          out=$(ARXIV_CORPUS=/tmp/select-corpus ax select add -reason seed 2501.00001 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "names no version"
+          out=$(ARXIV_CORPUS=/tmp/select-corpus ax select add -reason seed 2501.09999v1 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "is not in the plane"
+          # The two halves that are not written yet say so rather than succeeding
+          # quietly.
+          out=$(ax select seed 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "needs a person to edit it"
+          out=$(ax select suggest 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "citation closure"
       # The fixtures are four real files and a drawing. Rule F06 is what
       # separates a corpus from a mirror of copyrighted PDFs and rule F09 is
       # what keeps somebody else's figure out of a repository that claims to be

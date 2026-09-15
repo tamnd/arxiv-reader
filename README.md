@@ -8,7 +8,7 @@ It is not called `arxiv` because [tamnd/arxiv-cli](https://github.com/tamnd/arxi
 
 ## Status
 
-M5, which is the first thousand papers in English, and the parts of it that are written are the native path and the vision path: the PDF fetch, `pdftotext`, the structure recovered from the shape of a printed page, and the page images a model reads when there is no text on the page to read.
+M5, which is the first thousand papers in English, and the parts of it that are written are the native path, the vision path and the selection: the PDF fetch, `pdftotext`, the structure recovered from the shape of a printed page, the page images a model reads when there is no text on the page to read, and the file that says which papers are in the content plane and why.
 M4 before it was the source path: the papers arXiv never rendered, which is everything announced before December 2023.
 M3 before it was one paper end to end down the render path, and the seed paper is Mamba.
 M2 before that was the licence census: counting what the corpus is permitted to do with what it holds.
@@ -171,6 +171,82 @@ What fixes it is path selection deciding that a paper whose e-print is already a
 Choosing the sample papers for this path meant reading licences first, and what that reading found is worth writing down.
 Of eight famous machine learning preprints checked in September 2026, being Attention Is All You Need, ResNet, GANs, VAEs, GPT-3, ViT, BERT and DDPM, all eight are under arXiv's own nonexclusive licence, so this corpus may hold their metadata, their structure and their tags and none of their text.
 The famous papers that are CC-BY are elsewhere, and the NumPy paper and the two LIGO detections are three of them.
+
+That reading is the first half of the selection, and `ax select` is where it gets written down.
+
+```
+$ ax select add -reason cited-by-corpus -cited 7 -languages en,vi 2006.10256v1
+2006.10256v1  cited-by-corpus  cited by 7 papers already in the content plane
+$ ax select explain 2006.10256
+2006.10256v1
+  reason      cited-by-corpus
+  because     cited by 7 papers already in the content plane
+  means       cited by at least 3 papers already in the content plane
+  added       2026-09-15
+  status      selected
+  languages   en, vi
+```
+
+The metadata plane covers all of arXiv and the content plane never will, so the content plane is a selection, and the selection is the most consequential judgement in the project.
+It decides what gets read, translated and published, and what stays a record.
+That is why it is a committed file with a reason on every row rather than whatever list somebody happened to run the extractor over.
+
+There are six reasons and no seventh.
+A paper is on the hand written seed list, or at least three papers already in the corpus cite it, or it cites at least three of them, or it is near the top of its primary category for its year by citation count, or somebody asked for it in an issue, or it is a member of a named reading list.
+A paper nobody can put under one of the six is a paper somebody wants for a reason they have not written down, and there is no row for that.
+
+The reason on its own is a word, so each one has to carry the evidence that makes it checkable.
+`cited-by-corpus` with no count could be two papers, `requested` with no issue could be anybody, and `category-canon` with no rank could be the nine hundredth paper in its field.
+So the closure reasons are refused under three, which is the floor and not the threshold anybody runs, `category-canon` needs both a category and a rank, `requested` needs both an issue and a name so that somebody owns the request, and `collection` needs the list it is a member of.
+The same check runs on the way in and on the way out, which is what backs up the line at the top of the file saying not to edit it by hand.
+
+```
+$ ax select add -reason requested -issue 214 2006.10256v1
+ax: selection: 2006.10256v1 is requested and needs both an issue and a name, so that somebody owns the request
+```
+
+The licence gate is asked here and not later.
+A paper under arXiv's own licence cannot be in the content plane at all, because the corpus may publish its record and nothing else, and selecting it would be choosing a paper nothing can ever be written for.
+A paper nobody has resolved a licence for is refused separately, and the two refusals are different on purpose: an empty licence means nobody has looked, an unknown licence means somebody looked and arXiv did not say, and choosing on the strength of a field nobody filled in is how a corpus republishes something it may not.
+
+```
+$ ax select add -reason seed 1706.03762v7
+ax: 1706.03762v7 is arxiv-1.0, so the corpus may publish its record and nothing else, and a paper like that cannot be in the content plane
+```
+
+How far a paper has got is a rung and not a set of flags.
+The stages are `selected`, `fetched`, `extracted`, `tagged`, `translated` and `published`, they are strictly ordered, and recording the rung means a paper cannot claim to be translated and not extracted.
+It also means asking for everything extracted includes everything that got further, which is the question a batch run actually asks.
+A status that goes backwards is refused unless `-back` says so, because a paper does not become unextracted by accident.
+
+One entry per paper and not one per version, because the content plane holds the one version the licence gate decided may be published.
+Choosing a second version replaces that decision rather than making two of them, and the date the entry was first added is kept when a row is rewritten to correct a rank.
+
+```
+$ ax select list
+1710.05832v1  seed             extracted  on the hand written seed list, which is licence first and subject second
+2006.10256v1  cited-by-corpus  extracted  cited by 7 papers already in the content plane
+
+seed             1
+cited-by-corpus  1
+cites-corpus     0
+category-canon   0
+requested        0
+collection       0
+
+2 papers in the content plane: 2 extracted
+```
+
+Every reason is in that count, including the ones with nothing under them, because a reason that never fires is a fact about the selection and not an absence.
+The counts are over the whole file and not over whatever `-reason`, `-status` or `-at-least` kept, since the count of what a filter kept is a number the caller already has.
+
+`ax select drop` takes a paper out, and it is not a takedown.
+A takedown is somebody exercising a right over a paper that was published, it deletes the files and leaves a tombstone, and it belongs to the licence gate.
+This is for a paper that was chosen and should not have been, so it refuses a paper that has reached `extracted`: there are files for it in the corpus, and taking the row out would leave them with nothing saying why they are there.
+
+Two halves of this are not written yet and say so rather than succeeding quietly.
+`ax select seed` proposing a list off the licence census needs a person to edit what it proposes, and `ax select suggest` is the citation closure over `manifests/refs`, so it arrives with the reference work.
+The other half of this milestone item is `ax path decide` filling in which of the four paths each selected paper goes down, and the two refusals above are most of what that decision already knows.
 
 Once a rendering is on disk, `ax extract` reads it.
 
@@ -1169,7 +1245,7 @@ The **metadata plane** covers every paper on arXiv, which is about 3.17 million 
 It is JSONL, one file per month, and it needs no licence gate because arXiv publishes its metadata under CC0.
 
 The **content plane** is the papers whose licence permits republishing, extracted into Markdown with the mathematics, figures, tables and bibliographies kept intact.
-It is a small fraction of the first plane and it always will be.
+It is a small fraction of the first plane and it always will be, so which papers are in it is a decision, and `manifests/selected.yaml` is that decision with a reason on every row.
 
 ## The four extraction paths
 
