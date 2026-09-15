@@ -65,7 +65,7 @@ func Decide(caption string, im Image) Decision {
 		return d.Withhold("F02", Owned, fmt.Sprintf("it is %d by %d pixels, which is under the %d a figure has to be on both sides", im.Width, im.Height, MinSide))
 	}
 	if im.Bytes > SizeCap {
-		return d.Withhold("F03", Owned, fmt.Sprintf("it is %s, which is over the %s cap", prose.Bytes(im.Bytes), prose.Bytes(SizeCap)))
+		return d.Withhold("F03", Owned, fmt.Sprintf("it is %s, which is over the %s cap", prose.Bytes(int64(im.Bytes)), prose.Bytes(SizeCap)))
 	}
 	return d
 }

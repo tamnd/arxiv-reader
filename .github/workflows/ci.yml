@@ -2183,6 +2183,96 @@ jobs:
           # And the file it names is still the file the audit reads, so the one
           # rule that is spelled right is off and the rest are back on.
           grep -q "| native | 2 | 66.7% | 58 | 98.3% | M01 |" /tmp/cover-typo/reports/coverage.md
+      # The spec splits the content plane by year once a checkout goes over
+      # 20 GB or a clone goes over fifteen minutes, whichever comes first. This
+      # is the part of that plan that exists before the split does, and the
+      # fixture is written out with truncate so that every number below is one
+      # somebody can add up by hand rather than one taken on trust.
+      - name: the checkout is weighed plane by plane against the split trigger
+        run: |
+          rm -rf /tmp/size-corpus
+          mkdir -p /tmp/size-corpus/content/en/2106/2106.09685 /tmp/size-corpus/content/en/1706/1706.03762
+          mkdir -p /tmp/size-corpus/figures/2106/2106.09685 /tmp/size-corpus/metadata /tmp/size-corpus/manifests
+          truncate -s 4000 /tmp/size-corpus/content/en/2106/2106.09685/00-front.md
+          truncate -s 6000 /tmp/size-corpus/content/en/2106/2106.09685/01-introduction.md
+          truncate -s 2000 /tmp/size-corpus/content/en/1706/1706.03762/00-front.md
+          truncate -s 8000 /tmp/size-corpus/figures/2106/2106.09685/fig-01.png
+          truncate -s 1048576 /tmp/size-corpus/metadata/2106.jsonl
+          truncate -s 500 /tmp/size-corpus/manifests/selected.yaml
+          ARXIV_CORPUS=/tmp/size-corpus ax size | tee /tmp/size.txt
+          # 4000 and 6000 and 2000 is 12000, which is 12 KB in three files.
+          grep -qE '^content +12 KB +1\.1% +3 files$' /tmp/size.txt
+          grep -qE '^metadata +1\.0 MB +98\.1% +1 file$' /tmp/size.txt
+          grep -qE '^checkout +1\.0 MB +0\.0% +of the 20\.00 GB trigger$' /tmp/size.txt
+          grep -q "The checkout is the nearer half at 0.0% of the trigger, and neither half has been reached." /tmp/size.txt
+          # A plane with no files in it is not a row of noughts.
+          if grep -qE '^(graph|refs|tags|tables) ' /tmp/size.txt; then
+            echo "a plane with nothing in it got a row"
+            exit 1
+          fi
+      - name: the years are the shards rolled up, largest first
+        run: |
+          grep -qE '^2021 +10 KB +1 paper$' /tmp/size.txt
+          grep -qE '^2017 +2 KB +1 paper$' /tmp/size.txt
+          grep -q "Splitting 2021 off first would take 10 KB out of the checkout, leaving 1.0 MB." /tmp/size.txt
+          # 20500 bytes over two papers is 10250, and the metadata plane is the
+          # same size whatever is selected so it is not charged to either of
+          # them. Charging it would say a paper costs 534 KB rather than 10.
+          grep -q "2 papers in the content plane at 10 KB each" /tmp/size.txt
+          grep -q "leaves out the 1.0 MB of metadata and reports" /tmp/size.txt
+      - name: a translation is another copy of a year and not another paper
+        run: |
+          mkdir -p /tmp/size-corpus/content/vi/2106/2106.09685
+          truncate -s 5000 /tmp/size-corpus/content/vi/2106/2106.09685/00-front.md
+          ARXIV_CORPUS=/tmp/size-corpus ax size | tee /tmp/size-vi.txt
+          grep -qE '^2021 +15 KB +1 paper$' /tmp/size-vi.txt
+          grep -q "2 papers in the content plane" /tmp/size-vi.txt
+      # work/ holds arXiv's own bytes and is gitignored, and .git is what a
+      # clone transfers rather than what a checkout holds. Counting either into
+      # the checkout would put the split years too early.
+      - name: the working files and the history are not part of the checkout
+        run: |
+          mkdir -p /tmp/size-corpus/work/2106/2106.09685 /tmp/size-corpus/.git/objects/pack
+          truncate -s 20000000 /tmp/size-corpus/work/2106/2106.09685/paper.pdf
+          truncate -s 30000000 /tmp/size-corpus/.git/objects/pack/pack-1.pack
+          truncate -s 5000000 /tmp/size-corpus/.git/index
+          ARXIV_CORPUS=/tmp/size-corpus ax size | tee /tmp/size-git.txt
+          grep -qE '^checkout +1\.0 MB ' /tmp/size-git.txt
+          grep -qE '^objects +28\.6 MB +what a clone transfers$' /tmp/size-git.txt
+          grep -qE '^clone +3s +0\.3% +of the 15m0s trigger at 10\.0 MB a second$' /tmp/size-git.txt
+      # The sparse file is the only way to reach the trigger in a smoke job. It
+      # costs no disk and WalkDir reports the size it claims, which is the size
+      # a checkout of it would occupy.
+      - name: a corpus over the trigger says so and fails under -hard
+        run: |
+          rm -rf /tmp/size-big && mkdir -p /tmp/size-big/content/en/2106/2106.09685
+          truncate -s 21474836481 /tmp/size-big/content/en/2106/2106.09685/00-front.md
+          ARXIV_CORPUS=/tmp/size-big ax size | tee /tmp/size-big.txt
+          grep -q "The checkout has reached the trigger, so the content plane splits by year now." /tmp/size-big.txt
+          grep -q "0 more fit before the checkout trigger" /tmp/size-big.txt
+          if grep -q "nearer half" /tmp/size-big.txt; then
+            echo "a corpus that has reached the trigger should not be reporting how near it is"
+            exit 1
+          fi
+          out=$(ARXIV_CORPUS=/tmp/size-big ax size -hard 2>&1 >/dev/null || true)
+          echo "$out"
+          echo "$out" | grep -q "the checkout has reached the split trigger"
+          echo "$out" | grep -q "splits the content plane by year into tamnd/arxiv-20NN"
+          if ARXIV_CORPUS=/tmp/size-big ax size -hard >/dev/null 2>&1; then
+            echo "a corpus over the trigger passed -hard"
+            exit 1
+          fi
+          # And the same flag over a corpus that is nowhere near it exits clean.
+          ARXIV_CORPUS=/tmp/size-corpus ax size -hard >/dev/null
+      - name: size refuses the arguments it should refuse
+        run: |
+          out=$(ARXIV_CORPUS=/tmp/size-corpus ax size 2501.00001 2>&1 || true)
+          echo "$out" | grep -q "usage: ax size"
+          # A directory that is not a corpus is somebody running this in the
+          # wrong window, and it is a corpus of nothing rather than an error.
+          out=$(ARXIV_CORPUS=/tmp/size-nowhere ax size)
+          echo "$out" | grep -q "no plane of this corpus has a file in it"
+          echo "$out" | grep -q "there is no cost per paper to project from yet"
       # The fixtures are four real files and a drawing. Rule F06 is what
       # separates a corpus from a mirror of copyrighted PDFs and rule F09 is
       # what keeps somebody else's figure out of a repository that claims to be

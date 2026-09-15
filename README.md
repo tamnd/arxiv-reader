@@ -1512,6 +1512,53 @@ There is a fourth section that is usually absent.
 A rule the policy file names that this project does not have is a typo, and a typo there is silent by construction: it excuses nothing, so nothing changes, and the rule somebody meant to excuse goes on firing over the path they wanted it off.
 `ax report coverage -n` prints the terminal table and writes nothing.
 
+The other thing worth counting at a thousand papers is the room left.
+The content plane will outgrow one repository, and the spec settles that in advance rather than in a hurry: the trigger is a checkout over 20 GB or a `git clone` over fifteen minutes, whichever comes first, and at that point the content plane splits by year into `tamnd/arxiv-20NN` while the metadata, the manifests, the tags, the graph and the reports stay where they are.
+`ax size` is the half of that plan that can exist before the split does.
+
+```
+$ ax size
+corpus  /Users/apple/github/tamnd/arxiv
+
+figures    996 KB     79.8%  14 files
+content    132 KB     10.6%  12 files
+manifests  91 KB      7.3%   10 files
+tables     20 KB      1.6%   30 files
+reports    6 KB       0.5%   2 files
+tags       2 KB       0.2%   2 files
+metadata   420 bytes  0.0%   1 file
+
+checkout   1.2 MB     0.0%   of the 20.00 GB trigger
+objects    292 KB            what a clone transfers
+clone      0s         0.0%   of the 15m0s trigger at 10.0 MB a second
+
+The checkout is the nearer half at 0.0% of the trigger, and neither half has been reached.
+
+2023  132 KB  1 paper
+
+Splitting 2023 off first would take 132 KB out of the checkout, leaving 1.1 MB.
+
+1 paper in the content plane at 1.2 MB each, so about 16,885 more fit before the checkout trigger.
+The 1.2 MB each is the 1.2 MB that grows with the selection and leaves out the 7 KB of metadata and reports, which is the same size whatever is selected.
+It is the cost of the papers selected so far and not a forecast, since older papers are shorter and every language of a paper is another copy of it.
+```
+
+It walks the disk rather than asking git, because the question is what is there now and not what was committed, and a corpus half way through a run has files git has never seen that take up the same room.
+`work/` is left out, since it holds arXiv's own bytes, is gitignored, and a fresh checkout does not carry it.
+`.git/objects` is counted apart from the checkout rather than added to it, because a clone transfers the pack and then builds the working tree, so the two numbers are the two halves of the trigger and not one number counted twice.
+The clone time is a stated rate and not a measurement, for the plain reason that the clone that matters is somebody else's on a connection nobody here can test.
+Ten megabytes a second is an ordinary home connection and it is a named constant so the number can be argued with rather than believed.
+
+The cost per paper leaves the metadata plane and the reports out of the division.
+Both are in the checkout and both are counted against the trigger, and neither grows with the selection: the metadata plane holds every paper arXiv has whether it was selected or not, so it is the same size for a corpus of ten papers and a corpus of ten thousand.
+Charging it to the papers would say each of the ten cost a gigabyte and would put the trigger a thousand times too near.
+
+The years table is the split itself, laid out in the order it would happen in, so the last line says what the first move would actually buy.
+A paper is counted once per year however many languages hold it, because a split moves a year and takes every translation of that year with it, while the bytes are every language added up.
+
+`ax size -hard` exits non-zero once either half of the trigger has been reached, which is what makes this a watch rather than a printout.
+Nothing here writes a report file, because a committed report of the checkout size changes the checkout size and would never settle.
+
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
 
