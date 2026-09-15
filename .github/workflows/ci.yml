@@ -1786,6 +1786,189 @@ jobs:
           out=$(ARXIV_CORPUS=/tmp/path-corpus ax path decide -pdftotext /tmp/stub-typeset 2501.09999v1 2>&1 || true)
           echo "$out"
           echo "$out" | grep -q "is not in the selection, so run ax select add first"
+      # The batch driver. Everything it does can be done a paper at a time by
+      # hand, and what it adds is the thing a run of a thousand papers needs,
+      # which is a resume that costs only the work nobody has done: the rung each
+      # paper reached is in the selection, the bytes each paper needed are in the
+      # fetch manifest, and between them there is nothing left to remember.
+      #
+      # No network here either, so every paper below is already fetched and the
+      # run spends no requests. The stub reader and the stub converter are the
+      # ones the steps above built.
+      - name: three chosen papers, one for each thing a run can do with one
+        run: |
+          mkdir -p /tmp/run-corpus/metadata /tmp/run-corpus/manifests
+          mkdir -p /tmp/run-corpus/work/html/2501 /tmp/run-corpus/work/source/2501 /tmp/run-corpus/work/pdf/2501
+          cat > /tmp/run-corpus/metadata/2501.jsonl <<'JSONL'
+          {"id":"2501.00001","title":"A Paper About Nothing","abstract":"We say nothing.","authors":[{"surname":"First","forename":"Ada"},{"surname":"Second","forename":"Bo"}],"categories":["cs.LG"],"versions":[{"version":3,"created":"2025-02-02T00:00:00Z","licence":"cc-by","licence_from":"abs"}],"source":"oai","harvested":"2026-09-14"}
+          {"id":"2501.00002","title":"A Paper Nobody Has Decided A Path For","abstract":"x","authors":[{"surname":"Second","forename":"Bo"}],"categories":["cs.LG"],"versions":[{"version":1,"created":"2025-02-02T00:00:00Z","licence":"cc-by","licence_from":"abs"}],"source":"oai","harvested":"2026-09-14"}
+          {"id":"2501.00003","title":"A Paper Submitted As A Scan","abstract":"x","authors":[{"surname":"Third","forename":"Cy"}],"categories":["cs.LG"],"versions":[{"version":1,"created":"2025-02-02T00:00:00Z","licence":"cc-by","licence_from":"abs"}],"source":"oai","harvested":"2026-09-14"}
+          JSONL
+          cp extract/testdata/rendering.html /tmp/run-corpus/work/html/2501/2501.00001v3.html
+          printf '%%PDF-1.5\n' | gzip -c > /tmp/run-corpus/work/source/2501/2501.00003v1.gz
+          printf '%%PDF-1.5\n' > /tmp/run-corpus/work/pdf/2501/2501.00003v1.pdf
+          echo "sources:" > /tmp/run-corpus/manifests/sources.yaml
+          entry() {
+            sum=$(sha256sum /tmp/run-corpus/$4 | cut -d' ' -f1)
+            size=$(wc -c < /tmp/run-corpus/$4 | tr -d ' ')
+            cat >> /tmp/run-corpus/manifests/sources.yaml <<YAML
+            - id: "$1"
+              version: $2
+              route: $3
+              url: https://arxiv.org/$5/$1v$2
+              path: $4
+              sha256: $sum
+              bytes: $size
+              fetched: 2026-09-14T00:00:00Z
+              licence: cc-by
+              licence_from: abs
+          YAML
+          }
+          entry 2501.00001 3 render work/html/2501/2501.00001v3.html html
+          entry 2501.00003 1 source work/source/2501/2501.00003v1.gz e-print
+          entry 2501.00003 1 native work/pdf/2501/2501.00003v1.pdf pdf
+          ARXIV_CORPUS=/tmp/run-corpus ax select add -reason seed -by tamnd 2501.00001v3 2501.00002v1 2501.00003v1
+          # One paper on the render path, one on the vision path, and one nobody has
+          # decided, which is the third thing a run has to have an answer for.
+          ARXIV_CORPUS=/tmp/run-corpus ax path decide -pdftotext /tmp/stub-blank 2501.00001v3 2501.00003v1
+          ARXIV_CORPUS=/tmp/run-corpus ax path list -q | tee /tmp/run-paths.txt
+          grep -q "render *1" /tmp/run-paths.txt
+          grep -q "vision *1" /tmp/run-paths.txt
+          grep -q "undecided *1" /tmp/run-paths.txt
+          # Kept aside before anything has run, for the step about the limit below.
+          rm -rf /tmp/run-limit && cp -r /tmp/run-corpus /tmp/run-limit
+      # A dry run first, because a batch that is about to spend hours should be
+      # askable about what it will do, and then the same run for real.
+      - name: a chosen paper is taken from its reason to its content files
+        run: |
+          ARXIV_CORPUS=/tmp/run-corpus ax run -n 2501.00001v3 2>&1 | tee /tmp/run-dry.txt
+          grep -q "2501.00001v3  render  read it on the render path" /tmp/run-dry.txt
+          grep -q "1, 1 with something to do, 0 already at extracted" /tmp/run-dry.txt
+          grep -q "nothing written, because this was a dry run" /tmp/run-dry.txt
+          if [ -e /tmp/run-corpus/content ]; then
+            echo "a dry run wrote into the content plane"
+            exit 1
+          fi
+          ARXIV_CORPUS=/tmp/run-corpus ax run 2501.00001v3 2>&1 | tee /tmp/run-one.txt
+          # The rendering was fetched by the step that built the corpus, so this run
+          # says so rather than claiming a request it never made.
+          grep -q "2501.00001v3  render  the rendering was already here, extracted" /tmp/run-one.txt
+          grep -q "1, 1 moved, 0 already at extracted, 0 nothing can move yet, 0 failed" /tmp/run-one.txt
+          if grep -q "requests" /tmp/run-one.txt; then
+            echo "a run over a paper that was already fetched spent a request"
+            exit 1
+          fi
+          test -f /tmp/run-corpus/content/en/2501/2501.00001/01_introduction.md
+          grep -q "^      status: extracted$" /tmp/run-corpus/manifests/selected.yaml
+      # The rung is in the selection and nowhere else, so this is the whole of what
+      # makes a resume cheap. A second run reads it and does nothing.
+      - name: a second run over the same paper costs nothing and says so
+        run: |
+          cp /tmp/run-corpus/manifests/selected.yaml /tmp/run-before.yaml
+          ARXIV_CORPUS=/tmp/run-corpus ax run 2501.00001v3 2>&1 | tee /tmp/run-twice.txt
+          grep -q "1, 0 moved, 1 already at extracted" /tmp/run-twice.txt
+          diff /tmp/run-before.yaml /tmp/run-corpus/manifests/selected.yaml
+      - name: a run told to go further assigns the tags as well
+        run: |
+          ARXIV_CORPUS=/tmp/run-corpus ax run -to tagged 2501.00001v3 2>&1 | tee /tmp/run-tagged.txt
+          grep -q "14 tags on 2501.00001" /tmp/run-tagged.txt
+          grep -q "2501.00001v3  render  tagged" /tmp/run-tagged.txt
+          grep -q "^      status: tagged$" /tmp/run-corpus/manifests/selected.yaml
+          test -f /tmp/run-corpus/tags/2501/2501.00001.tags
+      # The two papers a batch will not decide for itself. One needs a path, and
+      # the other needs somebody to say they meant to spend a model call a page.
+      # Both are held rather than skipped, and the run exits non-zero, because a
+      # thousand papers held quietly is a corpus that stopped growing and nobody
+      # noticed.
+      - name: a paper with no path and a paper on the path that costs money are left alone
+        run: |
+          out=$(ARXIV_CORPUS=/tmp/run-corpus ax run 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "2501.00002v1: nothing has decided how this paper gets read, so run ax path decide"
+          echo "$out" | grep -q "2501.00003v1: the vision path reads every page with a model, so name the reader"
+          echo "$out" | grep -q "3, 0 moved, 1 already at extracted, 2 nothing can move yet, 0 failed"
+          echo "$out" | grep -q "2 papers cannot move yet"
+          if ARXIV_CORPUS=/tmp/run-corpus ax run >/dev/null 2>&1; then
+            echo "a run that could not move two of its three papers came back as a success"
+            exit 1
+          fi
+          if [ -e /tmp/run-corpus/content/en/2501/2501.00003 ]; then
+            echo "the path that costs money was started without a reader being named"
+            exit 1
+          fi
+      # A first run somebody is watching, and the reason the selection is written
+      # per paper rather than at the end. The paper it got through keeps its rung
+      # and the papers it did not reach are untouched.
+      - name: a limit stops the run where it was told and keeps what it got through
+        run: |
+          out=$(ARXIV_CORPUS=/tmp/run-limit ax run -limit 1 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "stopping at 1 paper, because that is the limit this run was given"
+          echo "$out" | grep -q "3, 1 moved, 0 already at extracted"
+          grep -q "^      status: extracted$" /tmp/run-limit/manifests/selected.yaml
+          test "$(grep -c '^      status: selected$' /tmp/run-limit/manifests/selected.yaml)" = 2
+          if [ -e /tmp/run-limit/content/en/2501/2501.00002 ]; then
+            echo "a run that stopped at its limit read a paper past it"
+            exit 1
+          fi
+      # The one thing about a path that cannot be known until the reading, and so
+      # the one thing a batch decides on its own. A rendering the reject rule will
+      # not accept is not a paper that failed, it is a paper on the source path,
+      # and the run moves it there and reads it before it finishes.
+      - name: a rendering the reject rule refuses puts the paper on the source path
+        run: |
+          mkdir -p /tmp/run-demote/metadata /tmp/run-demote/manifests /tmp/run-demote/work/html/2501 /tmp/run-demote/work/source/2501
+          cp /tmp/run-corpus/metadata/2501.jsonl /tmp/run-demote/metadata/2501.jsonl
+          cp extract/testdata/faulty.html /tmp/run-demote/work/html/2501/2501.00001v3.html
+          cp /tmp/source-corpus/work/source/2501/2501.00001v3.gz /tmp/run-demote/work/source/2501/2501.00001v3.gz
+          echo "sources:" > /tmp/run-demote/manifests/sources.yaml
+          entry() {
+            sum=$(sha256sum /tmp/run-demote/$4 | cut -d' ' -f1)
+            size=$(wc -c < /tmp/run-demote/$4 | tr -d ' ')
+            cat >> /tmp/run-demote/manifests/sources.yaml <<YAML
+            - id: "$1"
+              version: $2
+              route: $3
+              url: https://arxiv.org/$5/$1v$2
+              path: $4
+              sha256: $sum
+              bytes: $size
+              fetched: 2026-09-14T00:00:00Z
+              licence: cc-by
+              licence_from: abs
+          YAML
+          }
+          entry 2501.00001 3 render work/html/2501/2501.00001v3.html html
+          entry 2501.00001 3 source work/source/2501/2501.00001v3.gz e-print
+          ARXIV_CORPUS=/tmp/run-demote ax select add -reason seed -by tamnd 2501.00001v3
+          ARXIV_CORPUS=/tmp/run-demote ax path decide 2501.00001v3 | grep -q "2501.00001v3  render"
+          ARXIV_CORPUS=/tmp/run-demote ax run -latexmlc /tmp/stub-latexmlc -latexmlpost /tmp/stub-latexmlpost 2>&1 | tee /tmp/run-demoted.txt
+          grep -q "the rendering was rejected, so this paper is on the source path now" /tmp/run-demoted.txt
+          grep -q "2501.00001v3  source  extracted" /tmp/run-demoted.txt
+          grep -q "demoted *1, from the render path to the source path" /tmp/run-demoted.txt
+          grep -q "1, 1 moved, 0 already at extracted, 0 nothing can move yet, 0 failed" /tmp/run-demoted.txt
+          # Written down, because the next run over this paper should compile the TeX
+          # and not read the rendering again.
+          grep -q "^      path: source$" /tmp/run-demote/manifests/selected.yaml
+          grep -q "path_why: the rendering holds errors the reject rule will not accept" /tmp/run-demote/manifests/selected.yaml
+          grep -q "^path: source" /tmp/run-demote/content/en/2501/2501.00001/01_introduction.md
+      - name: run refuses the arguments it should refuse
+        run: |
+          out=$(ARXIV_CORPUS=/tmp/run-corpus ax run -to translated 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "nothing here translates or publishes yet"
+          out=$(ARXIV_CORPUS=/tmp/run-corpus ax run -pace 1s 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "faster than the fifteen seconds arXiv asks for"
+          out=$(ARXIV_CORPUS=/tmp/run-corpus ax run -path ocr 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "is not one of the four paths"
+          out=$(ARXIV_CORPUS=/tmp/run-corpus ax run 2501.09999v1 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "is not in the selection, so run ax select add first"
+          # A month with nothing chosen in it is not an error, and saying so is
+          # better than a summary of zeroes.
+          ARXIV_CORPUS=/tmp/run-corpus ax run -shard 1234 2>&1 | grep -q "nothing in the selection matches this run"
       # The fixtures are four real files and a drawing. Rule F06 is what
       # separates a corpus from a mirror of copyrighted PDFs and rule F09 is
       # what keeps somebody else's figure out of a repository that claims to be

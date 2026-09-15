@@ -42,6 +42,7 @@ var commands = []command{
 	{"select", "choose what enters the content plane, and say why", "M5", runSelect},
 	{"path", "decide which of the four paths a selected paper goes down", "M5", runPath},
 	{"extract", "render, source, native or vision, to tagged Markdown", "M3", runExtract},
+	{"run", "take the selection down its paths, a rung at a time", "M5", runRun},
 	{"figures", "the figure gate, and then crop, convert and size cap", "M3", runFigures},
 	{"tables", "keep every table twice, as Markdown and as LaTeX", "M3", runTables},
 	{"refs", "parse a bibliography and resolve it into the corpus", "M3", runRefs},
