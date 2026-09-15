@@ -31,11 +31,21 @@ func runAudit(args []string) error {
 	report := fs.String("report", "", "write the markdown report here as well")
 	limit := fs.Int("cap", 50, "findings to list per rule, the rest counted")
 	quiet := fs.Bool("q", false, "no per month progress")
+	medians := fs.Bool("baselines", false, "recompute manifests/baselines.yaml instead of running the rules")
+	dry := fs.Bool("n", false, "with -baselines, print the medians and write nothing")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if len(fs.Args()) != 0 {
 		return fmt.Errorf("ax audit takes no arguments, so drop %s", fs.Args()[0])
+	}
+	// The baselines are what the soft thresholds are read from and computing
+	// them is not a rule, so it is this command's other job rather than another
+	// command: it reads the same plane, with the same flags, over the same
+	// papers, and a rule that wants a median is asking about the corpus the
+	// audit just walked.
+	if *medians {
+		return runBaselines(*lang, *shard, *dry, *quiet)
 	}
 	if *limit < 1 {
 		return errors.New("-cap has to be at least 1")

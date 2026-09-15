@@ -2932,6 +2932,84 @@ jobs:
           copy && sed -i 's/^version: v3$/version: v9/' $intro && fails S07
           copy && sed -i 's/^licence_from: abs$/licence_from: kaggle/' $intro && fails S10
           copy && sed -i 's/^licence: CC-BY-4.0$/licence: CC-BY-SA-4.0/' $intro && fails S12
+      # The medians the soft thresholds are read from. Four papers against a
+      # floor of thirty, so what is being tested here is the arithmetic and the
+      # three states a cell can be in, and every number in the table is still in
+      # brackets when it is over.
+      - name: the medians are taken over a paper's own category
+        run: |
+          rm -rf /tmp/median-corpus && cp -r /tmp/extract-corpus /tmp/median-corpus
+          rm -rf /tmp/median-corpus/.git
+          dir=/tmp/median-corpus/content/en/2501
+          copy() {
+            cp -r $dir/2501.00001 $dir/$1
+            sed -i "s/^paper: 2501.00001$/paper: $1/" $dir/$1/*.md
+            printf '{"id":"%s","title":"A copy of the fixture","abstract":"A copy of the fixture, in another category.","authors":[{"surname":"First","forenames":"Ada"}],"categories":["%s"],"versions":[{"version":3,"created":"2025-02-02T00:00:00Z","licence":"cc-by","licence_from":"abs"}],"source":"oai","harvested":"2026-01-01"}\n' "$1" "$2" >> /tmp/median-corpus/metadata/2501.jsonl
+          }
+          copy 2501.00002 math.AG
+          copy 2501.00003 math.AG
+          copy 2501.00004 math.AG
+          # Three more displays in one of the three math papers, which is the
+          # review paper that a mean and a standard deviation would have let
+          # loosen the threshold for the other two.
+          printf '\n$$\nx = y\n$$\n\n$$\nx = z\n$$\n\n$$\nx = w\n$$\n' >> $dir/2501.00004/02_results.md
+          # And a paper the plane has never heard of, which is group S's
+          # finding rather than this command's.
+          cp -r $dir/2501.00001 $dir/2501.00009
+          sed -i "s/^paper: 2501.00001$/paper: 2501.00009/" $dir/2501.00009/*.md
+          ARXIV_CORPUS=/tmp/median-corpus ax audit -baselines -n -q 2>/tmp/medians-say.txt | tee /tmp/medians.txt
+          cat /tmp/medians-say.txt
+          grep -qE '^cs\.LG +1 ' /tmp/medians.txt
+          grep -qE '^math\.AG +3 ' /tmp/medians.txt
+          # The one paper with three more displays did not move the median of
+          # its category off the value the other two share, which is the whole
+          # reason the spread is a median absolute deviation.
+          one=$(awk '$1 == "cs.LG" { print $3 }' /tmp/medians.txt)
+          three=$(awk '$1 == "math.AG" { print $3 }' /tmp/medians.txt)
+          test -n "$one"
+          test "$one" = "$three"
+          # Every number is in brackets, because four papers is nowhere near
+          # the floor and a number that is not a baseline has to read as one.
+          test "$(grep -c '(' /tmp/medians.txt)" = 2
+          grep -q "baselines   0, which is the categories with 30 papers or more" /tmp/medians-say.txt
+          # None of the copies has a bibliography, and no bibliography is not a
+          # resolution rate of nought.
+          grep -qE '^math\.AG +3 +\([0-9.]+\) +none$' /tmp/medians.txt
+          grep -q "2501.00009: the metadata plane has no record of this paper" /tmp/medians-say.txt
+          grep -q "papers      4 over 2 categories" /tmp/medians-say.txt
+          test ! -f /tmp/median-corpus/manifests/baselines.yaml
+      - name: a run that is not a dry run writes the medians down
+        run: |
+          ARXIV_CORPUS=/tmp/median-corpus ax audit -baselines -q 2>/tmp/medians-written.txt
+          grep -q "written to manifests/baselines.yaml" /tmp/medians-written.txt
+          file=/tmp/median-corpus/manifests/baselines.yaml
+          # The floor the file was built under is written into it, because a
+          # file read by a later version of this tool should be judged by the
+          # rule it was made with and not by one that moved since.
+          grep -q "^floor: 30" $file
+          grep -q "^papers: 4" $file
+          grep -q "category: math.AG" $file
+          grep -q "displays_per_page:" $file
+          # And the category with no bibliography behind it has no line for
+          # that metric at all.
+          test "$(grep -c 'references_resolved:' $file)" = 1
+      - name: the baselines refuse the arguments they should refuse
+        run: |
+          rm -rf /tmp/nobase-corpus && mkdir -p /tmp/nobase-corpus
+          # A baseline is a description of papers, and a corpus with no papers
+          # in it has to say so rather than write a file with nothing in it.
+          if ARXIV_CORPUS=/tmp/nobase-corpus ax audit -baselines; then
+            echo "the baselines were computed over an empty content plane"
+            exit 1
+          fi
+          if ARXIV_CORPUS=/tmp/median-corpus ax audit -baselines -shard 2113; then
+            echo "2113 was allowed"
+            exit 1
+          fi
+          if ARXIV_CORPUS=/tmp/median-corpus ax audit -baselines -shard 2502; then
+            echo "a month with nothing extracted in it was allowed"
+            exit 1
+          fi
       - name: the audit refuses the arguments it should refuse
         run: |
           for c in "audit --plane both" "audit -rules S99" "audit -rules" "audit -cap 0" "audit -shard 2113" "audit meta"; do

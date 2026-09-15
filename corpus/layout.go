@@ -220,6 +220,15 @@ func SelectedPath(root string) string {
 	return path.Join(root, "manifests", "selected.yaml")
 }
 
+// BaselinesPath is the per category medians the soft thresholds are read from.
+//
+// One file for the corpus, like the selection and unlike the figures: it holds
+// one row per primary category, which is a hundred and fifty rows and not one
+// per paper, and every soft rule with a threshold reads all of it.
+func BaselinesPath(root string) string {
+	return path.Join(root, "manifests", "baselines.yaml")
+}
+
 // FiguresPath is the manifest of what was decided about one month's figures.
 //
 // Sharded rather than one file for the corpus, for the same reason the metadata
