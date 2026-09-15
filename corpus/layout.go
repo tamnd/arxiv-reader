@@ -220,6 +220,16 @@ func SelectedPath(root string) string {
 	return path.Join(root, "manifests", "selected.yaml")
 }
 
+// SeedPath is the candidate list the hand written seed is edited down from.
+//
+// A file of its own and not a section of selected.yaml, because it is the only
+// manifest in the corpus that is meant to be edited by hand and then read back.
+// Everything else here is written by a command and read by a command, so an
+// edit to it is a correction; an edit to this one is the point of it.
+func SeedPath(root string) string {
+	return path.Join(root, "manifests", "seed.yaml")
+}
+
 // BaselinesPath is the per category medians the soft thresholds are read from.
 //
 // One file for the corpus, like the selection and unlike the figures: it holds

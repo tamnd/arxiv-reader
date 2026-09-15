@@ -29,8 +29,55 @@ import (
 
 // Manifest is the whole file.
 type Manifest struct {
-	Audit Audit `yaml:"audit"`
+	Audit     Audit     `yaml:"audit"`
+	Selection Selection `yaml:"selection"`
 }
+
+// Selection is the weights the selection queue is ordered by.
+//
+// From 2166-04, which says the score is a weighted sum of the citation count
+// from inside the corpus, the citation count from outside where one is known,
+// the age of the paper, and a penalty for a paper whose extraction path is
+// vision. Its only job is to order a queue that is already filtered by licence,
+// and it decides nothing else.
+//
+// The weights are in this file rather than in the code because a change to them
+// changes what gets read next, and that should arrive as a diff somebody can
+// argue with rather than as a release note.
+type Selection struct {
+	// Inside weights a citation from a paper already in the content plane.
+	//
+	// The heaviest term by a long way, because a paper the corpus already cites
+	// three times is a paper the corpus is already talking about, and that is a
+	// better reason to read something than anything a stranger's ranking says.
+	Inside float64 `yaml:"inside"`
+	// Outside weights a citation from anywhere else, where a count is known.
+	//
+	// No count is known today. The Cornell snapshot does not carry one and
+	// arXiv does not publish one, so this term is nought on every paper until
+	// somebody joins a citation index onto the metadata plane.
+	Outside float64 `yaml:"outside"`
+	// Age weights a year of age, up to AgeCap.
+	//
+	// Positive, because a paper that has been out for a decade has had a decade
+	// to be built on, and capped, because the difference between twenty and
+	// thirty years is not four times the difference between two and four.
+	Age    float64 `yaml:"age"`
+	AgeCap int     `yaml:"age_cap"`
+	// Vision is the penalty for a paper only the vision path can read.
+	//
+	// Negative. A paper nobody can read except by photographing its pages costs
+	// the most of any paper in the corpus and produces the least, so it needs a
+	// better reason than a paper arXiv already renders.
+	Vision float64 `yaml:"vision"`
+}
+
+// Zero reports whether nobody has set any of the weights.
+//
+// Used to tell a file that says nothing about the selection from one that sets
+// every weight to nought, which is a corpus somebody has deliberately made
+// scoreless and is not the same thing.
+func (s Selection) Zero() bool { return s == Selection{} }
 
 // Audit is what the numbered rules are expected to be able to answer.
 //
@@ -87,7 +134,7 @@ func (a Audit) Skipped(p selection.Path) []string {
 // ask whether something is on disk that should not be, and a path that commits
 // no figures answers that with a pass rather than with a shrug.
 func Default() Manifest {
-	return Manifest{Audit: Audit{Skip: map[selection.Path][]string{
+	return Manifest{Selection: DefaultSelection(), Audit: Audit{Skip: map[selection.Path][]string{
 		// A PDF's text layer holds what a formula was printed as and not the
 		// formula, so this path flattens every formula by construction and says
 		// so in path: native. M05 and M13 stay, because the first reads the
@@ -105,6 +152,18 @@ func Default() Manifest {
 			"F10", "F11", "F12",
 		},
 	}}}
+}
+
+// DefaultSelection is the weights a corpus with no file of its own is run by.
+//
+// A citation from inside the corpus is worth ten of the years this project
+// could plausibly wait, which is the ordering 2166-04 asks for: the closure is
+// what makes the corpus a connected thing rather than a list, so a paper the
+// corpus already points at three times outranks anything chosen on age. The
+// vision penalty is set so that a paper only a camera can read needs about two
+// inside citations before it is worth the run.
+func DefaultSelection() Selection {
+	return Selection{Inside: 10, Outside: 0.01, Age: 1, AgeCap: 25, Vision: -20}
 }
 
 // Load reads the policy, falling back to the default.
@@ -127,6 +186,9 @@ func Load(path string) (Manifest, error) {
 	}
 	if m.Audit.Skip == nil {
 		m.Audit = Default().Audit
+	}
+	if m.Selection.Zero() {
+		m.Selection = DefaultSelection()
 	}
 	for p := range m.Audit.Skip {
 		if p != "" && !selection.KnownPath(p) {
@@ -157,4 +219,9 @@ const header = `# What the next run is told to do, rather than what the last one
 # able to answer. The audit marks those not applicable rather than passed, so
 # that a decision to read a lot of papers off printed pages shows up as what it
 # is, which is a decision to stop checking their mathematics.
+#
+# selection holds the weights the queue is ordered by. The score decides nothing
+# except what gets read next, and it is applied to a list the licence gate has
+# already filtered, so no weight in here can put a paper in the corpus that the
+# corpus may not publish.
 `
