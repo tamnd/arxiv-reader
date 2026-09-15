@@ -1004,6 +1004,23 @@ jobs:
           grep -qE '^S08 +pass ' /tmp/native-audit.txt
           grep -qE '^S09 +pass ' /tmp/native-audit.txt
           grep -q "4 files over 1 paper, nothing found" /tmp/native-audit.txt
+          # And both of them fired, because a rule that has only ever been
+          # watched passing is a rule nobody has tested. S08 is a file longer
+          # than the pages it names could hold, so thirteen thousand characters
+          # on one page, and S09 is the same paper spread over forty pages,
+          # which is what a text layer that was a cover sheet comes back as.
+          rm -rf /tmp/native-broken && cp -r /tmp/native-corpus /tmp/native-broken
+          head -c 13000 /dev/zero | tr '\0' 'x' >> /tmp/native-broken/content/en/2501/2501.00001/01_introduction.md
+          if ARXIV_CORPUS=/tmp/native-broken ax audit -plane content -rules S08 -q; then
+            echo "S08 did not fire on a file of 13000 characters off one page"
+            exit 1
+          fi
+          rm -rf /tmp/native-broken && cp -r /tmp/native-corpus /tmp/native-broken
+          sed -i 's/^source_pages: "1"$/source_pages: "1-40"/' /tmp/native-broken/content/en/2501/2501.00001/*.md
+          if ARXIV_CORPUS=/tmp/native-broken ax audit -plane content -rules S09 -q; then
+            echo "S09 did not fire on a paper of 700 characters off forty pages"
+            exit 1
+          fi
       # A PDF with no text layer is a fact about the paper and not a failure of
       # the command, the same way a submission that turned out to be a PDF is on
       # the path above this one, so a batch of a hundred steps over one.
