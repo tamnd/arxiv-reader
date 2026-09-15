@@ -1369,6 +1369,40 @@ Three rules of group R are not here.
 Of group X only `X01` runs, because the other eight read a result, a concept or an artefact record and none of those three things exist yet.
 Every one of them is named in the source with what it needs, because a rule registered before it can run is a rule everybody believes is working.
 
+Those medians are what `ax audit -baselines` computes, and they are the reason a soft rule with a threshold cannot just carry a number.
+A pure mathematics paper has fifteen displays a page and two figures in total, a structural biology paper has two displays and a figure on every page, and one constant over both either fails thousands of ordinary papers or catches nothing.
+So a soft threshold is read from the paper's own primary category, and what the rule reports is the paper's distance from its neighbours rather than its absolute value.
+A hard rule never does this: a hard rule states an invariant of the corpus, and an invariant that moves with the neighbourhood is not one.
+
+```
+$ ax audit -baselines
+category  papers  displays per page  references resolved
+cs.CL     1       (0.00)             (0.00)
+cs.MS     1       (0.00)             (0.00)
+gr-qc     2       (0.00)             none
+math.CO   1       (3.98)             (0.00)
+  papers      5 over 4 categories
+  baselines   0, which is the categories with 30 papers or more
+written to manifests/baselines.yaml
+```
+
+The brackets are the whole point of the command at this size.
+A category needs thirty papers before its numbers count as a baseline, and under that floor the number is written down with its count and marked unusable rather than left out, because how far a category is from having a baseline is the thing somebody reading the file wants to know.
+A median taken over three papers is the middle of three papers, and a rule that compared the fourth against it would be reporting which papers happened to get extracted first.
+The `baselines` line says nought here and will say nought until this corpus is thousands of papers, and saying it every run is how nobody ends up reading a median of three papers as though it described a field.
+
+`none` is a third state and not a nought.
+A paper nobody has run `ax refs` over has no bibliography, so it has no resolution rate, and counting it as nought would drag every category's median towards the papers nothing has read the references of.
+The two gravitational wave papers are the case above: they have bodies to measure and no bibliography yet, so they have a displays figure and no resolution figure at all.
+
+The spread beside each median is the median absolute deviation, scaled by 1.4826 so that it means on a normal distribution what a standard deviation means.
+A mean and a standard deviation would be the obvious pair and they are the wrong one, because one review paper with forty displays a page moves both, and every other paper in the category would then be judged more loosely because of that one.
+A page is three thousand characters of body, which is a convention and not a measurement: a Markdown corpus has no pages, displays per page is the quantity the rule is about, and the same convention for every paper makes the comparison between papers of a category rather than between a paper and a printed page.
+
+The category comes from the metadata plane and never from a content file, and the plane is read once for the whole corpus rather than once per paper.
+A paper the plane has no record of is named on stderr and left out, because that is group S's finding and not this command's, and counting it under an empty category would give the empty category a baseline of its own.
+`ax audit -baselines -n` prints the same table and writes nothing.
+
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
 
