@@ -1104,6 +1104,329 @@ jobs:
           out=$(ARXIV_CORPUS=/tmp/native-corpus ax extract native -n -pdftotext pdftotext-that-is-not-installed 2501.00001v3 2>&1 || true)
           echo "$out"
           echo "$out" | grep -q "install it with brew install poppler or apt install poppler-utils"
+      # There is no poppler on the runner and there is no model anywhere near it,
+      # so this path is exercised with three stubs: a pdftotext that hands back a
+      # thin text layer, a pdftoppm that writes a picture where it was told to,
+      # and a reader that writes back the page it was shown. That is the reason
+      # the reader is a program rather than a client library, and it leaves under
+      # test everything this project wrote: the ladder, the record, the nine
+      # acceptance rules, the Markdown reading and the front matter.
+      #
+      # The pages are two files rather than heredocs inside the stub so that what
+      # a model is supposed to send back is visible, and so that a step that
+      # wants a page read badly can change one of them and nothing else.
+      - name: a paper is read off pictures of its pages with stub programs
+        run: |
+          mkdir -p /tmp/vision-corpus/work/pdf/2501 /tmp/vision-corpus/manifests /tmp/vision-corpus/metadata
+          printf '%%PDF-1.5\n' > /tmp/vision-corpus/work/pdf/2501/2501.00001v3.pdf
+          sum=$(sha256sum /tmp/vision-corpus/work/pdf/2501/2501.00001v3.pdf | cut -d' ' -f1)
+          cat > /tmp/vision-corpus/manifests/sources.yaml <<YAML
+          sources:
+            - id: "2501.00001"
+              version: 3
+              route: native
+              url: https://arxiv.org/pdf/2501.00001v3
+              path: work/pdf/2501/2501.00001v3.pdf
+              sha256: $sum
+              bytes: 9
+              fetched: 2026-09-14T00:00:00Z
+              licence: cc-by
+              licence_from: abs
+          YAML
+          cp /tmp/extract-corpus/metadata/2501.jsonl /tmp/vision-corpus/metadata/2501.jsonl
+          cat > /tmp/vision-page1.md <<'MD'
+          # A Paper About Nothing
+
+          Ada First and Bob Second
+
+          ## Abstract
+
+          This paper is about nothing in particular, and it says so at some length, because an abstract is what the first page of a paper carries and this page carries nothing else worth reading at all.
+
+          # 1 Introduction
+
+          We did nothing at all and we did it carefully, which is the whole of the introduction and wants no more words than these to describe.
+          MD
+          cat > /tmp/vision-page2.md <<'MD'
+          # 2 Method
+
+          The measurement was made twice and came back the same both times, which is what the table records and all that this section has to say about it.
+
+          $$
+          E = mc^2
+          \tag{1}
+          $$
+
+          Table 1. What the run measured, both times over.
+
+          | Run | Measured |
+          | --- | --- |
+          | first | nothing |
+          | second | nothing |
+          MD
+          # The text layer of a paper on this path is thin by definition, and what
+          # is in it here is the margin stamp and one sentence of the page. The
+          # sentence is there because rule V09 is the only rule that compares a
+          # reading against the page rather than against itself, and a layer of
+          # nothing but a stamp would leave it with nothing to ask.
+          cat > /tmp/stub-thin-layer <<'SH'
+          #!/bin/sh
+          case "$1" in -v) echo "a stub reader, and not pdftotext" >&2; exit 99;; esac
+          echo "arXiv:2501.00001v3 [cs.DL] 5 Jan 2026"
+          echo "This paper is about nothing in particular, and it says so at some length, because an abstract is what the first page of a paper carries."
+          printf '\f'
+          echo "arXiv:2501.00001v3 [cs.DL] 5 Jan 2026"
+          echo "The measurement was made twice and came back the same both times, which is what the table records."
+          printf '\f'
+          SH
+          chmod +x /tmp/stub-thin-layer
+          # pdftoppm prints its banner on stderr and exits zero, unlike pdftotext,
+          # and with -singlefile it writes the last argument with the extension put
+          # back on. A stub that honours that is a stub that fails if this project
+          # gets the argument order wrong.
+          cat > /tmp/stub-pdftoppm <<'SH'
+          #!/bin/sh
+          case "$1" in -v) echo "a stub painter, and not pdftoppm" >&2; exit 0;; esac
+          for last; do :; done
+          printf 'PNG' > "$last.png"
+          SH
+          chmod +x /tmp/stub-pdftoppm
+          # The reader writes back the page it was shown, which is what a model
+          # does when it is working. It also checks the three things this project
+          # promises it: the picture as its argument, the prompt on standard input
+          # and the model in the environment.
+          cat > /tmp/stub-reader <<'SH'
+          #!/bin/sh
+          prompt=$(cat)
+          test -n "$prompt" || { echo "no prompt arrived on standard input" >&2; exit 1; }
+          test -n "$AX_VISION_MODEL" || { echo "no model arrived in the environment" >&2; exit 1; }
+          test "$AX_VISION_IMAGE" = "$1" || { echo "the picture in the environment is not the one in the arguments" >&2; exit 1; }
+          page=$(basename "$1" | sed 's/^p0*\([0-9]*\)@.*/\1/')
+          cat /tmp/vision-page$page.md
+          SH
+          chmod +x /tmp/stub-reader
+          ARXIV_CORPUS=/tmp/vision-corpus ax extract vision -n \
+            -reader /tmp/stub-reader -model stub-model-1 \
+            -pdftotext /tmp/stub-thin-layer -pdftoppm /tmp/stub-pdftoppm 2501.00001v3 2>&1 | tee /tmp/vision.txt
+          # Which pdftoppm drew the pictures is recorded on every run, because
+          # poppler renders a page differently between releases and a page that
+          # reads differently after an upgrade needs somewhere to point.
+          grep -q "a stub painter, and not pdftoppm" /tmp/vision.txt
+          grep -q "pages    2, 2 read now, 0 already read" /tmp/vision.txt
+          # Two headings, which are the two the model marked with hashes, and the
+          # title heading is the paper's title rather than a third section.
+          grep -q "headings    2" /tmp/vision.txt
+          grep -q "blocks      1 equation, 3 paragraph, 1 table" /tmp/vision.txt
+          grep -q "abstract    1 block" /tmp/vision.txt
+          # And the pictures are on the disk under the name that says which page
+          # at which resolution, because a directory where the second run
+          # overwrote the first cannot say what the model was shown.
+          test -s /tmp/vision-corpus/work/pages/2501/2501.00001v3/p001@300.png
+          test -s /tmp/vision-corpus/work/pages/2501/2501.00001v3/p002@300.png
+      # The two fields that make this path answerable for what it published. A
+      # page read by a model nobody can name under a prompt nobody kept is a page
+      # nobody can read again, so the model and the hash of the prompt are in the
+      # front matter of every file rather than in a log.
+      - name: a paper read off pictures says which model read it and under which prompt
+        run: |
+          ARXIV_CORPUS=/tmp/vision-corpus ax extract vision \
+            -reader /tmp/stub-reader -model stub-model-1 \
+            -pdftotext /tmp/stub-thin-layer -pdftoppm /tmp/stub-pdftoppm 2501.00001v3 | tee /tmp/vision-write.txt
+          grep -q "3 written, 0 unchanged" /tmp/vision-write.txt
+          dir=/tmp/vision-corpus/content/en/2501/2501.00001
+          # The route the bytes came by is native, because this path reads the PDF
+          # the native path reads. What read them is this path, and a file that
+          # said native would be telling a reader these paragraphs came off a text
+          # layer.
+          grep -q "^path: vision" $dir/01_introduction.md
+          grep -q "^extraction_model: stub-model-1" $dir/01_introduction.md
+          grep -qE '^prompt_sha256: [0-9a-f]{64}$' $dir/01_introduction.md
+          # The title and the authors come from the metadata plane, the same as on
+          # every other path, because a page has a byline on it and no way of
+          # saying which of its lines is one.
+          grep -q "  - Ada First" $dir/01_introduction.md
+          grep -q "^title: A Paper About Nothing" $dir/01_introduction.md
+          # And the same paper read twice writes nothing, which is what says this
+          # path is as idempotent as the three above it.
+          ARXIV_CORPUS=/tmp/vision-corpus ax extract vision \
+            -reader /tmp/stub-reader -model stub-model-1 \
+            -pdftotext /tmp/stub-thin-layer -pdftoppm /tmp/stub-pdftoppm 2501.00001v3 | grep -q "0 written, 3 unchanged"
+      # This path knows exactly which page every section came off, so the two
+      # rules that weigh a file against its printed pages have a real answer here
+      # and not the empty one a rendering gives them.
+      - name: the printed page rules are asked of the paper read off pictures
+        run: |
+          ARXIV_CORPUS=/tmp/vision-corpus ax audit -plane content -rules S08,S09 -q | tee /tmp/vision-audit.txt
+          grep -qE '^S08 +pass ' /tmp/vision-audit.txt
+          grep -qE '^S09 +pass ' /tmp/vision-audit.txt
+          grep -q "3 files over 1 paper, nothing found" /tmp/vision-audit.txt
+          grep -q '^source_pages: "2"$' /tmp/vision-corpus/content/en/2501/2501.00001/02_method.md
+      # The pictures and the readings are kept, and this is what they are kept
+      # for. A run that stopped on page thirty of forty has to leave thirty pages
+      # behind that the next run does not pay for again, and the reader here is
+      # one that fails if it is run at all.
+      - name: a second run over a paper already read asks nothing and draws nothing
+        run: |
+          cat > /tmp/stub-reader-that-must-not-run <<'SH'
+          #!/bin/sh
+          echo "the reader was asked for a page that had already been read" >&2
+          exit 1
+          SH
+          chmod +x /tmp/stub-reader-that-must-not-run
+          ARXIV_CORPUS=/tmp/vision-corpus ax extract vision -n \
+            -reader /tmp/stub-reader-that-must-not-run -model stub-model-1 \
+            -pdftotext /tmp/stub-thin-layer -pdftoppm /tmp/stub-pdftoppm 2501.00001v3 2>&1 | tee /tmp/vision-again.txt
+          grep -q "pages    2, 0 read now, 2 already read" /tmp/vision-again.txt
+          if grep -q "already been read" /tmp/vision-again.txt; then
+            echo "a page that was already read was read again"
+            exit 1
+          fi
+      # A reading made under different instructions is a different reading, even
+      # when it looks the same, so a run under a prompt the record does not know
+      # reads the paper again rather than keeping what is there.
+      - name: a paper read under a different prompt is read again
+        run: |
+          rm -rf /tmp/vision-prompt && cp -r /tmp/vision-corpus /tmp/vision-prompt
+          printf 'Write down what is printed on this page and nothing else at all.\n' > /tmp/vision-prompt.txt
+          ARXIV_CORPUS=/tmp/vision-prompt ax extract vision \
+            -reader /tmp/stub-reader -model stub-model-1 -prompt /tmp/vision-prompt.txt \
+            -pdftotext /tmp/stub-thin-layer -pdftoppm /tmp/stub-pdftoppm 2501.00001v3 2>&1 | tee /tmp/vision-prompt-run.txt
+          grep -q "so it is being read again" /tmp/vision-prompt-run.txt
+          grep -q "pages    2, 2 read now, 0 already read" /tmp/vision-prompt-run.txt
+          # And the paper now says it was read under the other prompt, which is
+          # the whole point of putting the hash in the file.
+          old=$(grep '^prompt_sha256:' /tmp/vision-corpus/content/en/2501/2501.00001/01_introduction.md)
+          new=$(grep '^prompt_sha256:' /tmp/vision-prompt/content/en/2501/2501.00001/01_introduction.md)
+          test "$old" != "$new"
+      # The ladder. A page the rules refused is drawn again at the next
+      # resolution rather than published with a warning next to it, and the record
+      # says which rungs it took.
+      - name: a page the rules refuse is asked again at the next resolution
+        run: |
+          rm -rf /tmp/vision-ladder && cp -r /tmp/vision-corpus /tmp/vision-ladder
+          cat > /tmp/stub-reader-blank-at-300 <<'SH'
+          #!/bin/sh
+          cat > /dev/null
+          case "$1" in *@300.png) exit 0;; esac
+          page=$(basename "$1" | sed 's/^p0*\([0-9]*\)@.*/\1/')
+          cat /tmp/vision-page$page.md
+          SH
+          chmod +x /tmp/stub-reader-blank-at-300
+          ARXIV_CORPUS=/tmp/vision-ladder ax extract vision -n \
+            -reader /tmp/stub-reader-blank-at-300 -model stub-model-2 \
+            -pdftotext /tmp/stub-thin-layer -pdftoppm /tmp/stub-pdftoppm 2501.00001v3 2>&1 | tee /tmp/vision-ladder.txt
+          grep -q "page 1 at 300 dots: V01" /tmp/vision-ladder.txt
+          grep -q "pages    2, 2 read now, 0 already read" /tmp/vision-ladder.txt
+          # Two pages and four asks, because each page was asked twice, and the
+          # asks are the number that was paid for.
+          grep -q "asks     4" /tmp/vision-ladder.txt
+          if grep -q "could not be read" /tmp/vision-ladder.txt; then
+            echo "a page that read cleanly at four hundred dots was given up on"
+            exit 1
+          fi
+          # Both rungs are in the record, because a paper that needed the second
+          # one is a fact about the paper and the reports on this milestone count
+          # them.
+          record=/tmp/vision-ladder/work/vision/2501/2501.00001v3/read.yaml
+          grep -q "dpi: 400" $record
+          grep -q -- "- 300" $record
+          grep -q -- "- 400" $record
+      # A page nothing could read at any resolution is a hole in the paper, and a
+      # corpus with a hole in it is honest while a corpus with an invented
+      # paragraph in it is not. So the paper is not written, and the run says
+      # which page and what was wrong with it.
+      - name: a page nothing can read leaves the paper unpublished and says so
+        run: |
+          rm -rf /tmp/vision-hole && cp -r /tmp/vision-corpus /tmp/vision-hole
+          # The files the good run wrote are taken out of the copy, because what
+          # this step is about is whether this run publishes anything.
+          rm -rf /tmp/vision-hole/content
+          cat > /tmp/stub-reader-loses-page-two <<'SH'
+          #!/bin/sh
+          cat > /dev/null
+          page=$(basename "$1" | sed 's/^p0*\([0-9]*\)@.*/\1/')
+          test "$page" = 2 && exit 0
+          cat /tmp/vision-page$page.md
+          SH
+          chmod +x /tmp/stub-reader-loses-page-two
+          out=$(ARXIV_CORPUS=/tmp/vision-hole ax extract vision \
+            -reader /tmp/stub-reader-loses-page-two -model stub-model-3 \
+            -pdftotext /tmp/stub-thin-layer -pdftoppm /tmp/stub-pdftoppm 2501.00001v3 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "page 2 at 600 dots: V01"
+          echo "$out" | grep -q "page 2 could not be read at 300,400,600"
+          echo "$out" | grep -q "1 of 1 papers have pages nothing could read"
+          if ARXIV_CORPUS=/tmp/vision-hole ax extract vision \
+            -reader /tmp/stub-reader-loses-page-two -model stub-model-3 \
+            -pdftotext /tmp/stub-thin-layer -pdftoppm /tmp/stub-pdftoppm 2501.00001v3; then
+            echo "a paper with a page nothing read was published"
+            exit 1
+          fi
+          # The method section came off page two, so a run that lost that page and
+          # wrote anyway would have published the paper with its method missing.
+          if [ -d /tmp/vision-hole/content ]; then
+            echo "the paper was written even though a page of it was never read"
+            exit 1
+          fi
+          # A blank page is a page rule V01 cannot tell from a failure, so this is
+          # how a person who has looked at it says which it was.
+          out=$(ARXIV_CORPUS=/tmp/vision-hole ax extract vision -anyway \
+            -reader /tmp/stub-reader-loses-page-two -model stub-model-3 \
+            -pdftotext /tmp/stub-thin-layer -pdftoppm /tmp/stub-pdftoppm 2501.00001v3 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "page 2 was kept anyway: V01"
+      # The cheap half of the path, and what makes it safe to add a rule. Every
+      # rule asks about text that is already on the disk, so putting them again to
+      # a paper that has been read costs nothing and wakes no model up.
+      - name: the acceptance rules can be put again to the readings on disk
+        run: |
+          rm -rf /tmp/vision-recheck && cp -r /tmp/vision-corpus /tmp/vision-recheck
+          # No reader and no model, because a person adding a rule should not need
+          # credentials for a service to run it over what is already there.
+          ARXIV_CORPUS=/tmp/vision-recheck ax extract vision -recheck \
+            -pdftotext /tmp/stub-thin-layer 2501.00001v3 2>&1 | tee /tmp/vision-recheck.txt
+          grep -q "pages    2, 0 read now, 0 already read" /tmp/vision-recheck.txt
+          # And a reading somebody edited is noticed rather than trusted, because
+          # the record is the only thing that says a file on disk is what the
+          # model sent back.
+          head -c 13000 /dev/zero | tr '\0' 'x' >> /tmp/vision-recheck/work/vision/2501/2501.00001v3/p001.md
+          out=$(ARXIV_CORPUS=/tmp/vision-recheck ax extract vision -recheck \
+            -pdftotext /tmp/stub-thin-layer 2501.00001v3 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "page 1 has been edited since it was read"
+          echo "$out" | grep -q "page 1: V06"
+          # And a recheck that finds a page the rules now refuse fails, because a
+          # new rule that objects to a paper already in the corpus is something
+          # somebody has to look at.
+          echo "$out" | grep -q "page 1 no longer passes the rules"
+          if ARXIV_CORPUS=/tmp/vision-recheck ax extract vision -recheck -pdftotext /tmp/stub-thin-layer 2501.00001v3; then
+            echo "a recheck that found a page the rules refuse said nothing was wrong"
+            exit 1
+          fi
+      - name: the vision extract refuses the arguments it should refuse
+        run: |
+          if ax extract vision; then
+            echo "an extract with no paper was allowed"
+            exit 1
+          fi
+          # A path that spends money on every page has no default reader, and a
+          # page read by a model the corpus cannot name is a page nobody can read
+          # again.
+          out=$(ARXIV_CORPUS=/tmp/vision-corpus ax extract vision -n -model stub-model-1 -pdftotext /tmp/stub-thin-layer 2501.00001v3 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q -- "-reader"
+          out=$(ARXIV_CORPUS=/tmp/vision-corpus ax extract vision -n -reader /tmp/stub-reader -pdftotext /tmp/stub-thin-layer -pdftoppm /tmp/stub-pdftoppm 2501.00001v3 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q -- "-model"
+          # A PDF is of one version of a paper and there is no such thing as the
+          # PDF of a paper.
+          out=$(ARXIV_CORPUS=/tmp/vision-corpus ax extract vision -n -reader /tmp/stub-reader -model stub-model-1 -pdftotext /tmp/stub-thin-layer -pdftoppm /tmp/stub-pdftoppm 2501.00001 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "names no version"
+          # And a ladder with nothing on it is not a ladder.
+          out=$(ARXIV_CORPUS=/tmp/vision-corpus ax extract vision -n -dpi none -reader /tmp/stub-reader -model stub-model-1 -pdftotext /tmp/stub-thin-layer -pdftoppm /tmp/stub-pdftoppm 2501.00001v3 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "is not a resolution"
       # The fixtures are four real files and a drawing. Rule F06 is what
       # separates a corpus from a mirror of copyrighted PDFs and rule F09 is
       # what keeps somebody else's figure out of a repository that claims to be
