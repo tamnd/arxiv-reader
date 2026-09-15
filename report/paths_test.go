@@ -9,8 +9,8 @@ import (
 	"github.com/tamnd/arxiv-reader/selection"
 )
 
-func entry(id string, p selection.Path, at selection.Status) selection.Entry {
-	return selection.Entry{ID: id, Path: p, Status: at}
+func entry(id string, p selection.Path, at selection.Status, langs ...string) selection.Entry {
+	return selection.Entry{ID: id, Path: p, Status: at, Languages: langs}
 }
 
 func build(es ...selection.Entry) Paths {

@@ -2068,6 +2068,64 @@ jobs:
           out=$(ARXIV_CORPUS=/tmp/report-empty ax report paths 2>&1 || true)
           echo "$out"
           echo "$out" | grep -q "needs a selection"
+          out=$(ARXIV_CORPUS=/tmp/path-corpus ax report coverage 2501.00001 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "takes no arguments"
+          out=$(ARXIV_CORPUS=/tmp/report-empty ax report coverage 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "needs a corpus"
+      # The coverage report is the one that stops the paper count being a number
+      # anybody can move. A corpus can reach a thousand papers with a clean
+      # audit and have got there by asking fewer and fewer questions of them,
+      # and this is what would say so.
+      - name: the coverage report counts the rules each path is still asked
+        run: |
+          ARXIV_CORPUS=/tmp/run-demo ax report coverage 2>/tmp/cover-say.txt | tee /tmp/cover.txt
+          cat /tmp/cover-say.txt
+          grep -q "written to reports/coverage.md" /tmp/cover-say.txt
+          grep -q "46 of 59 rules" /tmp/cover.txt
+          grep -q "13, asked of under 80.0%" /tmp/cover.txt
+          file=/tmp/run-demo/reports/coverage.md
+          grep -q "^| native | 1 | 100.0% | 46 | 78.0% | M01, M02, M03, M07, M08, M09, M10, M11, M12, M14, F10, F11, F12 |$" $file
+          # The papers that have not been extracted are in the language table
+          # and out of the rule denominator, because a rule cannot have been
+          # asked of a paper nothing has read.
+          grep -q "^| en | 1 | 0 | 0 | 5 |$" $file
+          # Each quiet rule carries its own sentence, because a report that
+          # names a rule by number is a report nobody can argue with.
+          grep -q "^| M14 | 1 | 100.0% | native | a paper with mathematics in its prose has mathematics in its markup |$" $file
+          # And the angle brackets in F11's sentence go in escaped, or a browser
+          # reads them as a tag it does not know and shows half the row.
+          grep -q "as &lt;n>.md and as &lt;n>.tex" $file
+          if grep -q "as <n>.md" $file; then
+            echo "a rule sentence went into a committed report as raw markup"
+            exit 1
+          fi
+      - name: a corpus where every rule still applies says so
+        run: |
+          ARXIV_CORPUS=/tmp/run-demote ax report coverage 2>/dev/null | tee /tmp/cover-whole.txt
+          grep -q "59 of 59 rules" /tmp/cover-whole.txt
+          grep -q "0, asked of under 80.0%" /tmp/cover-whole.txt
+          grep -q "None. Every one of the 59 rules is asked of more than 80.0%" /tmp/run-demote/reports/coverage.md
+          grep -q "| source | 1 | 100.0% | 59 | 100.0% | none, every rule is asked |" /tmp/run-demote/reports/coverage.md
+      - name: a corpus nothing has extracted says so rather than dividing by nought
+        run: |
+          ARXIV_CORPUS=/tmp/path-corpus ax report coverage 2>/dev/null | grep -q "0, which is the content plane"
+          grep -q "No paper in the selection has been extracted yet" /tmp/path-corpus/reports/coverage.md
+          grep -q "The content plane is empty" /tmp/path-corpus/reports/coverage.md
+      # A typo in the policy file is silent by construction. It excuses nothing,
+      # so nothing changes, and the rule somebody meant to excuse goes on firing
+      # over the path they wanted it off. This is where that gets said.
+      - name: a rule the policy names and this project does not have is reported
+        run: |
+          rm -rf /tmp/cover-typo && cp -r /tmp/run-demo /tmp/cover-typo
+          printf 'audit:\n  skip:\n    native: [M01, MO5]\n' > /tmp/cover-typo/manifests/selection.yaml
+          ARXIV_CORPUS=/tmp/cover-typo ax report coverage 2>/dev/null | tee /tmp/cover-typo.txt
+          grep -q "MO5, named by the policy and not by this project" /tmp/cover-typo.txt
+          grep -q "Rules the policy names and this project does not have" /tmp/cover-typo/reports/coverage.md
+          # And the file it names is still the file the audit reads, so the one
+          # rule that is spelled right is off and the rest are on.
+          grep -q "| native | 1 | 100.0% | 58 | 98.3% | M01 |" /tmp/cover-typo/reports/coverage.md
       # The fixtures are four real files and a drawing. Rule F06 is what
       # separates a corpus from a mirror of copyrighted PDFs and rule F09 is
       # what keeps somebody else's figure out of a repository that claims to be
