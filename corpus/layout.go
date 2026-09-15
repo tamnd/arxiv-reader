@@ -229,6 +229,16 @@ func BaselinesPath(root string) string {
 	return path.Join(root, "manifests", "baselines.yaml")
 }
 
+// ReportPath is one of the committed reports, named without its extension.
+//
+// Committed, and in the corpus rather than in this repository, because a report
+// is about the corpus and not about the code that wrote it. The diff between
+// last month's file and this month's is the news, so the file has to live where
+// the papers it describes live.
+func ReportPath(root, name string) string {
+	return path.Join(root, "reports", name+".md")
+}
+
 // FiguresPath is the manifest of what was decided about one month's figures.
 //
 // Sharded rather than one file for the corpus, for the same reason the metadata

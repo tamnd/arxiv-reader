@@ -133,10 +133,15 @@ jobs:
             echo "translate exited zero without doing anything"
             exit 1
           fi
-          if ax report coverage; then
-            echo "report exited zero without reporting anything"
+          if ax graph build; then
+            echo "graph exited zero without building anything"
             exit 1
           fi
+          # A command that is written but has only one of its reports so far
+          # says which report it does not have rather than writing an empty one.
+          out=$(ax report coverage 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "with coverage, usage, graph and licence to come"
       # These reach no further than the argument check, which is the point. CI
       # does not talk to arXiv: a job that harvests on every push is a job that
       # gets this project blocked.
@@ -1969,6 +1974,63 @@ jobs:
           # A month with nothing chosen in it is not an error, and saying so is
           # better than a summary of zeroes.
           ARXIV_CORPUS=/tmp/run-corpus ax run -shard 1234 2>&1 | grep -q "nothing in the selection matches this run"
+      # The committed reports. A report is not a log: it says what is true of
+      # the corpus now, it is in the repository, and the diff between last
+      # month's and this month's is the news. The corpora these run over are the
+      # ones the path steps and the run steps above built, because a report
+      # about how the selection divides needs a selection somebody decided.
+      - name: the paths report counts every path and every rung
+        run: |
+          ARXIV_CORPUS=/tmp/path-corpus ax report paths 2>/tmp/report-say.txt | tee /tmp/report-paths.txt
+          cat /tmp/report-say.txt
+          grep -q "written to reports/paths.md" /tmp/report-say.txt
+          grep -qE '^render	1	20.0%' /tmp/report-paths.txt
+          grep -qE '^vision	1	20.0%' /tmp/report-paths.txt
+          grep -qE '^undecided	2	40.0%' /tmp/report-paths.txt
+          grep -q "papers	5" /tmp/report-paths.txt
+          file=/tmp/path-corpus/reports/paths.md
+          grep -q "^| render | 1 | 20.0% |" $file
+          grep -q "^| source | 0 | 0.0% | nowhere yet |" $file
+          # The month table splits the month by path, because the month the
+          # vision column starts growing is the month the budget needs rewriting.
+          grep -q "^| 2501 | 5 | 1 | 0 | 1 | 1 | 2 |$" $file
+          grep -q "No paper in the selection is on the source path because a rendering was rejected." $file
+          # Two papers have no path and neither has a reason recorded, so they
+          # roll up into one line rather than two.
+          grep -q "^| 2 | nothing recorded, which means ax path decide has not been run over this paper |$" $file
+      - name: a demoted paper is the one number a run can change on its own
+        run: |
+          ARXIV_CORPUS=/tmp/run-demote ax report paths 2>/dev/null | tee /tmp/report-demoted.txt
+          grep -q "demoted	1, from the render path to the source path" /tmp/report-demoted.txt
+          grep -q "1 paper on the source path is there because arXiv's rendering held errors" /tmp/run-demote/reports/paths.md
+          # Every paper on this one has a path, so the last section says so
+          # rather than printing an empty table.
+          grep -q "Every paper in the selection has a path." /tmp/run-demote/reports/paths.md
+      - name: a dry run prints the report and writes nothing
+        run: |
+          rm -rf /tmp/report-dry && cp -r /tmp/path-corpus /tmp/report-dry
+          rm -rf /tmp/report-dry/reports
+          ARXIV_CORPUS=/tmp/report-dry ax report paths -n 2>&1 | grep -q "nothing written, because this was a dry run"
+          test ! -d /tmp/report-dry/reports
+      - name: report refuses the arguments it should refuse
+        run: |
+          if ax report; then
+            echo "report with no subcommand was allowed"
+            exit 1
+          fi
+          out=$(ax report usage 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "unknown report"
+          out=$(ARXIV_CORPUS=/tmp/path-corpus ax report paths 2501.00001 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "takes no arguments"
+          # A report about how the selection divides needs a selection, and a
+          # corpus with nothing chosen in it has to say so rather than commit a
+          # file of noughts.
+          rm -rf /tmp/report-empty && mkdir -p /tmp/report-empty
+          out=$(ARXIV_CORPUS=/tmp/report-empty ax report paths 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "needs a selection"
       # The fixtures are four real files and a drawing. Rule F06 is what
       # separates a corpus from a mirror of copyrighted PDFs and rule F09 is
       # what keeps somebody else's figure out of a repository that claims to be

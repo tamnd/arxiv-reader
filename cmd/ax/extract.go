@@ -77,7 +77,7 @@ func extractRender(args []string) error {
 		if err != nil {
 			return err
 		}
-		report(p, *outline)
+		printPaper(p, *outline)
 		if r, bad := p.Reject(); bad {
 			rejected++
 			fmt.Fprintf(os.Stderr, "%sv%d: %v\n", p.ID, p.Version, r)
@@ -317,7 +317,7 @@ func readRendering(root string, m fetch.Manifest, id axid.ID, ref string) (*extr
 	return p, entry, nil
 }
 
-func report(p *extract.Paper, outline bool) {
+func printPaper(p *extract.Paper, outline bool) {
 	tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintf(tw, "%sv%d\t%s\n", p.ID, p.Version, p.Stamp)
 	// Both of these are what the document itself states, and a printed page states

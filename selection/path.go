@@ -27,6 +27,14 @@ const (
 // Paths are the four, in the order they are preferred in.
 var Paths = []Path{PathRender, PathSource, PathNative, PathVision}
 
+// DemotedWhy is what a paper's path says after a rendering was rejected.
+//
+// A constant rather than a sentence written where the demotion happens, because
+// it is the only record that a paper was ever on the render path and the paths
+// report counts it. A report that counted a sentence somebody reworded would
+// quietly start saying nought, and nothing would fail.
+const DemotedWhy = "the rendering holds errors the reject rule will not accept, so the TeX is compiled here"
+
 // KnownPath says whether this is one of the four.
 func KnownPath(p Path) bool {
 	for _, k := range Paths {

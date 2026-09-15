@@ -166,7 +166,7 @@ func readPDF(ctx context.Context, r *pdftext.Reader, root string, m fetch.Manife
 // reportNative prints what came out, with the three things only this path can
 // say about a paper.
 func reportNative(p *extract.Paper, doc *pdftext.Document, outline bool) {
-	report(p, outline)
+	printPaper(p, outline)
 	tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintf(tw, "  pages\t%s, %d of them typeset, read in %s\n", p.Pages, doc.Typeset(), doc.Took.Round(time.Millisecond))
 	fmt.Fprintf(tw, "  characters\t%d\n", doc.Chars())

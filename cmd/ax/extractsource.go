@@ -100,7 +100,7 @@ func extractSource(args []string) error {
 		if err != nil {
 			return err
 		}
-		report(p, *outline)
+		printPaper(p, *outline)
 		if r, bad := refuse(p, res); bad {
 			rejected++
 			fmt.Fprintf(os.Stderr, "%sv%d: %v\n", p.ID, p.Version, r)

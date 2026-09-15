@@ -317,7 +317,7 @@ func (r *runner) paper(ctx context.Context, e selection.Entry) (selection.Entry,
 			// rendering LaTeXML could not finish is not a paper that fails, it is a
 			// paper on the source path, and this is the only place that ever finds out.
 			e.Path = selection.PathSource
-			e.PathWhy = "the rendering holds errors the reject rule will not accept, so the TeX is compiled here"
+			e.PathWhy = selection.DemotedWhy
 			return e, append(did, "the rendering was rejected, so this paper is on the source path now"), outDemoted
 		}
 		if err != nil {

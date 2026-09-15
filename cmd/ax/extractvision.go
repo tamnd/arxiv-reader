@@ -429,7 +429,7 @@ func says(refused []vision.Refusal) []string {
 // about a paper.
 func reportVision(p *extract.Paper, r reading, outline bool) {
 	if p != nil {
-		report(p, outline)
+		printPaper(p, outline)
 	}
 	tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintf(tw, "  pages\t%d, %d read now, %d already read\n", r.pages, r.read, r.reused)
