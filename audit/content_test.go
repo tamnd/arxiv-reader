@@ -232,7 +232,12 @@ func front() extract.Document {
 
 func section(n int, title, body string) extract.Document {
 	return extract.Document{
-		Front: extract.Front{Section: n, SectionTitle: title, Kind: "section", LocalID: fmt.Sprintf("s%d", n)},
+		// Every section fixture names the page it came off, because S08 and S09 are
+		// the two rules that only run on a file that does, and a fixture that left
+		// the field empty would be a fixture neither of them was ever tried on. The
+		// front file leaves it empty, which is what a paper read off markup looks
+		// like, so both rules are exercised on both kinds of file.
+		Front: extract.Front{Section: n, SectionTitle: title, Kind: "section", LocalID: fmt.Sprintf("s%d", n), SourcePages: fmt.Sprint(n)},
 		Body:  body,
 	}
 }

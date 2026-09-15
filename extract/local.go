@@ -72,6 +72,7 @@ var prefixes = map[string]string{
 	"table":      "tab",
 	"code":       "lst",
 	"section":    "s",
+	"note":       "note",
 }
 
 // Kinds are the sixteen object kinds of 2166-06, each under the class it is
@@ -136,6 +137,8 @@ func classOf(b Block) string {
 		return "table"
 	case KindListing, KindAlgorithm:
 		return "code"
+	case KindNote:
+		return "note"
 	}
 	return ""
 }

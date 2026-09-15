@@ -20,15 +20,17 @@ import (
 
 func runExtract(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: ax extract <render|source> -n <id>v<n> [...]")
+		return errors.New("usage: ax extract <render|source|native> -n <id>v<n> [...]")
 	}
 	switch args[0] {
 	case "render":
 		return extractRender(args[1:])
 	case "source":
 		return extractSource(args[1:])
+	case "native":
+		return extractNative(args[1:])
 	default:
-		return fmt.Errorf("unknown extract subcommand %q, and the paths are render and source", args[0])
+		return fmt.Errorf("unknown extract subcommand %q, and the paths are render, source and native", args[0])
 	}
 }
 
@@ -128,8 +130,11 @@ func writePaper(plane metadata.Plane, id axid.ID, p *extract.Paper, entry fetch.
 // disagrees with the plane when they never fetched a rendering has been sent to
 // look in the wrong place.
 func document(route fetch.Route) string {
-	if route == fetch.RouteSource {
+	switch route {
+	case fetch.RouteSource:
 		return "conversion"
+	case fetch.RouteNative:
+		return "text layer"
 	}
 	return "rendering"
 }
@@ -297,6 +302,7 @@ func report(p *extract.Paper, outline bool) {
 	fmt.Fprintf(tw, "  abstract\t%d block\n", len(p.Abstract))
 	fmt.Fprintf(tw, "  headings\t%d\n", p.Headings())
 	fmt.Fprintf(tw, "  blocks\t%s\n", counted(p.Counts()))
+	fmt.Fprintf(tw, "  references\t%d\n", len(p.Bibliography))
 	fmt.Fprintf(tw, "  unparsed\t%d\n", p.Unparsed)
 	fmt.Fprintf(tw, "  labels\t%s\n", labelled(p))
 	fmt.Fprintf(tw, "  faults\t%s\n", where(p.Faults))

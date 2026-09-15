@@ -50,6 +50,15 @@ const (
 	KindAlgorithm Kind = "algorithm"
 	// KindQuote is a quotation or a display block of prose.
 	KindQuote Kind = "quote"
+	// KindNote is something the corpus is saying about the paper rather than
+	// something the paper says.
+	//
+	// One thing produces one, which is the native path and the characters that
+	// were printed where a display equation used to be. That is not mathematics
+	// and writing it as mathematics would tell every renderer downstream to
+	// typeset it, so it is published as what it is: a note holding the marks the
+	// equation left, in the shape they were printed in.
+	KindNote Kind = "note"
 )
 
 // Image is one graphic a figure names.
@@ -155,6 +164,13 @@ type Section struct {
 	// already in Tag and repeating it is how a corpus ends up with headings
 	// like "3.1 3.1 Selection".
 	Title string
+	// Pages is the pages of the PDF this section was read off, as "3-7", and it
+	// is empty on every path but the native one.
+	//
+	// Only a path that reads a printed page knows which page a sentence was on.
+	// It goes into the front matter as source_pages and it is what audit rules
+	// S08 and S09 measure the file against.
+	Pages string
 	// Blocks is the content directly under this heading, with anything under a
 	// nested heading left to that heading.
 	Blocks []Block
@@ -203,6 +219,19 @@ type Paper struct {
 	Authors  []Author
 	Abstract []Block
 	Sections []Section
+	// Pages is the whole paper's page range, "1-20", and FrontPages is the pages
+	// the abstract was read off. Both are empty on every path but the native one,
+	// which is the only one that reads a printed page.
+	Pages      string
+	FrontPages string
+	// Encoding is a sentence saying the PDF's text layer has a broken font map,
+	// and it is empty when it has not.
+	//
+	// Not a fault, because a fault is a rejection and this paper is readable: the
+	// prose is perfect and the mathematics is mojibake. It is a note for the
+	// person running the extraction and, later, a reason for path selection to
+	// send this paper to the vision path instead.
+	Encoding string
 	// Faults is every .ltx_ERROR in the rendering, with where it was found.
 	Faults []Fault
 	// Unparsed is how many pieces of mathematics LaTeXML rendered but could

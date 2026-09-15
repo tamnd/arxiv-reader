@@ -18,13 +18,13 @@ import (
 // no-derivatives paper has none and one that a translation carries the licence
 // the propagation table gives it, and nothing is translated yet, so both arrive
 // with M8. S03 asks git what it tracks and S11 reads a takedown manifest, and
-// neither of those two things exists here yet. S08 and S09 measure a body
-// against the pages it was read off, which is a count only the native path has,
-// and that path is M4. A rule registered before it can run is a rule everybody
-// believes is working.
+// neither of those two things exists here yet.
 //
 // Every one of them is hard, which is the whole group's rule: a soft licence
-// check is a licence breach with a warning next to it.
+// check is a licence breach with a warning next to it. S08 and S09 are hard for
+// a different reason: they do not ask whether a paper was read well, they ask
+// whether the file that was read was the paper, and the answer to that is yes or
+// no.
 var sourceRules = []Rule{
 	{
 		ID: "S01", Group: GroupSources, Hard: true,
@@ -40,6 +40,16 @@ var sourceRules = []Rule{
 		ID: "S07", Group: GroupSources, Hard: true,
 		Says: "every content file names the version it was taken from, and the plane has that version",
 		Why:  "A licence belongs to a version. A file that does not say which version it holds cannot have its licence checked by anything, and a file naming a version the plane has never heard of has had its licence checked against a version that does not exist.",
+	},
+	{
+		ID: "S08", Group: GroupSources, Hard: true,
+		Says: "no content file is longer than the source it claims to come from could hold",
+		Why:  "Only a file read off a printed page can be measured this way, because only that file knows how many pages it was read off, and it is the path where the measurement is worth taking. A section that says it came off two pages and holds forty pages of prose is a paper the page numbering was lost in, or two papers in one file, or a reader that ran past the end of the document it was given. Nothing typeset holds this much text on a page, so this is not a judgement about how dense a paper is.",
+	},
+	{
+		ID: "S09", Group: GroupSources, Hard: true,
+		Says: "the pages a paper was read off carry as much text as a paper's pages do",
+		Why:  "The other half of the same question, and asked of the paper rather than of a file, because several sections of a paper are printed on one page and a short section that shares a page with the rest of the paper is ordinary. A PDF whose text layer is a cover sheet, a paywall notice or the output of a scanner that found nothing comes back as a handful of characters over twenty pages, and that is a paper that is not the paper it names. The floor is far below what any typeset page carries, so a paper of plates and a paper that is mostly tables both pass it, and a paper that fails it is one nobody should have extracted on this path at all.",
 	},
 	{
 		ID: "S10", Group: GroupSources, Hard: true,
@@ -91,6 +101,9 @@ type stated struct {
 func (c Content) sources(col *collector, id axid.ID, files []content, hold *pending) {
 	shard := corpus.Shard(id)
 	mine := own{shard: shard, id: id.Canonical, dir: corpus.ContentDir("", c.lang(), id)}
+	// What S09 is measured on: the characters of every file that says which pages
+	// it came off, and the first and the last of those pages.
+	read, counted, firstPage, lastPage := 0, 0, 0, 0
 	for _, f := range files {
 		at := func(rule string, what string, args ...any) {
 			col.add(Finding{Rule: rule, File: f.path, Shard: shard, ID: id.Canonical, What: fmt.Sprintf(what, args...)})
@@ -141,7 +154,42 @@ func (c Content) sources(col *collector, id axid.ID, files []content, hold *pend
 			}
 		}
 
+		// Only the native path fills source_pages in, so on a corpus with no
+		// paper read off a printed page this never looks and reports that it
+		// never ran, which is the honest answer and not a pass.
+		if pages := pageCount(front.SourcePages); pages > 0 {
+			held := len([]rune(f.doc.Body))
+			col.checked("S08")
+			if held > pages*mostPerPage {
+				at("S08", "holds %d characters and says it was read off %s, which is %d a page, and no page carries more than %d", held, pageWord(pages), held/pages, mostPerPage)
+			}
+			read, counted = read+held, counted+1
+			if a, b := pageSpan(front.SourcePages); a > 0 {
+				if firstPage == 0 || a < firstPage {
+					firstPage = a
+				}
+				if b > lastPage {
+					lastPage = b
+				}
+			}
+		}
+
 		mine.files = append(mine.files, stated{path: f.path, version: version, licenceOfSource: front.LicenceOfSource, known: known, access: front.Access})
+	}
+	// S09 is asked of the paper and not of a file, which S08 above it is. Several
+	// sections of a paper are printed on one page, so a file's own characters over
+	// its own pages is not a density: a paper that prints "The authors declare no
+	// competing interests." under a heading of its own has a section of forty
+	// characters that says it was read off one page, and that page holds the rest
+	// of the paper as well. What this rule is for is a PDF whose text layer was a
+	// cover sheet, which is the whole paper coming back as a handful of characters
+	// over twenty pages, and that question only has an answer at the paper.
+	if firstPage > 0 {
+		pages := lastPage - firstPage + 1
+		col.checked("S09")
+		if read < pages*leastPerPage {
+			col.add(Finding{Rule: "S09", File: mine.dir, Shard: shard, ID: id.Canonical, What: fmt.Sprintf("holds %d characters over %s and says they were read off %s, which is %d a page, and a page of a paper carries at least %d", read, fileWord(counted), pageWord(pages), read/pages, leastPerPage)})
+		}
 	}
 	hold.own = append(hold.own, mine)
 }
@@ -183,6 +231,80 @@ func (c Content) records(col *collector, papers []own, found map[string]metadata
 			}
 		}
 	}
+}
+
+const (
+	// mostPerPage is the characters a printed page can hold, for S08.
+	//
+	// Twelve thousand. A page of a two column paper measured off the text layer
+	// carries three to four thousand characters, a page of dense tabular matter
+	// gets to about eight, and twelve is past anything a typesetter has ever put
+	// on a page. This is a ceiling on an impossible file and not an opinion about
+	// a dense one.
+	mostPerPage = 12000
+	// leastPerPage is the characters a page of a paper carries, for S09.
+	//
+	// Two hundred, which is one paragraph. A page holding one full width figure
+	// and its caption is above it, a page of plates with running heads is around
+	// it, and the thing this catches is far below both: a cover sheet, a paywall
+	// notice, or the nothing a scanner's text layer holds, spread over a paper's
+	// worth of pages. The floor is per page and the measurement is over the whole
+	// paper, so a plate section is averaged against the prose around it and a
+	// section of one sentence is not a finding about anything.
+	leastPerPage = 200
+)
+
+// pageWord is a page count the way a finding reads it out.
+func pageWord(n int) string {
+	if n == 1 {
+		return "1 page"
+	}
+	return fmt.Sprintf("%d pages", n)
+}
+
+// fileWord is the same for a file count.
+func fileWord(n int) string {
+	if n == 1 {
+		return "1 file"
+	}
+	return fmt.Sprintf("%d files", n)
+}
+
+// pageCount is how many pages a source_pages range names, and nought for a file
+// that names none.
+//
+// The two forms are "7" for one page and "3-7" for a range, which is what span
+// writes, and anything else is a field somebody edited. A field nobody can read
+// counts as no field rather than as a finding of its own, because S08 and S09 are
+// about the paper and not about the punctuation in the front matter.
+func pageCount(pages string) int {
+	a, b := pageSpan(pages)
+	if a == 0 {
+		return 0
+	}
+	return b - a + 1
+}
+
+// pageSpan is the first and the last page a source_pages range names, and nought
+// for a field nobody can read.
+func pageSpan(pages string) (int, int) {
+	s := strings.TrimSpace(pages)
+	if s == "" {
+		return 0, 0
+	}
+	first, last := s, s
+	if i := strings.Index(s, "-"); i > 0 {
+		first, last = s[:i], s[i+1:]
+	}
+	a, err := strconv.Atoi(strings.TrimSpace(first))
+	if err != nil || a < 1 {
+		return 0, 0
+	}
+	b, err := strconv.Atoi(strings.TrimSpace(last))
+	if err != nil || b < a {
+		return 0, 0
+	}
+	return a, b
 }
 
 // versionOf reads the number out of the version a file names.

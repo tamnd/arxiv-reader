@@ -163,6 +163,8 @@ func (w *body) block(b Block, parent within, i int) string {
 		w.float(b, id)
 	case KindListing:
 		w.listing(b, id)
+	case KindNote:
+		w.note(b, id)
 	case KindTheorem:
 		w.theorem(b, id)
 	case KindProof:
@@ -290,6 +292,30 @@ func (w *body) contained(b Block) string {
 	}
 	w.names.anchor(b.ID, first)
 	return first
+}
+
+// note writes something the corpus is saying about the paper.
+//
+// Fenced and never wrapped in dollars. The only thing that produces one of these
+// is the native path's flattened mathematics, and the characters in it are in the
+// order they were printed rather than the order they were written, so telling a
+// renderer to typeset them would produce nonsense with a confident look to it.
+// A fence says these are marks on a page, which is all they are, and keeps the
+// lines in the shape the equation left them in.
+func (w *body) note(b Block, id string) {
+	w.label(noteTitle(b), attrs{id: id, class: "note"}.with("label", b.Label))
+	if strings.TrimSpace(b.Text) == "" {
+		return
+	}
+	w.para("```text\n" + strings.TrimRight(b.Text, "\n") + "\n```")
+	w.para(b.Caption)
+}
+
+func noteTitle(b Block) string {
+	if s := strings.TrimSpace(b.Title); s != "" {
+		return s
+	}
+	return "Note"
 }
 
 func (w *body) listing(b Block, id string) {

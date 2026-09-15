@@ -84,7 +84,7 @@ var mathRules = []Rule{
 	{
 		ID: "M14", Group: GroupMath, Hard: true,
 		Says: "a paper with mathematics in its prose has mathematics in its markup",
-		Why:  "This is the rule for mathematics that was deleted rather than mangled. Every other rule in the group reads the spans and asks whether they are right, which leaves the worst outcome unexamined: a paper whose formulas were dissolved into prose has no spans to read, so the other twelve report that they had nothing to look at and the audit comes back green over a destroyed paper.",
+		Why:  "This is the rule for mathematics that was deleted rather than mangled. Every other rule in the group reads the spans and asks whether they are right, which leaves the worst outcome unexamined: a paper whose formulas were dissolved into prose has no spans to read, so the other twelve report that they had nothing to look at and the audit comes back green over a destroyed paper. A paper read off the native path is not asked, because a PDF's text layer holds what a formula was printed as and not the formula, so that path flattens every formula by construction and says so in path: native.",
 	},
 }
 
@@ -172,11 +172,35 @@ func (c Content) maths(col *collector, id axid.ID, files []content) {
 		col.add(Finding{Rule: "M02", File: s.file, Shard: shard, Line: s.line, ID: id.Canonical, What: s.what})
 	}
 
-	col.checked("M14")
-	if spanCount == 0 && len(prose) >= flattenedPaper {
-		col.add(Finding{Rule: "M14", File: dir, Shard: shard, ID: id.Canonical,
-			What: fmt.Sprintf("uses %d characters in its prose that only mathematics uses, and carries not one math span in the whole paper, so its formulas were flattened rather than extracted", len(prose))})
+	// A paper off the native path is not asked, because the answer is known and is
+	// the path's own account of itself. A PDF's text layer holds the characters a
+	// formula was printed as and not the formula, so every paper read this way has
+	// flattened mathematics in it by construction, and a rule that reports what a
+	// path says it does in its own front matter is a rule that fires on a thousand
+	// papers and means nothing on any of them. The question this rule exists to
+	// ask, which is whether something destroyed the mathematics of a paper that
+	// had it in markup, is only a question on the two paths that read markup.
+	if !nativePaper(files) {
+		col.checked("M14")
+		if spanCount == 0 && len(prose) >= flattenedPaper {
+			col.add(Finding{Rule: "M14", File: dir, Shard: shard, ID: id.Canonical,
+				What: fmt.Sprintf("uses %d characters in its prose that only mathematics uses, and carries not one math span in the whole paper, so its formulas were flattened rather than extracted", len(prose))})
+		}
 	}
+}
+
+// nativePaper says every file of this paper was read off a printed page.
+//
+// Asked of all of them rather than of the first, because a paper whose files
+// disagree about where they came from is a paper somebody assembled by hand, and
+// that one is worth asking the question of.
+func nativePaper(files []content) bool {
+	for _, f := range files {
+		if f.doc.Front.Path != "native" {
+			return false
+		}
+	}
+	return len(files) > 0
 }
 
 // flattenedPaper is how many mathematical characters in the prose make a paper
