@@ -1586,6 +1586,206 @@ jobs:
           out=$(ax select suggest 2>&1 || true)
           echo "$out"
           echo "$out" | grep -q "citation closure"
+      # The other half of the selection. The reasons say why a paper is in the
+      # content plane and the path says what reading it will cost, which is the
+      # difference between a corpus of a thousand papers and a bill: three of the
+      # four paths cost nothing but local work and the fourth costs a model call a
+      # page.
+      #
+      # Every fact the decision runs on is either already on disk or one HEAD away.
+      # The HEAD is the one thing not exercised here, because a smoke job has no
+      # network, and it is covered by the probe tests in the fetch package instead.
+      - name: five chosen papers, and what is on disk about each of them
+        run: |
+          mkdir -p /tmp/path-corpus/metadata /tmp/path-corpus/manifests
+          mkdir -p /tmp/path-corpus/work/html/2501 /tmp/path-corpus/work/source/2501 /tmp/path-corpus/work/pdf/2501
+          cat > /tmp/path-corpus/metadata/2501.jsonl <<'JSONL'
+          {"id":"2501.00001","title":"A Paper With A Rendering","abstract":"x","authors":[{"surname":"First","forename":"Ada"}],"categories":["cs.LG"],"versions":[{"version":3,"created":"2025-02-02T00:00:00Z","licence":"cc-by","licence_from":"abs"}],"source":"oai","harvested":"2026-09-14"}
+          {"id":"2501.00002","title":"A Paper Submitted As A PDF","abstract":"x","authors":[{"surname":"Second","forename":"Bo"}],"categories":["cs.LG"],"versions":[{"version":1,"created":"2025-02-02T00:00:00Z","licence":"cc-by","licence_from":"abs"}],"source":"oai","harvested":"2026-09-14"}
+          {"id":"2501.00003","title":"A Paper Submitted As A Scan","abstract":"x","authors":[{"surname":"Third","forename":"Cy"}],"categories":["cs.LG"],"versions":[{"version":1,"created":"2025-02-02T00:00:00Z","licence":"cc-by","licence_from":"abs"}],"source":"oai","harvested":"2026-09-14"}
+          {"id":"2501.00004","title":"A Paper With TeX And No Rendering Yet","abstract":"x","authors":[{"surname":"Fourth","forename":"Di"}],"categories":["cs.LG"],"versions":[{"version":1,"created":"2025-02-02T00:00:00Z","licence":"cc-by","licence_from":"abs"}],"source":"oai","harvested":"2026-09-14"}
+          {"id":"2501.00005","title":"A Paper Nobody Has Fetched","abstract":"x","authors":[{"surname":"Fifth","forename":"Em"}],"categories":["cs.LG"],"versions":[{"version":1,"created":"2025-02-02T00:00:00Z","licence":"cc-by","licence_from":"abs"}],"source":"oai","harvested":"2026-09-14"}
+          JSONL
+          # The rendering, the two PDF submissions and the one that holds TeX. A
+          # gzipped stream starting %PDF is what arXiv serves for a paper whose
+          # author uploaded a PDF, and it is how the e-print says there is no source.
+          printf '<html><body>nothing</body></html>\n' > /tmp/path-corpus/work/html/2501/2501.00001v3.html
+          printf '%%PDF-1.5\n' | gzip -c > /tmp/path-corpus/work/source/2501/2501.00002v1.gz
+          printf '%%PDF-1.5\n' | gzip -c > /tmp/path-corpus/work/source/2501/2501.00003v1.gz
+          printf '\\documentclass{article}\\begin{document}Nothing.\\end{document}\n' | gzip -c > /tmp/path-corpus/work/source/2501/2501.00004v1.gz
+          printf '%%PDF-1.5\n' > /tmp/path-corpus/work/pdf/2501/2501.00002v1.pdf
+          printf '%%PDF-1.5\n' > /tmp/path-corpus/work/pdf/2501/2501.00003v1.pdf
+          echo "sources:" > /tmp/path-corpus/manifests/sources.yaml
+          entry() {
+            sum=$(sha256sum /tmp/path-corpus/$4 | cut -d' ' -f1)
+            size=$(wc -c < /tmp/path-corpus/$4 | tr -d ' ')
+            cat >> /tmp/path-corpus/manifests/sources.yaml <<YAML
+            - id: "$1"
+              version: $2
+              route: $3
+              url: https://arxiv.org/$5/$1v$2
+              path: $4
+              sha256: $sum
+              bytes: $size
+              fetched: 2026-09-14T00:00:00Z
+              licence: cc-by
+              licence_from: abs
+          YAML
+          }
+          entry 2501.00001 3 render work/html/2501/2501.00001v3.html html
+          entry 2501.00002 1 source work/source/2501/2501.00002v1.gz e-print
+          entry 2501.00002 1 native work/pdf/2501/2501.00002v1.pdf pdf
+          entry 2501.00003 1 source work/source/2501/2501.00003v1.gz e-print
+          entry 2501.00003 1 native work/pdf/2501/2501.00003v1.pdf pdf
+          entry 2501.00004 1 source work/source/2501/2501.00004v1.gz e-print
+          ARXIV_CORPUS=/tmp/path-corpus ax fetch verify 2>&1 | tee /tmp/path-verify.txt
+          grep -q "6 sources, 6 ok, 0 missing, 0 changed" /tmp/path-verify.txt
+          ARXIV_CORPUS=/tmp/path-corpus ax select add -reason seed -by tamnd 2501.00001v3 2501.00002v1 2501.00003v1 2501.00004v1 2501.00005v1
+          ARXIV_CORPUS=/tmp/path-corpus ax path list -q | grep -q "undecided *5"
+          # Two stub readers, one for a PDF that was typeset and one for a PDF that
+          # was scanned. The run takes one reader for all its papers, which is why
+          # the two PDF papers below are decided one command at a time.
+          cat > /tmp/stub-typeset <<'SH'
+          #!/bin/sh
+          case "$1" in -v) echo "a stub reader, and not pdftotext" >&2; exit 99;; esac
+          for p in 1 2 3; do
+            echo "arXiv:2501.00002v1 [cs.LG] 2 Feb 2025"
+            for line in 1 2 3 4 5 6 7 8 9 10; do
+              echo "This page holds enough characters that nobody would mistake it for a page with a margin stamp and nothing else on it."
+            done
+            printf '\f'
+          done
+          SH
+          cat > /tmp/stub-blank <<'SH'
+          #!/bin/sh
+          case "$1" in -v) echo "a stub reader, and not pdftotext" >&2; exit 99;; esac
+          for p in 1 2 3; do echo "arXiv:2501.00003v1 [cs.LG] 2 Feb 2025"; printf '\f'; done
+          SH
+          chmod +x /tmp/stub-typeset /tmp/stub-blank
+      # A rendering already on disk settles both questions at once, because arXiv
+      # only renders submissions that held TeX. So this paper is decided without
+      # opening a file and without asking arXiv anything.
+      - name: a paper whose rendering is already fetched is decided off the manifest
+        run: |
+          ARXIV_CORPUS=/tmp/path-corpus ax path decide -pdftotext /tmp/stub-typeset 2501.00001v3 2>&1 | tee /tmp/path-render.txt
+          grep -q "2501.00001v3  render" /tmp/path-render.txt
+          grep -q "arXiv serves a rendering of this version, which costs one request and no model" /tmp/path-render.txt
+          grep -q "1, 1 decided now, 0 nothing can decide yet" /tmp/path-render.txt
+          grep -q "^      path: render$" /tmp/path-corpus/manifests/selected.yaml
+          grep -q "path_why: the submission holds TeX and arXiv serves a rendering" /tmp/path-corpus/manifests/selected.yaml
+      - name: a submission that turned out to be a PDF with text on it is on the native path
+        run: |
+          ARXIV_CORPUS=/tmp/path-corpus ax path decide -pdftotext /tmp/stub-typeset 2501.00002v1 2>&1 | tee /tmp/path-native.txt
+          grep -q "2501.00002v1  native" /tmp/path-native.txt
+          grep -q "it holds a text layer, so the text is already there to be read" /tmp/path-native.txt
+      # The only path that costs money, and the only one nothing else could have
+      # read. A page with arXiv's margin stamp on it and nothing else is a scan.
+      - name: a submission that turned out to be a PDF with nothing on it is on the vision path
+        run: |
+          ARXIV_CORPUS=/tmp/path-corpus ax path decide -pdftotext /tmp/stub-blank 2501.00003v1 2>&1 | tee /tmp/path-vision.txt
+          grep -q "2501.00003v1  vision" /tmp/path-vision.txt
+          grep -q "no text layer worth reading, so the pages have to be read as pictures" /tmp/path-vision.txt
+          grep -q "vision *1" /tmp/path-vision.txt
+      # A paper nobody has gathered the facts for is not a paper for the vision
+      # path. It is a paper that needs one more cheap thing done to it, and saying
+      # which is the whole use of this command.
+      - name: a paper with TeX and no rendering on disk needs one question asked of arXiv
+        run: |
+          out=$(ARXIV_CORPUS=/tmp/path-corpus ax path decide -pdftotext /tmp/stub-typeset 2501.00004v1 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "somebody has asked arXiv whether it renders this version"
+          echo "$out" | grep -q "run ax path decide -probe"
+          echo "$out" | grep -q "1, 0 decided now, 1 nothing can decide yet"
+          echo "$out" | grep -q "1 paper has no path yet"
+          if ARXIV_CORPUS=/tmp/path-corpus ax path decide -pdftotext /tmp/stub-typeset 2501.00004v1 >/dev/null 2>&1; then
+            echo "a paper with no path decided came back as a success"
+            exit 1
+          fi
+          out=$(ARXIV_CORPUS=/tmp/path-corpus ax path decide -pdftotext /tmp/stub-typeset 2501.00005v1 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "somebody has looked at what the submission holds"
+          echo "$out" | grep -q "run ax fetch source"
+          ARXIV_CORPUS=/tmp/path-corpus ax path list -q | grep -q "undecided *2"
+      - name: the four paths and the papers nobody has decided are counted
+        run: |
+          ARXIV_CORPUS=/tmp/path-corpus ax path list | tee /tmp/path-list.txt
+          grep -q "2501.00004v1  undecided" /tmp/path-list.txt
+          grep -q "^render *1 " /tmp/path-list.txt
+          grep -q "^source *0 " /tmp/path-list.txt
+          grep -q "^native *1 " /tmp/path-list.txt
+          grep -q "^vision *1 " /tmp/path-list.txt
+          grep -q "^undecided *2 " /tmp/path-list.txt
+          grep -q "5 papers in the content plane: 1 on render, 1 on native, 1 on vision" /tmp/path-list.txt
+          ARXIV_CORPUS=/tmp/path-corpus ax path list -path vision | tee /tmp/path-only.txt
+          grep -q "2501.00003v1  vision" /tmp/path-only.txt
+          if grep -q "2501.00001v3" /tmp/path-only.txt; then
+            echo "a filter for one path printed a paper on another"
+            exit 1
+          fi
+      # A command that gets run over a month at a time has to be cheap to run
+      # twice, so a paper that already has a path keeps it and the second run costs
+      # nothing and says so.
+      - name: a second run decides nothing twice unless it is told to
+        run: |
+          rm -rf /tmp/path-done && cp -r /tmp/path-corpus /tmp/path-done
+          ARXIV_CORPUS=/tmp/path-done ax select drop 2501.00004 2501.00005
+          ARXIV_CORPUS=/tmp/path-done ax path decide -pdftotext /tmp/stub-typeset 2>&1 | tee /tmp/path-twice.txt
+          grep -q "nothing in the selection needs a path" /tmp/path-twice.txt
+          ARXIV_CORPUS=/tmp/path-done ax path decide -again -pdftotext /tmp/stub-typeset 2>&1 | tee /tmp/path-again.txt
+          grep -q "3, 3 decided now, 0 nothing can decide yet" /tmp/path-again.txt
+          # And a dry run decides and prints and writes nothing.
+          cp /tmp/path-done/manifests/selected.yaml /tmp/path-before.yaml
+          ARXIV_CORPUS=/tmp/path-done ax path decide -n -again -pdftotext /tmp/stub-blank 2>&1 | grep -q "nothing written, because this was a dry run"
+          diff /tmp/path-before.yaml /tmp/path-done/manifests/selected.yaml
+      - name: a path typed in by hand with nothing behind it stops the next read
+        run: |
+          rm -rf /tmp/path-edited && mkdir -p /tmp/path-edited/manifests
+          cp -r /tmp/path-corpus/metadata /tmp/path-edited/metadata
+          cat > /tmp/path-edited/manifests/selected.yaml <<'YAML'
+          selected:
+            - id: "2501.00001"
+              version: 3
+              reason: seed
+              path: vision
+              status: selected
+          YAML
+          out=$(ARXIV_CORPUS=/tmp/path-edited ax path list 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "says nothing about how that was decided, so run ax path decide"
+          echo "$out" | grep -q "selected.yaml"
+          cat > /tmp/path-edited/manifests/selected.yaml <<'YAML'
+          selected:
+            - id: "2501.00001"
+              version: 3
+              reason: seed
+              path_why: because somebody felt like it
+              status: selected
+          YAML
+          out=$(ARXIV_CORPUS=/tmp/path-edited ax path list 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "explains a path it is not on"
+      - name: path refuses the arguments it should refuse
+        run: |
+          if ax path; then
+            echo "path with no subcommand was allowed"
+            exit 1
+          fi
+          out=$(ax path guess 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "unknown path subcommand"
+          out=$(ARXIV_CORPUS=/tmp/path-corpus ax path list -path ocr 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "is not one of the four paths"
+          out=$(ARXIV_CORPUS=/tmp/path-corpus ax path list 2501.00001 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "takes no arguments"
+          # A probe is a request to arXiv like any other, so it waits like any other.
+          out=$(ARXIV_CORPUS=/tmp/path-corpus ax path decide -probe -pace 1s 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "faster than the fifteen seconds arXiv asks for"
+          out=$(ARXIV_CORPUS=/tmp/path-corpus ax path decide -pdftotext /tmp/stub-typeset 2501.09999v1 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "is not in the selection, so run ax select add first"
       # The fixtures are four real files and a drawing. Rule F06 is what
       # separates a corpus from a mirror of copyrighted PDFs and rule F09 is
       # what keeps somebody else's figure out of a repository that claims to be

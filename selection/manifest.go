@@ -43,6 +43,15 @@ type Entry struct {
 	// computed elsewhere, and it is recorded rather than recomputed so that the
 	// order a paper was read in can be explained later.
 	Score float64 `yaml:"score,omitempty"`
+	// Path is which of the four ways this paper gets read, and PathWhy is the
+	// fact that decided it.
+	//
+	// Both or neither. A path with nothing saying how it was arrived at is the
+	// same word with no evidence behind it that a reason with no count would be,
+	// and the path is the field that decides whether a paper costs one request or
+	// a model call a page.
+	Path    Path   `yaml:"path,omitempty"`
+	PathWhy string `yaml:"path_why,omitempty"`
 	// Added is the date the entry was written, as YYYY-MM-DD.
 	//
 	// A date and not a timestamp, because nothing needs the minute and a timestamp
@@ -80,6 +89,17 @@ func (e Entry) Check() error {
 	}
 	if e.Added != "" && !day.MatchString(e.Added) {
 		return fmt.Errorf("selection: %s was added %q, and a date is YYYY-MM-DD", e.Ref(), e.Added)
+	}
+	if e.Path != "" {
+		if _, err := ParsePath(string(e.Path)); err != nil {
+			return err
+		}
+		if e.PathWhy == "" {
+			return fmt.Errorf("selection: %s is on the %s path and says nothing about how that was decided, so run ax path decide", e.Ref(), e.Path)
+		}
+	}
+	if e.Path == "" && e.PathWhy != "" {
+		return fmt.Errorf("selection: %s explains a path it is not on, which is %q", e.Ref(), e.PathWhy)
 	}
 	switch e.Reason {
 	case CitedByCorpus, CitesCorpus:
@@ -244,6 +264,24 @@ func (m Manifest) ByReason() map[Reason]int {
 	}
 	for _, e := range m.Selected {
 		out[e.Reason]++
+	}
+	return out
+}
+
+// ByPath counts the entries on each of the four paths.
+//
+// The papers nobody has decided a path for are counted under the empty path, and
+// they are the number that matters most in this report: a corpus that has chosen a
+// thousand papers and decided the path for four hundred of them has six hundred
+// papers whose cost nobody knows yet.
+func (m Manifest) ByPath() map[Path]int {
+	out := make(map[Path]int, len(Paths)+1)
+	for _, p := range Paths {
+		out[p] = 0
+	}
+	out[""] = 0
+	for _, e := range m.Selected {
+		out[e.Path]++
 	}
 	return out
 }

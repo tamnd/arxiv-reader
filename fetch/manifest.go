@@ -41,7 +41,43 @@ type Source struct {
 	Fetched     time.Time       `yaml:"fetched"`
 	Licence     corpus.Licence  `yaml:"licence"`
 	LicenceFrom metadata.Source `yaml:"licence_from"`
+	// Holds is what an e-print turned out to contain, and it is empty on the other
+	// two routes.
+	//
+	// It is recorded because it is the fact that decides the path, it is learnt for
+	// nothing at the moment the bytes land, and the bytes do not survive: work/ is
+	// gitignored, so a corpus that printed this and threw it away would have to
+	// download the e-print again to answer the same question on another machine.
+	Holds Holding `yaml:"holds,omitempty"`
+	// Text is whether a PDF holds a text layer, and it is empty on the other two
+	// routes. Recorded for the same reason Holds is.
+	Text Answer `yaml:"text,omitempty"`
 }
+
+// Holding is what a submission turned out to contain.
+type Holding string
+
+const (
+	// HoldsTeX is a submission with TeX in it, whether one file or a tar of them.
+	HoldsTeX Holding = "tex"
+	// HoldsPDF is a PDF the author produced themselves, which arXiv accepts and
+	// which leaves no source to read.
+	HoldsPDF Holding = "pdf"
+)
+
+// Answer is yes or no, or empty for nobody having looked.
+//
+// Three values and not a bool, because a PDF nobody has run pdftotext over is not
+// a PDF with no text layer, and the difference decides whether a paper is read for
+// nothing or read by a model at a price per page.
+type Answer string
+
+const (
+	// Yes is the fact established.
+	Yes Answer = "yes"
+	// No is the fact established the other way.
+	No Answer = "no"
+)
 
 // Ref is the versioned reference this entry is of.
 func (s Source) Ref() string { return fmt.Sprintf("%sv%d", s.ID, s.Version) }
@@ -90,6 +126,19 @@ func Load(path string) (Manifest, error) {
 		}
 		if s.SHA256 == "" {
 			return Manifest{}, fmt.Errorf("fetch: %s: %s records no hash, so it records nothing worth having", path, s.Ref())
+		}
+		// The two facts about the bytes are checked because something reads them to
+		// decide which path a paper goes down, and a word nothing recognises would
+		// otherwise be read as nobody having looked.
+		switch s.Holds {
+		case "", HoldsTeX, HoldsPDF:
+		default:
+			return Manifest{}, fmt.Errorf("fetch: %s: %s says it holds %q, which is tex or pdf", path, s.Ref(), s.Holds)
+		}
+		switch s.Text {
+		case "", Yes, No:
+		default:
+			return Manifest{}, fmt.Errorf("fetch: %s: %s says its text layer is %q, which is yes or no", path, s.Ref(), s.Text)
 		}
 	}
 	return m, nil

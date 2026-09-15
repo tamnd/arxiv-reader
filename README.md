@@ -8,7 +8,7 @@ It is not called `arxiv` because [tamnd/arxiv-cli](https://github.com/tamnd/arxi
 
 ## Status
 
-M5, which is the first thousand papers in English, and the parts of it that are written are the native path, the vision path and the selection: the PDF fetch, `pdftotext`, the structure recovered from the shape of a printed page, the page images a model reads when there is no text on the page to read, and the file that says which papers are in the content plane and why.
+M5, which is the first thousand papers in English, and the parts of it that are written are the native path, the vision path and the selection: the PDF fetch, `pdftotext`, the structure recovered from the shape of a printed page, the page images a model reads when there is no text on the page to read, the file that says which papers are in the content plane and why, and which of the four paths each of them goes down.
 M4 before it was the source path: the papers arXiv never rendered, which is everything announced before December 2023.
 M3 before it was one paper end to end down the render path, and the seed paper is Mamba.
 M2 before that was the licence census: counting what the corpus is permitted to do with what it holds.
@@ -246,7 +246,83 @@ This is for a paper that was chosen and should not have been, so it refuses a pa
 
 Two halves of this are not written yet and say so rather than succeeding quietly.
 `ax select seed` proposing a list off the licence census needs a person to edit what it proposes, and `ax select suggest` is the citation closure over `manifests/refs`, so it arrives with the reference work.
-The other half of this milestone item is `ax path decide` filling in which of the four paths each selected paper goes down, and the two refusals above are most of what that decision already knows.
+
+Once a paper is chosen, `ax path decide` works out which of the four paths it goes down and writes that next to the reason it was chosen.
+
+The tree is three questions asked in order.
+Does the submission hold TeX, and if it does, does arXiv serve a rendering of this version, and if it does not, does the PDF hold a text layer.
+TeX with a rendering is the render path, TeX with no rendering is the source path, a PDF with text on it is the native path, and a PDF with nothing on it is the vision path.
+
+```
+$ ax path decide -probe
+1602.03837v1: selection: the path cannot be decided until somebody has looked at whether the PDF holds a text layer, so run ax fetch native
+1710.05832v1: selection: the path cannot be decided until somebody has looked at whether the PDF holds a text layer, so run ax fetch native
+2207.09293v3: selection: the path cannot be decided until somebody has looked at what the submission holds, so run ax fetch source
+2006.10256v1  render  the submission holds TeX and arXiv serves a rendering of this version, which costs one request and no model
+2201.11903v1  render  the submission holds TeX and arXiv serves a rendering of this version, which costs one request and no model
+  papers     5, 2 decided now, 3 nothing can decide yet
+  probes     2
+  render     2
+  source     0
+  native     2
+  vision     0
+  undecided  3
+ax: 3 papers have no path yet, and the line above each one says what would settle that
+```
+
+A question nobody has answered is a hold and not a default, which is the whole design of this command.
+The two gravitational wave papers there are PDF submissions, so the next question is what their text layer holds, and nothing on this machine has looked.
+Guessing at that point would put a paper on the vision path, and the vision path is the one that costs money per page, so the command says which command would settle it and moves on.
+Nothing else in the tree can be guessed at either: the 2022 paper has no e-print here, and a paper whose submission nobody has opened has no answer to the first question.
+
+The rendering question is one HEAD request at the same fifteen second pace as everything else, and it only happens under `-probe`.
+The spec says to read the abs page for a link to the rendering, and this asks the rendering itself, because it is the same one request and the answer is the status code rather than a link that may or may not be in the markup.
+A version arXiv does not render is a 404 and a 404 is an answer, so it comes back as no and not as a failure.
+
+```
+$ ax fetch native 1602.03837v1 1710.05832v1
+fetching 1602.03837v1
+1602.03837v1           fetched  cc-by           935476  work/pdf/1602/1602.03837v1.pdf
+                       holds text on 16 of its 16 pages, which is a PDF that was typeset rather than scanned
+fetching 1710.05832v1
+1710.05832v1           fetched  cc-by          1599186  work/pdf/1710/1710.05832v1.pdf
+                       holds text on 18 of its 18 pages, which is a PDF that was typeset rather than scanned
+2 fetched, 0 cached, 0 arXiv does not serve, 8 sources in manifests/sources.yaml
+$ ax path decide
+2207.09293v3: selection: the path cannot be decided until somebody has looked at what the submission holds, so run ax fetch source
+1602.03837v1  native  the submission is a PDF the authors made themselves and it holds a text layer, so the text is already there to be read
+1710.05832v1  native  the submission is a PDF the authors made themselves and it holds a text layer, so the text is already there to be read
+```
+
+Both of those facts are written into `manifests/sources.yaml` as `holds` and `text` at the moment they are learnt, which is why the second run needed no argument and no network.
+They are learnt for nothing during a fetch, since something has to open the e-print to see what is in it and something has to read the PDF to know whether it is worth reading.
+They are recorded because the bytes do not survive: `work/` is not committed, so a corpus that printed those two lines and threw them away would make the next machine download the same files again to answer the same two questions.
+
+A paper that has a path keeps it, so running this over a month twice costs nothing and a batch that stopped halfway can be run again.
+`-again` decides the papers that already have a path, which is what to do when arXiv has backfilled renderings for a year that had none.
+`-n` decides everything and writes nothing.
+A path with nothing next to it saying how it was decided is refused the next time the file is read, the same way a reason with no evidence is, so a row edited by hand to say `vision` stops the next command rather than quietly sending a paper to a model.
+
+```
+$ ax path list
+1602.03837v1  native     the submission is a PDF the authors made themselves and it holds a text layer, so the text is already there to be read
+1710.05832v1  native     the submission is a PDF the authors made themselves and it holds a text layer, so the text is already there to be read
+2006.10256v1  render     the submission holds TeX and arXiv serves a rendering of this version, which costs one request and no model
+2201.11903v1  render     the submission holds TeX and arXiv serves a rendering of this version, which costs one request and no model
+2207.09293v3  undecided
+
+render     2  arXiv's own LaTeXML rendering, one request and no model
+source     0  the submitted TeX, compiled with LaTeXML here
+native     2  the PDF's own text layer, read with pdftotext
+vision     0  pictures of the pages, read by a model, which is the path that costs money
+undecided  1  nobody has worked out how these get read
+
+5 papers in the content plane: 2 on render, 2 on native
+```
+
+The decision is not final in one direction.
+A paper on the render path whose rendering turns out to hold LaTeXML errors the reject rule will not accept is moved to the source path at extract time, because that is when anybody finds out.
+Nothing moves the other way, since a paper with no TeX in it does not acquire any.
 
 Once a rendering is on disk, `ax extract` reads it.
 
@@ -1258,6 +1334,7 @@ It is a small fraction of the first plane and it always will be, so which papers
 
 Three of the four use no model at all, which matters more than it sounds.
 About 90 per cent of arXiv has TeX source and about 97 per cent of recent submissions have an HTML rendering, so the paths that cost nothing cover almost everything and the vision path is the fallback for scanned submissions.
+Which path a given paper is on is decided by `ax path decide` off what its submission holds, whether arXiv renders that version and whether its PDF has a text layer, and it is recorded per paper in `manifests/selected.yaml`.
 
 ## Related
 
