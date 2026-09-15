@@ -993,6 +993,17 @@ jobs:
           # And the same paper read twice writes nothing, which is the test that
           # this path is as idempotent as the two above it.
           ARXIV_CORPUS=/tmp/native-corpus ax extract native -pdftotext /tmp/stub-pdftotext 2501.00001v3 | grep -q "0 written, 4 unchanged"
+      # S08 and S09 weigh what a file holds against the printed pages it says it
+      # was read off, so the only paper that can answer them is one that was read
+      # off printed pages, and the audit step at the end of this job reads a
+      # corpus built from a rendering. They are asked here, on the paper that has
+      # a page count in its front matter, and nowhere else.
+      - name: the two rules that only a printed page can answer are asked here
+        run: |
+          ARXIV_CORPUS=/tmp/native-corpus ax audit -plane content -rules S08,S09 -q | tee /tmp/native-audit.txt
+          grep -qE '^S08 +pass ' /tmp/native-audit.txt
+          grep -qE '^S09 +pass ' /tmp/native-audit.txt
+          grep -q "4 files over 1 paper, nothing found" /tmp/native-audit.txt
       # A PDF with no text layer is a fact about the paper and not a failure of
       # the command, the same way a submission that turned out to be a PDF is on
       # the path above this one, so a batch of a hundred steps over one.
@@ -1856,7 +1867,10 @@ jobs:
       # fetched, rendered, split, figured, tabled, referenced and tagged. Every
       # rule has to say pass and not "not run": a rule with nothing to look at
       # has not passed anything, and telling those two apart is what the four
-      # states are for.
+      # states are for. The two exceptions are S08 and S09, which measure a
+      # paper's text against the printed pages it was read off, so a paper that
+      # came off a rendering has no answer to give them and the native step above
+      # asks them instead.
       # G08 reads the repository rather than the corpus, so the corpus has to be
       # one. A tombstone goes in first, because a register of a paper that has
       # been revised has one in it and both G07 and G08 have to have something
@@ -1871,11 +1885,12 @@ jobs:
         run: |
           ARXIV_CORPUS=/tmp/extract-corpus ax audit -plane content -q | tee /tmp/audit-content.txt
           grep -q "3 files over 1 paper, nothing found" /tmp/audit-content.txt
-          test "$(grep -cE '^[STMFRGX][0-9]+ +pass ' /tmp/audit-content.txt)" = 57
-          if grep -q "not run" /tmp/audit-content.txt; then
+          test "$(grep -cE '^[STMFRGX][0-9]+ +pass ' /tmp/audit-content.txt)" = 55
+          if grep "not run" /tmp/audit-content.txt | grep -qvE '^S0[89] '; then
             echo "a content rule had nothing to look at"
             exit 1
           fi
+          test "$(grep -c 'not run' /tmp/audit-content.txt)" = 2
       # And the same fifty seven rules over nothing at all, which has to read as
       # not run rather than as a clean corpus. A green audit over an empty plane
       # is the single easiest way for this project to lie to itself.
