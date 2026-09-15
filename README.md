@@ -8,7 +8,7 @@ It is not called `arxiv` because [tamnd/arxiv-cli](https://github.com/tamnd/arxi
 
 ## Status
 
-M5, which is the first thousand papers in English, and the parts of it that are written are the native path, the vision path and the selection: the PDF fetch, `pdftotext`, the structure recovered from the shape of a printed page, the page images a model reads when there is no text on the page to read, the file that says which papers are in the content plane and why, and which of the four paths each of them goes down.
+M5, which is the first thousand papers in English, and the parts of it that are written are the native path, the vision path and the selection: the PDF fetch, `pdftotext`, the structure recovered from the shape of a printed page, the page images a model reads when there is no text on the page to read, the file that says which papers are in the content plane and why, which of the four paths each of them goes down, and the batch that takes them down it and can be started again after it stops.
 M4 before it was the source path: the papers arXiv never rendered, which is everything announced before December 2023.
 M3 before it was one paper end to end down the render path, and the seed paper is Mamba.
 M2 before that was the licence census: counting what the corpus is permitted to do with what it holds.
@@ -1106,6 +1106,89 @@ Each revision is matched again at report time and not read back from what the ma
 
 A version the cache does not hold is skipped rather than fetched, so this reads the disk and never the network, and `reports/tags.md` lists each paper's cached versions next to its tags, which is what says why a paper with four versions has one revision in it.
 A corpus with one version of everything has compared nothing, and the report says so rather than printing a rate of nought, which would claim every name was read off when nothing had looked.
+
+`ax run` is all of that for a thousand papers instead of one.
+
+```
+$ ax run -n
+1602.03837v1  native     read it on the native path
+1710.05832v1  native     read it on the native path
+1809.03842v8  source     read it on the source path
+2006.10256v1  render     fetch the rendering, then read it on the render path
+2201.11903v1  render     fetch the rendering, then read it on the render path
+2207.09293v3  undecided  nothing, until ax path decide says how this paper gets read
+  papers    6, 6 with something to do, 0 already at extracted
+  selected  6
+nothing written, because this was a dry run
+```
+
+Everything this does can be done a paper at a time by hand, and for one paper that is what to do.
+This is for the run that takes hours, has something go wrong in the middle of it, and has to be started again.
+The question that matters then is what the second run costs, and the answer is that it costs only the work nobody has done.
+
+Nothing new is invented to make that true.
+The rung each paper has reached is in `manifests/selected.yaml`, the bytes each paper needed are in `manifests/sources.yaml`, and between them there is nothing left for this command to remember.
+The selection is written per paper as the run goes rather than once at the end, so a run that was interrupted after four hours keeps the four hours.
+
+```
+$ ax run -path native -limit 1
+pdftotext version 26.09.0
+1602.03837v1
+  authors     none in the rendering, and the metadata plane has the list that counts
+  abstract    1 block
+  headings    12
+  blocks      4 figure, 1 note, 170 paragraph, 2 table
+  references  115
+  unparsed    0
+  labels      none
+  faults      none
+  pages       1-16, 16 of them typeset, read in 106ms
+  characters  62840
+  written  00_front.md
+  written  01_introduction.md
+  written  02_introduction.md
+  written  03_observation.md
+  written  04_detectors.md
+  written  05_detector_validation.md
+  written  06_searches.md
+  written  07_source_discussion.md
+  written  08_outlook.md
+  written  09_these_include_further_commissioning_of.md
+  written  10_conclusion.md
+  written  11_acknowledgments.md
+  written  12_body.md
+13 files in content/en/1602/1602.03837: 13 written, 0 unchanged, 0 removed, 0 left alone
+stopping at 1 paper, because that is the limit this run was given
+1602.03837v1  native  the PDF was already here, extracted
+  papers     2, 1 moved, 0 already at extracted, 0 nothing can move yet, 0 failed
+  selected   5
+  extracted  1
+```
+
+That is the paper that announced the first detection of gravitational waves, read off its own PDF because the submission is one, and the run said what it did with it in one line.
+The extraction's own report is above that line, unchanged, because the batch runs the same four commands a person would run by hand rather than a second copy of them.
+
+`-to` says which rung to stop at, which is `fetched`, `extracted` or `tagged`, and it is `extracted` by default.
+`-limit` stops after that many papers that needed work, which is what to use on the first run somebody is watching.
+`-shard`, `-path` and a list of references narrow what the run is about, and the papers that are already at the rung are counted and reported rather than filtered out, because a run that says nothing about what it skipped is a run nobody can check.
+A paper that fails does not stop the batch, since a thousand paper run that gave up on the third submission because it is a PostScript file from 1997 is a run nobody could leave going, so the failure is printed, counted, and the exit code says how it went.
+
+Two things are held rather than guessed at.
+A paper with no path is left alone with the command that settles it, and a paper on the vision path is left alone unless `-reader` names the program, because that is the path that costs a model call a page and naming the reader is the sentence that says somebody meant to spend it.
+
+The one decision a batch makes on its own is the demotion, and here are the last lines of a run over the test fixture where one happens.
+
+```
+2501.00001v3  render  the rendering was already here, the rendering was rejected, so this paper is on the source path now
+2501.00001v3  source  extracted
+  papers     1, 1 moved, 0 already at extracted, 0 nothing can move yet, 0 failed
+  demoted    1, from the render path to the source path
+  extracted  1
+```
+
+A rendering LaTeXML could not finish is the one fact about a path that cannot be known before the reading, and the paper belongs on the source path from then on.
+So the run moves it there, writes that into the selection with the reason, reads it again down the other path, and the next run over that paper compiles the TeX rather than finding out a second time.
+It goes round once more and no further, because the render path is the only path that can be wrong about itself and it can only be wrong in one direction.
 
 `ax audit -plane content` is where all of that gets checked rather than trusted.
 

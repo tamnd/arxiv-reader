@@ -94,9 +94,21 @@ func extractRender(args []string) error {
 		}
 	}
 	if rejected > 0 {
-		return fmt.Errorf("%d of %d renderings are too broken to use, and those papers are on the source path", rejected, len(refs))
+		return &tooBroken{n: rejected, of: len(refs)}
 	}
 	return nil
+}
+
+// tooBroken is a rendering the reject rule will not accept.
+//
+// It has a type because something does more about it than print it. A rendering
+// LaTeXML could not finish is the one thing about a path that cannot be known
+// before the reading, and the paper belongs on the source path from then on, so
+// ax run moves it there rather than counting it as a paper that failed.
+type tooBroken struct{ n, of int }
+
+func (t *tooBroken) Error() string {
+	return fmt.Sprintf("%d of %d renderings are too broken to use, and those papers are on the source path", t.n, t.of)
 }
 
 // writePaper runs the gate, builds the front matter and puts the files down.
@@ -308,8 +320,16 @@ func readRendering(root string, m fetch.Manifest, id axid.ID, ref string) (*extr
 func report(p *extract.Paper, outline bool) {
 	tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintf(tw, "%sv%d\t%s\n", p.ID, p.Version, p.Stamp)
-	fmt.Fprintf(tw, "  licence\t%s\n", p.Licence)
-	fmt.Fprintf(tw, "  title\t%s\n", p.Title)
+	// Both of these are what the document itself states, and a printed page states
+	// neither, so the papers on the native and the vision paths print no line here
+	// rather than a line with nothing after it. What the corpus publishes comes
+	// from the metadata plane either way.
+	if p.Licence != "" {
+		fmt.Fprintf(tw, "  licence\t%s\n", p.Licence)
+	}
+	if p.Title != "" {
+		fmt.Fprintf(tw, "  title\t%s\n", p.Title)
+	}
 	fmt.Fprintf(tw, "  authors\t%s\n", authorNames(p.Authors))
 	fmt.Fprintf(tw, "  abstract\t%d block\n", len(p.Abstract))
 	fmt.Fprintf(tw, "  headings\t%d\n", p.Headings())

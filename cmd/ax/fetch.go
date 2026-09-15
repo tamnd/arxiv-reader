@@ -241,7 +241,8 @@ func reportMain(root, rel string) fetch.Holding {
 // cannot be seen from its size, its licence or its name, it decides which of two
 // paths the paper is on, and a person fetching a thousand of them wants to know
 // the split before they start extracting rather than after. It is a reading and
-// not a decision: nothing is written down, and the paper is routed by ax extract.
+// not a decision: the answer goes into the manifest as a fact, and ax path decide
+// is what turns it into a path.
 //
 // Nothing here fails the run. A PDF pdftotext will not open is a fact about that
 // paper, the bytes are on disk either way, and a download that threw itself away
