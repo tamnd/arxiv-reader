@@ -116,14 +116,58 @@ func (h *Hub) URL(dataset, revision, file string) string {
 	return fmt.Sprintf("%s/datasets/%s/resolve/%s/%s", h.base(), dataset, revision, file)
 }
 
-// Open streams a file from the start.
+// Open streams a file from the start. When the server ends the stream
+// before the end, the stream starts again at the same byte with a range
+// request, up to ten times in a row.
 func (h *Hub) Open(ctx context.Context, url string) (io.ReadCloser, error) {
 	resp, err := h.do(ctx, url, "")
 	if err != nil {
 		return nil, err
 	}
-	return resp.Body, nil
+	return &stream{hub: h, ctx: ctx, url: url, body: resp.Body, size: resp.ContentLength}, nil
 }
+
+type stream struct {
+	hub   *Hub
+	ctx   context.Context
+	url   string
+	body  io.ReadCloser
+	off   int64
+	size  int64
+	tries int
+}
+
+func (s *stream) Read(p []byte) (int, error) {
+	for {
+		n, err := s.body.Read(p)
+		s.off += int64(n)
+		if n > 0 {
+			s.tries = 0
+		}
+		if err == nil || (errors.Is(err, io.EOF) && (s.size < 0 || s.off >= s.size)) {
+			return n, err
+		}
+		if n > 0 {
+			return n, nil
+		}
+		if s.ctx.Err() != nil || s.tries >= 10 {
+			return 0, err
+		}
+		s.tries++
+		s.body.Close()
+		resp, rerr := s.hub.do(s.ctx, s.url, fmt.Sprintf("bytes=%d-", s.off))
+		if rerr != nil {
+			return 0, fmt.Errorf("%w, and the stream did not start again at byte %d: %v", err, s.off, rerr)
+		}
+		if resp.StatusCode != http.StatusPartialContent {
+			resp.Body.Close()
+			return 0, fmt.Errorf("%w, and the server does not give a range to start again at byte %d", err, s.off)
+		}
+		s.body = resp.Body
+	}
+}
+
+func (s *stream) Close() error { return s.body.Close() }
 
 // ReaderAt reads a remote file with range requests, so that a parquet file is
 // read a column at a time and is not written to the disk.

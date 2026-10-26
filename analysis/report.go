@@ -115,12 +115,24 @@ type Report struct {
 	// Extracted and Halted are the ones that have a census record and a stop
 	// record for the latest version.
 	Scope, Extracted, Halted int
+	// Closed is the papers in scope that are not open or share-alike, and
+	// ClosedOutside the ones with a structure from TheoremGraph (way R1).
+	Closed, ClosedOutside int
 
+	// Size is the files and the bytes of each part of the analysis plane, for
+	// AQ10.
+	Size []PlaneSize
 	// Witness is the comparison with each outside index (AX4.5, AQ21).
 	Witness map[string]*WitnessRow
 
 	versions, months, codes map[string]*Row
 	patterns                map[string]*Pattern
+}
+
+// PlaneSize is the size of one part of the analysis plane.
+type PlaneSize struct {
+	Part         string
+	Files, Bytes int64
 }
 
 // WitnessRow compares the census with one outside index.
@@ -290,6 +302,10 @@ func (rp *Report) Markdown() string {
 		fmt.Fprintf(&b, "| stopped | %s | %s |\n", prose.Thousands(rp.Halted), share(rp.Halted, rp.Scope))
 		fmt.Fprintf(&b, "| not yet | %s | %s |\n", prose.Thousands(left), share(left, rp.Scope))
 		fmt.Fprintf(&b, "| all | %s | 100.0%% |\n\n", prose.Thousands(rp.Scope))
+		if rp.Closed > 0 {
+			fmt.Fprintf(&b, "The other %s papers in scope are verbatim or record, and the corpus does not read their text. TheoremGraph gives the structure of %s of them (%s), which is way R1 of AX2.5. The rest are stopped with the reason licence until AQ01 is settled.\n\n",
+				prose.Thousands(rp.Closed), prose.Thousands(rp.ClosedOutside), share(rp.ClosedOutside, rp.Closed))
+		}
 	}
 
 	b.WriteString("## The measures of each extractor version\n\n")
@@ -353,10 +369,23 @@ func (rp *Report) Markdown() string {
 			if len(ex) > 50 {
 				ex = ex[:50]
 			}
-			fmt.Fprintf(&b, "\n### census-diff from %s\n\nThe %s versions with the largest excess.\n\n| Version | Census items | %s results |\n| --- | ---: | ---: |\n", k, prose.Thousands(len(ex)), k)
+			fmt.Fprintf(&b, "\n### census-diff from %s\n\n%s with the largest excess.\n\n| Version | Census items | %s results |\n| --- | ---: | ---: |\n", k, prose.Count(len(ex), "version"), k)
 			for _, d := range ex {
 				fmt.Fprintf(&b, "| %s | %s | %s |\n", d.Paper, prose.Thousands(d.Census), prose.Thousands(d.Index))
 			}
+		}
+	}
+
+	if len(rp.Size) > 0 {
+		b.WriteString("\n## The size of the analysis plane\n\n")
+		b.WriteString("This is the measure of AQ10. The estimate for the open papers in scope scales the census and the objects by the versions with a census.\n\n")
+		b.WriteString("| Part | Files | Bytes | Estimate for the open papers in scope |\n| --- | ---: | ---: | ---: |\n")
+		for _, z := range rp.Size {
+			est := "-"
+			if (z.Part == "census" || z.Part == "objects") && a.Papers > 0 && rp.Scope > 0 {
+				est = prose.Bytes(z.Bytes * int64(rp.Scope) / int64(a.Papers))
+			}
+			fmt.Fprintf(&b, "| %s | %s | %s | %s |\n", z.Part, prose.Thousands(int(z.Files)), prose.Bytes(z.Bytes), est)
 		}
 	}
 

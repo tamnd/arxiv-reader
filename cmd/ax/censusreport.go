@@ -135,6 +135,14 @@ func censusReport(args []string) error {
 					l, _ = licence.Latest(r)
 				}
 				if c := licence.ClassOf(l); c != licence.ClassOpen && c != licence.ClassShareAlikeNC {
+					// A paper that math2 cannot read has its structure from
+					// TheoremGraph by way R1 (AX2.5), when the index has it.
+					rp.Closed++
+					if _, ok, err := wit.Get(witness.TheoremGraph, shard, r.ID); err != nil {
+						return err
+					} else if ok {
+						rp.ClosedOutside++
+					}
 					return nil
 				}
 				rp.Scope++
@@ -151,6 +159,28 @@ func censusReport(args []string) error {
 				return err
 			}
 		}
+	}
+
+	for _, part := range []string{"census", "objects", "stopped", "witness"} {
+		z := analysis.PlaneSize{Part: part}
+		err := filepath.WalkDir(filepath.Join(root, "analysis", part), func(p string, d iofs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.Type().IsRegular() {
+				info, err := d.Info()
+				if err != nil {
+					return err
+				}
+				z.Files++
+				z.Bytes += info.Size()
+			}
+			return nil
+		})
+		if err != nil && !errors.Is(err, iofs.ErrNotExist) {
+			return err
+		}
+		rp.Size = append(rp.Size, z)
 	}
 
 	md := rp.Markdown()

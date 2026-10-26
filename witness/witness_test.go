@@ -3,6 +3,7 @@ package witness
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -162,5 +163,38 @@ func TestARemoteFileReadsWithRanges(t *testing.T) {
 	}
 	if n, err := f.ReadAt(p, f.Size-5); n != 5 || err != io.EOF {
 		t.Errorf("a read at the end gives %d %v", n, err)
+	}
+}
+
+func TestAStreamStartsAgainWhereItWasCut(t *testing.T) {
+	data := []byte(strings.Repeat("abcdefghij", 1000))
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Range") == "" {
+			w.Header().Set("Content-Length", fmt.Sprint(len(data)))
+			w.WriteHeader(http.StatusOK)
+			hj, _ := w.(http.Hijacker)
+			w.Write(data[:3000])
+			w.(http.Flusher).Flush()
+			if hj != nil {
+				c, _, _ := hj.Hijack()
+				c.Close()
+			}
+			return
+		}
+		http.ServeContent(w, r, "f", time.Time{}, bytes.NewReader(data))
+	}))
+	defer srv.Close()
+	h := &Hub{Base: srv.URL}
+	f, err := h.Open(context.Background(), srv.URL+"/f")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	got, err := io.ReadAll(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, data) {
+		t.Errorf("got %d bytes, want %d", len(got), len(data))
 	}
 }
