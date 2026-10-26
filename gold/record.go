@@ -33,6 +33,8 @@ type Record struct {
 	By    string `json:"by,omitempty"`
 	On    string `json:"on,omitempty"`
 	Marks []Mark `json:"marks"`
+	// Uses is the marks of set E: what each proof uses.
+	Uses []Use `json:"uses,omitempty"`
 }
 
 // Mark is one item of a paper, as a person marks it (AX11.2).
@@ -88,6 +90,16 @@ func (r Record) Check() error {
 	for _, m := range r.Marks {
 		if m.Proves != "" && !ids[m.Proves] {
 			errs = append(errs, fmt.Errorf("mark %s proves %s, and no mark has that id", m.ID, m.Proves))
+		}
+	}
+	for _, u := range r.Uses {
+		switch {
+		case !ids[u.Proof]:
+			errs = append(errs, fmt.Errorf("a use names the proof %s, and no mark has that id", u.Proof))
+		case u.To == "":
+			errs = append(errs, fmt.Errorf("a use of proof %s names no target", u.Proof))
+		case !ids[u.To] && !strings.HasPrefix(u.To, "bib:"):
+			errs = append(errs, fmt.Errorf("proof %s uses %s, and no mark has that id", u.Proof, u.To))
 		}
 	}
 	return errors.Join(errs...)
