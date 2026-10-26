@@ -35,6 +35,9 @@ import (
 // batch nobody could leave running, so a failure is printed, counted, and the run
 // carries on. The exit code says how it went.
 func runRun(args []string) error {
+	if len(args) > 0 && args[0] == "analysis" {
+		return runAnalysis(args[1:])
+	}
 	fs := flag.NewFlagSet("ax run", flag.ContinueOnError)
 	shard := fs.String("shard", "", "only the papers announced in one month, as YYMM")
 	only := fs.String("path", "", "only the papers on one path, which is "+selection.PathNames())

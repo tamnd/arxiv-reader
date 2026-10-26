@@ -1765,6 +1765,24 @@ $ ax census batch -list manifests/gold/x-v1.txt -limit 3
 915 papers: 0 extracted before, 3 extracted now
 ```
 
+`ax run analysis` is `ax census batch -scope math`. It takes each open and share-alike paper in the math scope, in the order of AX2.6: open papers first, the newest month first, and the old-style ids last. `-n` prints the count and the first ten papers and does nothing.
+
+```
+$ ax run analysis -n
+141732 papers in the batch
+2610.22345
+2610.22326
+```
+
+`manifests/waivers.yaml` holds the waivers of the census (AX4.8). A waiver excuses an occurrence that no object accounts for, so it is not a gap. The reason must be `layout`, `empty`, `not-math`, `duplicate-main`, `author-error` or `bug:<issue>`. A waiver names the version, the occurrence and the person who wrote it. A rule waives each occurrence of one environment, and it names the person who approved it. The census record of a waived occurrence names the person, or the rule as `rule:<name>`. A file with an unknown reason, a waiver with no person, or the same occurrence twice is refused, and rule D03 checks the waivers in each census record.
+
+```yaml
+waivers:
+  - {paper: 2312.01234v2, occurrence: env-7, reason: empty, by: A. Person}
+rules:
+  - {name: quote-box, env: quotebox, reason: layout, approved: A. Person}
+```
+
 `ax census report` counts the analysis plane into `reports/census.md`.
 It gives the measures of AX11.4 for each extractor version: the share of papers with a gap, with a waiver, and with a finding of D07, D08 or D09, the share of statements with the proof_status none, the share of orphan proofs, and the share of items with the kind unknown.
 It also gives the strength, the stopped versions by reason, the counts by month and by MSC code, and the gap patterns with three example papers each.

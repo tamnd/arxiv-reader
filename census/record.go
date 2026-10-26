@@ -23,8 +23,11 @@ type Ref struct {
 type Waiver struct {
 	Occurrence string `json:"occurrence"`
 	Reason     string `json:"reason"`
-	// By is the person or the rule that wrote it.
+	// By is the person or the rule that wrote it. A rule is rule:<name>.
 	By string `json:"by"`
+	// Env is set on a waiver rule instead of Occurrence. The rule waives each
+	// occurrence of the environment that no object accounts for.
+	Env string `json:"-"`
 }
 
 // Gap is one occurrence that no object accounts for, or that two objects
@@ -125,7 +128,12 @@ func (c *Census) Match(objs []Ref, waivers []Waiver) *Record {
 		}
 	}
 	waived := map[string]Waiver{}
+	byEnv := map[string]Waiver{}
 	for _, w := range waivers {
+		if w.Occurrence == "" && w.Env != "" {
+			byEnv[w.Env] = w
+			continue
+		}
 		waived[w.Occurrence] = w
 	}
 	named := map[string]int{}
@@ -152,7 +160,13 @@ func (c *Census) Match(objs []Ref, waivers []Waiver) *Record {
 			default:
 				o.Result = Missing
 			}
-			if w, ok := waived[o.ID]; ok && o.Result != Matched {
+			w, ok := waived[o.ID]
+			if !ok && o.Type == Env {
+				if w, ok = byEnv[o.Env]; ok {
+					w.Occurrence = o.ID
+				}
+			}
+			if ok && o.Result != Matched {
 				o.Result, o.Waiver = Waived, w.Reason
 				r.Waivers = append(r.Waivers, w)
 			}

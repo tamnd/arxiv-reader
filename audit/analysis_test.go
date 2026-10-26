@@ -18,7 +18,7 @@ func TestAnalysisRules(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	put("analysis/census/2312/2312.00001v1.json", `{"paper":"2312.00001","version":1,"extractor":"","main":["a.tex"],"declarations":[{"env":"foo","title":"Foo","item":"unknown","numbered":true,"from":"newtheorem"}],"occurrences":{"env":1},"matched":{},"gaps":[{"occurrence":"env-1","result":"missing","pattern":"env/newtheorem/article"}],"waivers":[],"numbers":{},"textrefs":{},"strength":"normal"}`)
+	put("analysis/census/2312/2312.00001v1.json", `{"paper":"2312.00001","version":1,"extractor":"","main":["a.tex"],"declarations":[{"env":"foo","title":"Foo","item":"unknown","numbered":true,"from":"newtheorem"}],"occurrences":{"env":1},"matched":{},"gaps":[{"occurrence":"env-1","result":"missing","pattern":"env/newtheorem/article"}],"waivers":[{"occurrence":"env-2","reason":"boring","by":"Ann"},{"occurrence":"env-3","reason":"layout","by":""},{"occurrence":"env-4","reason":"bug:7","by":"rule:x"}],"numbers":{},"textrefs":{},"strength":"normal"}`)
 	put("analysis/objects/2312/2312.00001.jsonl", `{"kind":"statement","paper":"2312.00001","version":"1","local":"theorem-1","file":"","order":0,"path":"source","confidence":"certain","item":"statement/theorem","proof_status":"here","body_md":"Every x.","extractor":"ax/0"}
 {"kind":"statement","paper":"2312.00001","version":"1","local":"lemma-1","file":"","order":1,"path":"source","item":"statement/lemma","extractor":"ax/0"}
 `)
@@ -32,7 +32,7 @@ func TestAnalysisRules(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]int{"D01": 2, "D02": 2, "D03": 1, "D04": 2, "D06": 1, "D13": 1, "D15": 1}
+	want := map[string]int{"D01": 2, "D02": 2, "D03": 3, "D04": 2, "D06": 1, "D13": 1, "D15": 1}
 	for _, r := range rep.Results {
 		if r.Total != want[r.Rule.ID] {
 			t.Errorf("%s: %d findings, want %d: %+v", r.Rule.ID, r.Total, want[r.Rule.ID], r.Findings)

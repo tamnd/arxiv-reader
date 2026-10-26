@@ -55,6 +55,11 @@ func runCensus(args []string) error {
 		return err
 	}
 	p := analysis.Paper{ID: id, Version: version, Extractor: "ax/" + Version}
+	waivers, err := analysis.ReadWaivers(corpus.WaiversPath(corpusRoot()))
+	if err != nil {
+		return err
+	}
+	p.Waivers = waivers.For(id, version)
 	switch *class {
 	case "open":
 		p.Text = true
