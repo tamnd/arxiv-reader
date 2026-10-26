@@ -29,7 +29,7 @@ import (
 // never be found, so the ones that are have to say how confident they are.
 func runGraph(args []string) error {
 	if len(args) < 1 {
-		return errors.New("usage: ax graph build [-all|-shard <yymm>|<id> ...], ax graph node <uri>, ax graph out <id>, or ax graph in <id>")
+		return errors.New("usage: ax graph build [-all|-shard <yymm>|<id> ...], ax graph node <uri>, ax graph out <id>, ax graph in <id>, or ax graph report")
 	}
 	switch args[0] {
 	case "build":
@@ -40,8 +40,10 @@ func runGraph(args []string) error {
 		return graphOut(args[1:])
 	case "in":
 		return graphIn(args[1:])
+	case "report":
+		return graphReport(args[1:])
 	default:
-		return fmt.Errorf("unknown graph subcommand %q, the subcommands are build, node, out and in", args[0])
+		return fmt.Errorf("unknown graph subcommand %q, the subcommands are build, node, out, in and report", args[0])
 	}
 }
 

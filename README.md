@@ -1798,6 +1798,15 @@ written to reports/census.md
 
 `ax witness import -index theoremsearch` and `-index theoremgraph` read the outside indexes of AX8.5 into `analysis/witness/<index>/<YYMM>.jsonl`. For each paper in scope a witness record gives the count of results, the count of each kind and the printed numbers, and no text. The import reads the dataset on Hugging Face at a pinned revision and writes the revision in `import.json`. It reads the parquet file of TheoremSearch with range requests and the CSV files of TheoremGraph as a stream, so nothing goes to the disk. The batch puts the counts in the field `outside` of the census record, and `ax census report` compares them with the census (AX4.5, AQ21). A version where an index has more than one result more than the census has items goes to the queue census-diff in the report.
 
+`ax census -write` also resolves the edges of AX6 between the items of the paper and writes them to `analysis/edges/<YYMM>/<id>.jsonl`. Each edge has a predicate, a method, a confidence and the place of its cue, and no text of the paper. The methods are attach, ref, text, cite, position, scope and term. A cycle in the in-paper uses graph gets the flag `cycle`. Rule D10 of `ax audit -group D` checks the method and the confidence of each edge, and rule D19 lists each version with a cycle.
+
+`ax graph report` counts the edges into `reports/graph.md`. These are the checks of AX6.7: the share of statements with an incoming uses or proves edge, the share of proofs that use nothing, the versions with a cycle, and the share of each method, confidence and predicate. The report gives them for each MSC code at two digits and for each month. A share that moves by more than 5 points from one month to the next, for one code, is listed as a finding.
+
+```
+$ ax graph report
+reports/graph.md: 15 versions, 657 edges
+```
+
 ```
 $ ax witness import -index theoremsearch
 theoremsearch: 1239720 results read, 1160579 kept for 70981 papers in scope over 255 months

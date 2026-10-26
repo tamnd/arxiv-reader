@@ -27,12 +27,17 @@ func TestAnalysisRules(t *testing.T) {
 	put("analysis/stopped/2312/2312.00001v1.json", `{"paper":"2312.00001","version":1,"state":"stopped","reason":"failed","by":"ax/0","on":"2026-10-27"}`)
 	put("analysis/stopped/2312/2312.00003v2.json", `{"paper":"2312.00003","version":2,"state":"stopped","reason":"tired","by":"ax/0","on":"2026-10-27"}`)
 	put("analysis/stopped/2312/2312.00004v1.json", `{"paper":"2312.00004","version":1,"state":"stopped","reason":"no-source","by":"ax/0","on":"2026-10-27"}`)
+	put("analysis/edges/2312/2312.00001.jsonl", `{"from":"2312.00001#proof-1","to":"2312.00001#lemma-1","predicate":"uses","method":"ref","confidence":"certain","flags":["cycle"],"evidence":{"version":1,"cue":"by"},"extractor":"ax/0"}
+{"from":"2312.00001#proof-2","to":"2312.00001#lemma-2","predicate":"uses","method":"ref","confidence":"certain","flags":["cycle"],"evidence":{"version":1,"cue":"by"},"extractor":"ax/0"}
+{"from":"2312.00001#remark-1","to":"2312.00001#lemma-1","predicate":"refers-to","method":"model","confidence":"high","evidence":{"version":1,"cue":"none"},"extractor":"ax/0"}
+{"from":"2312.00001#remark-1","to":"2312.00001#lemma-2","predicate":"refers-to","method":"guess","confidence":"low","evidence":{"version":1,"cue":"none"},"extractor":"ax/0"}
+`)
 	a := Analysis{Root: root, Cap: 10, Text: func(string, int) (bool, bool) { return false, true }}
 	rep, err := a.Run()
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]int{"D01": 2, "D02": 2, "D03": 3, "D04": 2, "D06": 1, "D13": 1, "D15": 1}
+	want := map[string]int{"D01": 2, "D02": 2, "D03": 3, "D04": 2, "D06": 1, "D10": 2, "D13": 1, "D15": 1, "D19": 1}
 	for _, r := range rep.Results {
 		if r.Total != want[r.Rule.ID] {
 			t.Errorf("%s: %d findings, want %d: %+v", r.Rule.ID, r.Total, want[r.Rule.ID], r.Findings)
