@@ -1777,6 +1777,13 @@ $ ax audit -q
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
 
+A range of dates cannot name a short list of papers, as the papers that a paper in the corpus cites. For that, `-id` reads each paper with one GetRecord request, at the same pace of three seconds.
+
+```
+$ ax harvest oai -id 2302.13971,2307.09288
+2 added, 0 updated, 0 unchanged over 2 months
+```
+
 ```
 $ ax licence explain cc-by-nc-nd
 licence      cc-by-nc-nd

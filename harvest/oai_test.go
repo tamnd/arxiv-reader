@@ -552,3 +552,33 @@ func TestVersionNumber(t *testing.T) {
 		}
 	}
 }
+
+// GetRecord reads one paper by its id, and the fixture is a real answer.
+func TestGetReadsOnePaperByItsID(t *testing.T) {
+	srv, n := serve(t, "get_2302_13971.xml")
+	recs, err := client(srv.URL).Get(context.Background(), FormatRaw, []string{"2302.13971"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *n != 1 || len(recs) != 1 {
+		t.Fatalf("got %d records from %d requests, want 1 from 1", len(recs), *n)
+	}
+	r := recs[0]
+	if r.ID != "2302.13971" || len(r.Versions) != 1 || r.Versions[0].Licence != corpus.LicenceCCBY {
+		t.Errorf("got %+v", r)
+	}
+}
+
+func TestGetOfAnUnknownIDIsAnError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">
+  <error code="idDoesNotExist">no such record</error>
+</OAI-PMH>`))
+	}))
+	defer srv.Close()
+	_, err := client(srv.URL).Get(context.Background(), FormatRaw, []string{"2399.99999"})
+	if err == nil || !strings.Contains(err.Error(), "idDoesNotExist") {
+		t.Errorf("got %v, want the OAI code", err)
+	}
+}

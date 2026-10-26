@@ -228,6 +228,40 @@ func (o *OAI) Records(ctx context.Context, q Query) ([]metadata.Record, error) {
 	return out, err
 }
 
+// Get reads the records of the papers with these ids, one GetRecord request
+// for each. It is for a short list of papers that a range cannot name, as the
+// papers that a paper in the corpus cites. An id that arXiv does not know is an
+// error, because the caller asked for that paper by name.
+func (o *OAI) Get(ctx context.Context, format string, ids []string) ([]metadata.Record, error) {
+	if err := (Query{Format: format}).Validate(); err != nil {
+		return nil, err
+	}
+	var out []metadata.Record
+	for _, id := range ids {
+		v := url.Values{"verb": {"GetRecord"}, "metadataPrefix": {format}, "identifier": {"oai:arXiv.org:" + id}}
+		body, err := o.get(ctx, v)
+		if err != nil {
+			return out, err
+		}
+		var resp getResponse
+		if err := xml.Unmarshal(body, &resp); err != nil {
+			return out, fmt.Errorf("harvest: the record of %s is not the XML we expected: %w", id, err)
+		}
+		if resp.Error.Code != "" {
+			return out, fmt.Errorf("harvest: arXiv answered %s for %s: %s", resp.Error.Code, id, strings.TrimSpace(resp.Error.Message))
+		}
+		if resp.Record.Header.Status == "deleted" {
+			return out, fmt.Errorf("harvest: arXiv has %s as a deleted record", id)
+		}
+		r, err := o.record(resp.Record, format)
+		if err != nil {
+			return out, err
+		}
+		out = append(out, r)
+	}
+	return out, nil
+}
+
 // get makes one request, keeping to the pace and honouring a 503.
 func (o *OAI) get(ctx context.Context, v url.Values) ([]byte, error) {
 	endpoint := o.Endpoint
@@ -451,6 +485,12 @@ type listResponse struct {
 	Error   oaiError    `xml:"error"`
 	Records []oaiRecord `xml:"ListRecords>record"`
 	Token   string      `xml:"ListRecords>resumptionToken"`
+}
+
+type getResponse struct {
+	XMLName xml.Name  `xml:"OAI-PMH"`
+	Error   oaiError  `xml:"error"`
+	Record  oaiRecord `xml:"GetRecord>record"`
 }
 
 type oaiError struct {

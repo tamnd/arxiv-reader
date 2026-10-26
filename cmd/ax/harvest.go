@@ -342,8 +342,18 @@ func harvestOAI(args []string) error {
 	limit := fs.Int("limit", 0, "stop after about this many records, rounded up to the end of a page")
 	dry := fs.Bool("n", false, "fetch and report, but write nothing")
 	quiet := fs.Bool("q", false, "no per page progress")
+	ids := fs.String("id", "", "read only these papers, as ids separated by commas, with one GetRecord request for each")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	var only []string
+	for _, id := range strings.Split(*ids, ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			only = append(only, id)
+		}
+	}
+	if len(only) > 0 && (*from != "" || *until != "" || *set != "" || *limit != 0) {
+		return errors.New("-id names the papers, so it does not go with -from, -until, -set or -limit")
 	}
 
 	query := harvest.Query{
@@ -360,7 +370,7 @@ func harvestOAI(args []string) error {
 	// paper was submitted, so an unbounded run asks for the whole archive. That
 	// is a week of requests and it should be something a person typed on
 	// purpose.
-	if query.From == "" && query.Until == "" && query.Limit == 0 {
+	if len(only) == 0 && query.From == "" && query.Until == "" && query.Limit == 0 {
 		return errors.New("a harvest with no -from, no -until and no -limit asks for the whole archive, which is about a week of requests, so say -from 1991-01-01 if that is what you meant")
 	}
 
@@ -382,10 +392,15 @@ func harvestOAI(args []string) error {
 
 	plane := metadata.Plane{Root: corpusRoot()}
 	var records []metadata.Record
-	err := client.List(context.Background(), query, func(r metadata.Record) error {
-		records = append(records, r)
-		return nil
-	})
+	var err error
+	if len(only) > 0 {
+		records, err = client.Get(context.Background(), query.Format, only)
+	} else {
+		err = client.List(context.Background(), query, func(r metadata.Record) error {
+			records = append(records, r)
+			return nil
+		})
+	}
 	if err != nil {
 		return err
 	}
