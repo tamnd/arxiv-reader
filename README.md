@@ -1749,6 +1749,43 @@ A version whose licence does not allow text gives structure only: numbers, label
 `ax audit -group D` reads those two planes and checks rules D02, D03, D04, D06, D07, D08, D09, D13 and D15.
 The forms that the census must count are in `testdata/sett/`, one small TeX file for each form with the result it must give, and `go test ./analysis` runs them.
 
+`ax census batch` takes the latest version of each paper in a list to the state `extracted`, or to `stopped` with a reason.
+For each paper it reads the licence of the version from the abs page, fetches the e-print, and fetches the render when arXiv has one, which is for versions from December 2023.
+Then it writes the census record and the object records, and it removes the downloads from `work/`.
+A paper that cannot go further gets a stop record in `analysis/stopped/<YYMM>/<id>v<n>.json`, with the reason `no-source`, `withdrawn`, `licence` or `failed`.
+The front end has 60 seconds for each paper.
+All requests keep one pace of 15 seconds, so a paper takes 30 or 45 seconds.
+A paper with a census record or a stop record is not done again, so a stopped batch starts again with the same command.
+
+```
+$ ax census batch -list manifests/gold/x-v1.txt -limit 3
+1/915 math/0003117 extracted
+2/915 alg-geom/9506022 extracted
+3/915 math/0009023 extracted
+915 papers: 0 extracted before, 3 extracted now
+```
+
+`ax gold` makes gold set X of AX11.2, which measures the extractor against papers that people marked.
+`ax gold draw` draws the set from the open papers of the scope: 100 papers from each of 1991-2000, 2001-2010 and 2011-2020, 400 from 2021-2026, and 300 for the form of the heads.
+Inside each group the MSC codes at two digits are in proportion, and each code with 1,000 papers or more gets at least 5.
+The draw is the same for the same seed, and it writes `manifests/gold/x-v1.txt`.
+`ax gold propose <id>v<n>` writes a proposed gold record from the object records, and a person corrects the marks.
+`ax gold mark -by <person> <id>v<n>` records that the person decided each mark.
+A proposed record is not scored, and a proposal does not write over a marked record.
+`ax gold score -report reports/gold-x.md` scores the extractor against the marked records, with the targets of AX11.3.
+
+```
+$ ax gold draw
+915 papers drawn from 129697 open papers in scope
+  1991-2000    15 of 100
+  2001-2010   100 of 100
+  2011-2020   100 of 100
+  2021-2026   400 of 400
+  form        300 of 300
+```
+
+The scope has only 15 open papers from 1991-2000, so that group is short. The rest of it waits for AQ01.
+
 `ax select scope` writes the list of the papers in the math scope, `manifests/scope/math.txt`, from the metadata plane.
 A paper is in scope when one of its categories is a math category, math-ph, or one of the old archives alg-geom, dg-ga, funct-an and q-alg.
 The list holds the ids only, sorted, and its first line gives the counts.
