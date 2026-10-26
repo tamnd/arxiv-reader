@@ -359,9 +359,7 @@ func (c *Census) labels() {
 		o.Parent = "#" + fmt.Sprint(indexOf(c.Occurrences, owner))
 		found = append(found, o)
 	}
-	for _, o := range found {
-		c.Occurrences = append(c.Occurrences, o)
-	}
+	c.Occurrences = append(c.Occurrences, found...)
 }
 
 func (c *Census) innermost(off int) *Occurrence {
