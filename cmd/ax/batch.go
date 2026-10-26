@@ -10,7 +10,6 @@ import (
 	iofs "io/fs"
 	"os"
 	"os/signal"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -25,31 +24,6 @@ import (
 	"github.com/tamnd/arxiv-reader/metadata"
 	"github.com/tamnd/arxiv-reader/source"
 )
-
-// The reasons of the state stopped (AX1.6).
-const (
-	StopNoSource  = "no-source"
-	StopWithdrawn = "withdrawn"
-	StopLicence   = "licence"
-	StopFailed    = "failed"
-)
-
-// Stop is the record of a version that cannot go further. A version with a
-// census record is extracted, and a version with a stop record is stopped.
-type Stop struct {
-	Paper   string `json:"paper"`
-	Version int    `json:"version"`
-	State   string `json:"state"`
-	Reason  string `json:"reason"`
-	Detail  string `json:"detail,omitempty"`
-	By      string `json:"by"`
-	On      string `json:"on"`
-}
-
-// StopPath is the stop record of one version.
-func StopPath(root string, id axid.ID, version int) string {
-	return path.Join(root, "analysis", "stopped", corpus.Shard(id), fmt.Sprintf("%sv%d.json", corpus.PathID(id), version))
-}
 
 // renderFrom is the first month that arXiv rendered. It does not render the
 // versions before it.
@@ -133,7 +107,7 @@ func censusBatch(args []string) error {
 		}
 	}
 	fmt.Printf("%d papers: %d extracted before, %d extracted now", len(ids), counts["done"], counts["extracted"])
-	for _, r := range []string{StopNoSource, StopWithdrawn, StopLicence, StopFailed} {
+	for _, r := range analysis.StopReasons {
 		if n := counts["stopped: "+r]; n > 0 {
 			fmt.Printf(", %d stopped: %s", n, r)
 		}
@@ -184,7 +158,7 @@ func (b *batch) one(ctx context.Context, ref string) (state string, did bool, er
 		return "", false, fmt.Errorf("the record has no versions")
 	}
 	v := latest.Version
-	if exists(corpus.CensusPath(b.root, id, v)) || exists(StopPath(b.root, id, v)) {
+	if exists(corpus.CensusPath(b.root, id, v)) || exists(corpus.StopPath(b.root, id, v)) {
 		return "done", false, nil
 	}
 	ver := fmt.Sprintf("%sv%d", rec.ID, v)
@@ -201,7 +175,7 @@ func (b *batch) one(ctx context.Context, ref string) (state string, did bool, er
 		latest, _ = rec.VersionAt(v)
 	}
 	if !corpus.AccessFor(latest.Licence).MayPublishText() {
-		return b.stop(id, rec.ID, v, StopLicence, fmt.Sprintf("the abs page gives %s for v%d", latest.Licence, v))
+		return b.stop(id, rec.ID, v, analysis.StopLicence, fmt.Sprintf("the abs page gives %s for v%d", latest.Licence, v))
 	}
 
 	order := fetch.Order{Record: rec, Version: v}
@@ -213,9 +187,9 @@ func (b *batch) one(ctx context.Context, ref string) (state string, did bool, er
 	res, err := b.fetcher.EPrint(ctx, b.root, b.m, order)
 	var noEPrint *fetch.NoEPrint
 	if errors.As(err, &noEPrint) {
-		reason := StopNoSource
+		reason := analysis.StopNoSource
 		if strings.Contains(strings.ToLower(rec.Comments), "withdrawn") {
-			reason = StopWithdrawn
+			reason = analysis.StopWithdrawn
 		}
 		return b.stop(id, rec.ID, v, reason, err.Error())
 	}
@@ -230,10 +204,10 @@ func (b *batch) one(ctx context.Context, ref string) (state string, did bool, er
 	if errors.As(err, &pdfOnly) {
 		res.Entry.Holds = fetch.HoldsPDF
 		b.m.Put(res.Entry)
-		return b.stop(id, rec.ID, v, StopNoSource, "the e-print is a PDF and has no TeX source")
+		return b.stop(id, rec.ID, v, analysis.StopNoSource, "the e-print is a PDF and has no TeX source")
 	}
 	if err != nil {
-		return b.stop(id, rec.ID, v, StopFailed, "the e-print does not read: "+err.Error())
+		return b.stop(id, rec.ID, v, analysis.StopFailed, "the e-print does not read: "+err.Error())
 	}
 	res.Entry.Holds = fetch.HoldsTeX
 	b.m.Put(res.Entry)
@@ -278,10 +252,10 @@ func (b *batch) one(ctx context.Context, ref string) (state string, did bool, er
 	select {
 	case got = <-done:
 	case <-time.After(frontEndLimit):
-		return b.stop(id, rec.ID, v, StopFailed, fmt.Sprintf("the front end did not finish in %s", frontEndLimit))
+		return b.stop(id, rec.ID, v, analysis.StopFailed, fmt.Sprintf("the front end did not finish in %s", frontEndLimit))
 	}
 	if got.err != nil {
-		return b.stop(id, rec.ID, v, StopFailed, got.err.Error())
+		return b.stop(id, rec.ID, v, analysis.StopFailed, got.err.Error())
 	}
 	if err := writeAnalysis(b.root, rec.ID, v, got.res); err != nil {
 		return "", true, err
@@ -290,15 +264,15 @@ func (b *batch) one(ctx context.Context, ref string) (state string, did bool, er
 }
 
 func (b *batch) stop(id axid.ID, paper string, version int, reason, detail string) (string, bool, error) {
-	s := Stop{Paper: paper, Version: version, State: "stopped", Reason: reason, Detail: detail, By: "ax/" + Version, On: time.Now().UTC().Format("2006-01-02")}
+	s := analysis.Stop{Paper: paper, Version: version, State: analysis.Stopped, Reason: reason, Detail: detail, By: "ax/" + Version, On: time.Now().UTC().Format("2006-01-02")}
 	out, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return "", true, err
 	}
-	if err := writeFile(StopPath(b.root, id, version), append(out, '\n')); err != nil {
+	if err := writeFile(corpus.StopPath(b.root, id, version), append(out, '\n')); err != nil {
 		return "", true, err
 	}
-	return "stopped: " + reason, true, nil
+	return analysis.Stopped + ": " + reason, true, nil
 }
 
 // remove removes one download from work/, unless the batch keeps them. The
