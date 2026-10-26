@@ -362,6 +362,12 @@ func AnalysisObjectsPath(root string, id axid.ID) string {
 	return path.Join(root, "analysis", "objects", Shard(id), PathID(id)+".jsonl")
 }
 
+// GoldPath is the gold record of one version in one version of a gold set
+// (AX11.2).
+func GoldPath(root, set, setVersion string, id axid.ID, version int) string {
+	return path.Join(root, "gold", strings.ToLower(set), setVersion, Shard(id), fmt.Sprintf("%sv%d.json", PathID(id), version))
+}
+
 // EdgesPath is the edge records of one paper (AX6.4). It is committed like
 // the census and the object records.
 func EdgesPath(root string, id axid.ID) string {

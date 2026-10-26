@@ -1,0 +1,321 @@
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"flag"
+	"fmt"
+	iofs "io/fs"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/tamnd/arxiv-cli/pkg/axid"
+	"github.com/tamnd/arxiv-reader/census"
+	"github.com/tamnd/arxiv-reader/corpus"
+	"github.com/tamnd/arxiv-reader/gold"
+	"github.com/tamnd/arxiv-reader/licence"
+	"github.com/tamnd/arxiv-reader/metadata"
+	"github.com/tamnd/arxiv-reader/objects"
+	"github.com/tamnd/arxiv-reader/scope"
+)
+
+// runGold is ax gold: the gold sets of AX11.2.
+func runGold(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: ax gold <draw|propose|mark|score>")
+	}
+	switch args[0] {
+	case "draw":
+		return goldDraw(args[1:])
+	case "propose":
+		return goldPropose(args[1:])
+	case "mark":
+		return goldMark(args[1:])
+	case "score":
+		return goldScore(args[1:])
+	}
+	return fmt.Errorf("unknown gold subcommand %q", args[0])
+}
+
+func setFlags(fs *flag.FlagSet) (set, version *string) {
+	set = fs.String("set", "x", "the gold set, and only x is known")
+	version = fs.String("version", "v1", "the version of the set")
+	return set, version
+}
+
+func checkSet(set string) error {
+	if strings.ToLower(set) != "x" {
+		return fmt.Errorf("%q is not a gold set that ax knows, want x", set)
+	}
+	return nil
+}
+
+// goldDraw draws set X from the open papers of the math scope (AX11.2).
+func goldDraw(args []string) error {
+	fs := flag.NewFlagSet("ax gold draw", flag.ContinueOnError)
+	set, version := setFlags(fs)
+	seed := fs.String("seed", "", "the seed of the draw, and the set and its version when empty")
+	dry := fs.Bool("n", false, "draw and count, but write nothing")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if err := checkSet(*set); err != nil {
+		return err
+	}
+	if *seed == "" {
+		*seed = strings.ToLower(*set) + "-" + *version
+	}
+	root := corpusRoot()
+	in, err := scope.Read(scope.Path(root, scope.Math))
+	if err != nil {
+		return fmt.Errorf("%w, so run ax select scope first", err)
+	}
+	plane := metadata.Plane{Root: root}
+	var pool []gold.Candidate
+	err = plane.ScanAll(func(shard string, r metadata.Record) error {
+		if !in[r.ID] {
+			return nil
+		}
+		if l, _ := licence.Latest(r); licence.ClassOf(l) != licence.ClassOpen {
+			return nil
+		}
+		month, err := metadata.ShardMonth(shard)
+		if err != nil {
+			return err
+		}
+		pool = append(pool, gold.Candidate{ID: r.ID, Year: month.Year(), Code: gold.CodeOf(r)})
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	picks := gold.Draw(pool, gold.PlanX, *seed)
+	groups := map[string]int{}
+	for _, p := range picks {
+		groups[p.Group]++
+	}
+	fmt.Printf("%d papers drawn from %d open papers in scope\n", len(picks), len(pool))
+	for _, g := range gold.PlanX.Groups {
+		fmt.Printf("  %-10s %4d of %d\n", g.Name, groups[g.Name], g.Size)
+	}
+	if *dry {
+		return nil
+	}
+	path := gold.ListPath(root, *set, *version)
+	header := fmt.Sprintf("gold set %s %s: %d papers drawn from %d open papers of scope-math with the seed %q on %s. The columns are the id, the group and the MSC code at two digits, or the primary category when the paper gives no MSC code.",
+		strings.ToUpper(*set), *version, len(picks), len(pool), *seed, time.Now().UTC().Format("2006-01-02"))
+	for _, g := range gold.PlanX.Groups {
+		if n := groups[g.Name]; n < g.Size {
+			header += fmt.Sprintf(" The group %s has %d of %d papers, because the scope has only %d open papers in it. The rest of the group waits for AQ01, because a record paper can be marked only after AQ01 allows it (AX11.1).", g.Name, n, g.Size, n)
+		}
+	}
+	if err := gold.WriteList(path, header, picks); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "written to %s\n", path)
+	return nil
+}
+
+func readObjectsOf(root string, id axid.ID) ([]objects.Record, error) {
+	b, err := os.ReadFile(corpus.AnalysisObjectsPath(root, id))
+	if errors.Is(err, iofs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var out []objects.Record
+	for line := range bytes.SplitSeq(b, []byte("\n")) {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		var r objects.Record
+		if err := json.Unmarshal(line, &r); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, nil
+}
+
+func groupOf(root, set, version, paper string) string {
+	picks, err := gold.ReadList(gold.ListPath(root, set, version))
+	if err != nil {
+		return ""
+	}
+	for _, p := range picks {
+		if p.ID == paper {
+			return p.Group
+		}
+	}
+	return ""
+}
+
+// goldPropose writes a proposed gold record from the object records of a
+// version. It does not write over a marked record.
+func goldPropose(args []string) error {
+	fs := flag.NewFlagSet("ax gold propose", flag.ContinueOnError)
+	set, version := setFlags(fs)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if err := checkSet(*set); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return errors.New("usage: ax gold propose [-set x] [-version v1] <id>v<n>")
+	}
+	paper, v, err := splitVersion(fs.Arg(0))
+	if err != nil {
+		return err
+	}
+	id, err := axid.Parse(paper)
+	if err != nil {
+		return err
+	}
+	root := corpusRoot()
+	path := corpus.GoldPath(root, *set, *version, id, v)
+	if old, err := gold.Read(path); err == nil && old.State == gold.Marked {
+		return fmt.Errorf("%s is marked by %s, and a proposal does not write over it", path, old.By)
+	}
+	recs, err := readObjectsOf(root, id)
+	if err != nil {
+		return err
+	}
+	if len(gold.Items(recs, fmt.Sprint(v))) == 0 {
+		fmt.Fprintf(os.Stderr, "%sv%d has no object records with an item kind, so the proposal has no marks\n", paper, v)
+	}
+	r := gold.Propose(strings.ToUpper(*set), *version, groupOf(root, *set, *version, paper), "ax/"+Version, paper, v, recs)
+	if err := r.Write(path); err != nil {
+		return err
+	}
+	fmt.Printf("%sv%d: %d marks proposed, written to %s\n", paper, v, len(r.Marks), path)
+	return nil
+}
+
+// goldMark records that a person decided each mark of a record.
+func goldMark(args []string) error {
+	fs := flag.NewFlagSet("ax gold mark", flag.ContinueOnError)
+	set, version := setFlags(fs)
+	by := fs.String("by", "", "the person who read the paper and decided each mark")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if err := checkSet(*set); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 || strings.TrimSpace(*by) == "" {
+		return errors.New("usage: ax gold mark [-set x] [-version v1] -by <person> <id>v<n>")
+	}
+	paper, v, err := splitVersion(fs.Arg(0))
+	if err != nil {
+		return err
+	}
+	id, err := axid.Parse(paper)
+	if err != nil {
+		return err
+	}
+	path := corpus.GoldPath(corpusRoot(), *set, *version, id, v)
+	r, err := gold.Read(path)
+	if err != nil {
+		return fmt.Errorf("%w, so run ax gold propose first and correct the marks", err)
+	}
+	r.State, r.By, r.On = gold.Marked, *by, time.Now().UTC().Format("2006-01-02")
+	if err := r.Write(path); err != nil {
+		return err
+	}
+	fmt.Printf("%sv%d: %d marks, marked by %s\n", paper, v, len(r.Marks), *by)
+	return nil
+}
+
+// goldScore scores the object records against the marked records of a set.
+func goldScore(args []string) error {
+	fs := flag.NewFlagSet("ax gold score", flag.ContinueOnError)
+	set, version := setFlags(fs)
+	report := fs.String("report", "", "write the markdown report here as well")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if err := checkSet(*set); err != nil {
+		return err
+	}
+	root := corpusRoot()
+	picks, err := gold.ReadList(gold.ListPath(root, *set, *version))
+	if err != nil {
+		return fmt.Errorf("%w, so run ax gold draw first", err)
+	}
+	s := gold.Score{Set: strings.ToUpper(*set), SetVersion: *version, Extractor: "ax/" + Version, Papers: len(picks)}
+	for _, p := range picks {
+		id, err := axid.Parse(p.ID)
+		if err != nil {
+			return err
+		}
+		recs, err := readObjectsOf(root, id)
+		if err != nil {
+			return err
+		}
+		v := latestVersion(recs)
+		if v == 0 {
+			continue
+		}
+		if c, err := os.ReadFile(corpus.CensusPath(root, id, v)); err == nil {
+			var rec census.Record
+			if json.Unmarshal(c, &rec) == nil {
+				s.Strength.Of++
+				if rec.Strength == "strong" || rec.Strength == "normal" {
+					s.Strength.Hit++
+				}
+			}
+		}
+		g, err := gold.Read(corpus.GoldPath(root, *set, *version, id, v))
+		if errors.Is(err, iofs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if g.State != gold.Marked {
+			s.Proposed++
+			continue
+		}
+		s.Marked++
+		s.Add(gold.ScorePaper(g, recs))
+	}
+	md := s.Markdown()
+	fmt.Print(md)
+	if *report != "" {
+		if err := writeFile(*report, []byte(md)); err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "written to %s\n", *report)
+	}
+	return nil
+}
+
+// latestVersion is the latest version that has object records of the source
+// path, or 0.
+func latestVersion(recs []objects.Record) int {
+	v := 0
+	for _, r := range recs {
+		if r.Path != "source" {
+			continue
+		}
+		if n := atoiOr(r.Version); n > v {
+			v = n
+		}
+	}
+	return v
+}
+
+func atoiOr(s string) int {
+	n := 0
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return 0
+		}
+		n = n*10 + int(c-'0')
+	}
+	return n
+}
