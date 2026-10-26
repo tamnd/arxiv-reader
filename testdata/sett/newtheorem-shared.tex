@@ -1,0 +1,35 @@
+% Pattern: env/newtheorem/article. A counter within section, shared by two
+% environments, and an unnumbered environment.
+% want theorem-1 statement/theorem 1.1 status=here labels=thm:a
+% want proof-1 proof - proves=theorem-1
+% want lemma-1 statement/lemma 1.2 status=none
+% want remark-1 remark -
+% want theorem-2 statement/theorem 2.1 status=here
+% want proof-2 proof - proves=theorem-2
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem*{remark}{Remark}
+\begin{document}
+\section{One}
+\begin{theorem}\label{thm:a}
+Every $x$ is $x$.
+\end{theorem}
+\begin{proof}
+Clear.
+\end{proof}
+\begin{lemma}
+A lemma with no proof.
+\end{lemma}
+\begin{remark}
+A remark.
+\end{remark}
+\section{Two}
+\begin{theorem}
+Another one.
+\end{theorem}
+\begin{proof}
+Also clear.
+\end{proof}
+\end{document}

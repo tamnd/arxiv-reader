@@ -1725,6 +1725,30 @@ A paper URI matches its objects too, so asking what a paper cites is everything 
 A shard is a month, a rebuild is a paper, and rebuilding one paper drops that paper's stored edges and leaves every other paper in the month exactly as it was.
 An edge that was already there keeps the day it was first written, because a build that stamped today on everything it saw would turn every rebuild into a diff on every line.
 
+`ax census` reads the TeX source of one version and counts each theorem-like item in it.
+It finds the environments that the paper declares, the proofs, the manual heads such as a bold "Lemma 3." at the start of a paragraph, and the restatements.
+Then it makes one object record for each item, and it matches each count to a record.
+An occurrence with no record is a gap, and a record with no occurrence is a phantom.
+The numbers come from a model of the LaTeX counters, and the render of the same version is the second witness when one is given.
+
+```
+$ ax census -render 2312.00752v2.html -write 2312.00752v2 2312.00752.gz
+paper       2312.00752v2
+main        main.tex
+occurrences env 3, proof 1, head 0, restate 0, label 2, textref 0
+matched     env 3, proof 1, head 0, restate 0
+numbers     aux 0, render 3, counter 0, head 0, agree 3, disagree 0, contiguity gaps 0
+textrefs    resolved 0, unresolved 0
+render      theorems 3, proofs 1, agree true
+gaps        0
+strength    strong
+```
+
+With `-write` the command writes `analysis/census/<YYMM>/<id>v<n>.json` and `analysis/objects/<YYMM>/<id>.jsonl` in the corpus.
+A version whose licence does not allow text gives structure only: numbers, labels, kinds, spans and hashes, and no body and no name.
+`ax audit -group D` reads those two planes and checks rules D02, D03, D04, D06, D07, D08, D09, D13 and D15.
+The forms that the census must count are in `testdata/sett/`, one small TeX file for each form with the result it must give, and `go test ./analysis` runs them.
+
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
 

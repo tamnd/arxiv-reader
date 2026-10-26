@@ -1,0 +1,21 @@
+% Pattern: env/declaretheorem/article. Keys name, numberwithin and sibling.
+% want thm-1 statement/theorem 1.1
+% want lem-1 statement/lemma 1.2
+% want defn-1 definition -
+\documentclass{article}
+\usepackage{amsthm,thmtools}
+\declaretheorem[name=Theorem,numberwithin=section]{thm}
+\declaretheorem[name=Lemma,sibling=thm]{lem}
+\declaretheorem[name=Definition,numbered=no]{defn}
+\begin{document}
+\section{Start}
+\begin{thm}
+First.
+\end{thm}
+\begin{lem}
+Second.
+\end{lem}
+\begin{defn}
+A word.
+\end{defn}
+\end{document}

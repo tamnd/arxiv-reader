@@ -292,6 +292,27 @@ func (b *Bundle) Main() (string, error) {
 	return "", fmt.Errorf("source: %d files in this submission begin a document and nothing tells them apart, which are %s, so name the one to read", len(candidates), strings.Join(candidates, ", "))
 }
 
+// Mains is each file that a document starts from.
+//
+// It is Main when Main finds one file. When Main finds more than one and cannot
+// tell them apart, it is all of them, because a census has to count the items
+// of each one. A thesis in parts and a paper with a supplement are the usual
+// cases.
+func (b *Bundle) Mains() ([]string, error) {
+	main, err := b.Main()
+	if err == nil {
+		return []string{main}, nil
+	}
+	candidates := b.documents()
+	if len(candidates) < 2 {
+		return nil, err
+	}
+	if left := b.notIncluded(candidates); len(left) > 1 {
+		return left, nil
+	}
+	return candidates, nil
+}
+
 // declared reads the file where the submitter says which file is the top level
 // one.
 //

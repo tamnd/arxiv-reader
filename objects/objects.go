@@ -84,6 +84,67 @@ type Record struct {
 	// Confidence is how much the recognition of this object is worth, in the
 	// vocabulary of 2166-08: certain, high or medium, and never low.
 	Confidence string `json:"confidence"`
+
+	// The fields of AX3.9. They are set by the analysis of the source and are
+	// empty for an object of the content plane that the analysis did not see.
+
+	// Env is the environment name in the paper, or head for a manual head.
+	Env string `json:"env,omitempty"`
+	// Item is the item kind of AX1.3, as statement/lemma.
+	Item string `json:"item,omitempty"`
+	// Head is environment, manual, section or prose.
+	Head string `json:"head,omitempty"`
+	// Counter is the counter, and NumberFrom says where Number came from:
+	// aux, render, counter or head (AX4.4).
+	Counter    string `json:"counter,omitempty"`
+	NumberFrom string `json:"number_from,omitempty"`
+	// Name is the name in the optional argument or the head, and CitesInHead
+	// is each citation in the head, as key or key|locator.
+	Name        string   `json:"name,omitempty"`
+	CitesInHead []string `json:"cites_in_head,omitempty"`
+	Labels      []string `json:"labels,omitempty"`
+	Parts       []Part   `json:"parts,omitempty"`
+	// Parent is the local identifier of the enclosing proof or item, and Scope
+	// is local for an item inside a proof and paper otherwise.
+	Parent string `json:"parent,omitempty"`
+	Scope  string `json:"scope,omitempty"`
+	// ProofStatus is here, elsewhere, cited, omitted, restated or none, for
+	// a statement (AX3.6).
+	ProofStatus string `json:"proof_status,omitempty"`
+	// Proves is the local identifier of what a proof proves, ProvesPart the
+	// part, and Attach the rule of AX3.6 that attached it.
+	Proves     string `json:"proves,omitempty"`
+	ProvesPart string `json:"proves_part,omitempty"`
+	Attach     int    `json:"attach,omitempty"`
+	// Origin is own, restated, cited or folklore, and Restates is the local
+	// identifier of the first item of a restatement (AX3.7).
+	Origin   string   `json:"origin,omitempty"`
+	Restates string   `json:"restates,omitempty"`
+	Flags    []string `json:"flags,omitempty"`
+	Span     *Span    `json:"span,omitempty"`
+	// Hash and MinHash are the fingerprints of AX3.8.
+	Hash    string `json:"hash,omitempty"`
+	MinHash string `json:"minhash,omitempty"`
+	// Census is the id of the census occurrence that this object accounts
+	// for (AX4.2), and Extractor the version of the extractor (rule D13).
+	Census    string `json:"census,omitempty"`
+	Extractor string `json:"extractor,omitempty"`
+}
+
+// Part is one part of an item, as the (b) of Theorem 2.1(b) (AX3.5).
+type Part struct {
+	Marker string `json:"marker"`
+	Label  string `json:"label,omitempty"`
+	From   int    `json:"from,omitempty"`
+	To     int    `json:"to,omitempty"`
+}
+
+// Span is where an item is in the expanded source: the file of its first
+// line, and its first and last line.
+type Span struct {
+	File string `json:"file"`
+	From int    `json:"from"`
+	To   int    `json:"to"`
 }
 
 // Paper is one paper's objects, in reading order.

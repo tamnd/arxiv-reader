@@ -1,0 +1,15 @@
+% Pattern: head/bold/article. Heads written by hand, with a proof head and an
+% end mark.
+% want head-1 statement/theorem 2.1 status=here
+% want head-2 proof - proves=head-1
+% want head-3 definition -
+\documentclass{article}
+\begin{document}
+Some text before.
+
+\medskip\noindent{\bf Theorem 2.1.} {\it Let $X$ be a compact space. Then $X$ is bounded.}
+
+\noindent{\it Proof.} Cover $X$ by balls. \qed
+
+\noindent\textbf{Definition.} A space is nice when it is compact.
+\end{document}

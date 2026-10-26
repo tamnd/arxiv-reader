@@ -24,7 +24,8 @@ import (
 // cheap one wait for the expensive one on every push.
 func runAudit(args []string) error {
 	fs := flag.NewFlagSet("ax audit", flag.ContinueOnError)
-	plane := fs.String("plane", "meta", "which half to read, meta or content")
+	plane := fs.String("plane", "", "which plane to read: meta, content or analysis")
+	group := fs.String("group", "", "one group of rules, so D, which also picks its plane")
 	shard := fs.String("shard", "", "one month, so 2106")
 	lang := fs.String("lang", "en", "which language of the content plane to read")
 	rules := fs.String("rules", "", "a comma separated list of rule ids, so S14,S20")
@@ -51,25 +52,58 @@ func runAudit(args []string) error {
 	if *limit < 1 {
 		return errors.New("-cap has to be at least 1")
 	}
+	if *group != "" {
+		g := strings.ToUpper(*group)
+		p := "meta"
+		switch {
+		case g == string(audit.GroupAnalysis):
+			p = "analysis"
+		case !hasGroup(audit.MetaRules, g):
+			p = "content"
+		}
+		if *plane != "" && *plane != p {
+			return fmt.Errorf("group %s is in the %s plane, not in %s", g, p, *plane)
+		}
+		*plane = p
+	}
+	if *plane == "" {
+		*plane = "meta"
+	}
 	var known []audit.Rule
 	switch *plane {
 	case "meta":
 		known = audit.MetaRules
 	case "content":
 		known = audit.ContentRules
+	case "analysis":
+		known = audit.AnalysisRules
 	default:
-		return fmt.Errorf("%q is not a plane, want meta or content", *plane)
+		return fmt.Errorf("%q is not a plane, want meta, content or analysis", *plane)
+	}
+	if *group != "" {
+		known = inGroup(known, strings.ToUpper(*group))
+		if len(known) == 0 {
+			return fmt.Errorf("%s is not a group of rules this tool runs", *group)
+		}
 	}
 
 	only, err := chooseRules(*rules, *hard, *plane, known)
 	if err != nil {
 		return err
 	}
+	if *group != "" && len(only) == 0 {
+		for _, r := range known {
+			only = append(only, r.ID)
+		}
+	}
 
 	var result audit.Report
-	if *plane == "content" {
+	switch *plane {
+	case "content":
 		result, err = auditContent(*lang, *shard, *limit, only, *quiet)
-	} else {
+	case "analysis":
+		result, err = auditAnalysis(*shard, *limit, only)
+	default:
 		result, err = auditMeta(*shard, *limit, only, *quiet)
 	}
 	if err != nil {
@@ -204,6 +238,32 @@ func chooseRules(rules string, hard bool, plane string, known []audit.Rule) ([]s
 		return nil, errors.New("-hard and -rules together named no rules")
 	}
 	return out, nil
+}
+
+// auditAnalysis reads the census records and the object records under
+// analysis/.
+func auditAnalysis(shard string, limit int, only []string) (audit.Report, error) {
+	if shard != "" && !metadata.ValidShard(shard) {
+		return audit.Report{}, fmt.Errorf("%q is not a month, want four digits like 2106", shard)
+	}
+	root := corpusRoot()
+	lic := licences{plane: metadata.Plane{Root: root}}
+	a := audit.Analysis{Root: root, Cap: limit, Only: only, Shard: shard, Text: lic.text}
+	return a.Run()
+}
+
+func hasGroup(rules []audit.Rule, g string) bool {
+	return len(inGroup(rules, g)) > 0
+}
+
+func inGroup(rules []audit.Rule, g string) []audit.Rule {
+	var out []audit.Rule
+	for _, r := range rules {
+		if string(r.Group) == g {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 func contains(list []string, want string) bool {

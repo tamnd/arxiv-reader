@@ -1,0 +1,39 @@
+# Cue patterns for prose items (AX7.4).
+# Each cue is a lower case phrase. The understand role reads the sentences that hold a cue.
+# The census does not count prose items, because code cannot count them (AX1.4).
+definition:
+  - we say that
+  - is said to be
+  - is called
+  - are called
+  - we call
+  - we define
+  - is defined as
+  - is defined to be
+  - let us call
+  - will be called
+  - we denote by
+  - denote by
+conjecture:
+  - we conjecture
+  - it is conjectured
+  - conjecturally
+problem:
+  - it is not known whether
+  - it is unknown whether
+  - it would be interesting to
+  - an open question
+  - remains open
+  - we ask whether
+claim:
+  - we claim that
+  - we show that
+  - we prove that
+hypothesis:
+  - throughout this paper
+  - throughout the paper
+  - throughout this section
+  - from now on
+  - in the rest of the paper
+  - we assume that
+  - we always assume

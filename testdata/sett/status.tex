@@ -1,0 +1,29 @@
+% Pattern: proof_status cited and omitted, and a claim inside a proof.
+% want theorem-1 statement/theorem 1 status=cited origin=cited
+% want theorem-2 statement/theorem 2 status=omitted
+% want theorem-3 statement/theorem 3 status=here
+% want proof-1 proof - proves=theorem-3
+% want claim-1 statement/claim - parent=proof-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\newtheorem*{claim}{Claim}
+\begin{document}
+\begin{theorem}[{\cite[Theorem 4.1]{Rudin}}]
+A known theorem.
+\end{theorem}
+\begin{theorem}
+A routine result.
+\end{theorem}
+The proof is omitted.
+
+\begin{theorem}
+A new result.
+\end{theorem}
+\begin{proof}
+\begin{claim}
+A local claim.
+\end{claim}
+So it holds.
+\end{proof}
+\end{document}

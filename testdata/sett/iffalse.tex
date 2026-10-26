@@ -1,0 +1,25 @@
+% Pattern: env/conditional/article. \iffalse and a \newif switch hide items.
+% want lemma-1 statement/lemma 1
+% want lemma-2 statement/lemma 2
+\documentclass{article}
+\newtheorem{lemma}{Lemma}
+\newif\iflong
+\longfalse
+\begin{document}
+\begin{lemma}
+Kept.
+\end{lemma}
+\iffalse
+\begin{lemma}
+Hidden.
+\end{lemma}
+\fi
+\iflong
+\begin{lemma}
+Only in the long version.
+\end{lemma}
+\fi
+\begin{lemma}
+Kept too.
+\end{lemma}
+\end{document}

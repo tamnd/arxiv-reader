@@ -1,0 +1,28 @@
+% Pattern: env/conditional/article. An etoolbox toggle hides a theorem, and a
+% test with no third argument before a blank line.
+% from 2312.00752
+% want theorem-1 statement/theorem 1
+% want remark-1 remark 2
+\documentclass{article}
+\usepackage{etoolbox}
+\newtoggle{arxiv}
+\toggletrue{arxiv}
+\newtheorem{theorem}{Theorem}
+\newtheorem{remark}[theorem]{Remark}
+\begin{document}
+\iftoggle{arxiv}{}{
+\begin{theorem}
+Only in the conference version.
+\end{theorem}
+}
+\begin{theorem}
+In each version.
+\end{theorem}
+\iftoggle{arxiv}{
+Some text for arXiv only.
+}
+
+\begin{remark}
+After the blank line.
+\end{remark}
+\end{document}

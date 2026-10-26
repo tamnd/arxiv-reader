@@ -1,0 +1,121 @@
+# Theorem-like environments that a document class or a package defines before the paper declares anything (AX3.2).
+# Each entry is an environment with its title, its counter, and whether it is numbered.
+# shared names the environment whose counter it uses. A proof entry is a proof environment.
+classes:
+  llncs:
+    - {env: theorem, title: Theorem}
+    - {env: lemma, title: Lemma}
+    - {env: corollary, title: Corollary}
+    - {env: proposition, title: Proposition}
+    - {env: definition, title: Definition}
+    - {env: example, title: Example}
+    - {env: exercise, title: Exercise}
+    - {env: problem, title: Problem}
+    - {env: property, title: Property}
+    - {env: question, title: Question}
+    - {env: solution, title: Solution}
+    - {env: conjecture, title: Conjecture}
+    - {env: remark, title: Remark, numbered: false}
+    - {env: note, title: Note, numbered: false}
+    - {env: case, title: Case}
+    - {env: claim, title: Claim, numbered: false}
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  svjour3:
+    - {env: theorem, title: Theorem}
+    - {env: lemma, title: Lemma}
+    - {env: corollary, title: Corollary}
+    - {env: proposition, title: Proposition}
+    - {env: definition, title: Definition}
+    - {env: example, title: Example}
+    - {env: exercise, title: Exercise}
+    - {env: problem, title: Problem}
+    - {env: property, title: Property}
+    - {env: question, title: Question}
+    - {env: solution, title: Solution}
+    - {env: conjecture, title: Conjecture}
+    - {env: remark, title: Remark}
+    - {env: note, title: Note}
+    - {env: case, title: Case}
+    - {env: claim, title: Claim, numbered: false}
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  svjour:
+    - {env: theorem, title: Theorem}
+    - {env: lemma, title: Lemma}
+    - {env: corollary, title: Corollary}
+    - {env: proposition, title: Proposition}
+    - {env: definition, title: Definition}
+    - {env: example, title: Example}
+    - {env: remark, title: Remark}
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  svmult:
+    - {env: theorem, title: Theorem}
+    - {env: lemma, title: Lemma}
+    - {env: corollary, title: Corollary}
+    - {env: proposition, title: Proposition}
+    - {env: definition, title: Definition}
+    - {env: example, title: Example}
+    - {env: exercise, title: Exercise}
+    - {env: problem, title: Problem}
+    - {env: property, title: Property}
+    - {env: question, title: Question}
+    - {env: solution, title: Solution}
+    - {env: remark, title: Remark}
+    - {env: note, title: Note}
+    - {env: case, title: Case}
+    - {env: claim, title: Claim, numbered: false}
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  svmono:
+    - {env: theorem, title: Theorem}
+    - {env: lemma, title: Lemma}
+    - {env: corollary, title: Corollary}
+    - {env: proposition, title: Proposition}
+    - {env: definition, title: Definition}
+    - {env: example, title: Example}
+    - {env: exercise, title: Exercise}
+    - {env: problem, title: Problem}
+    - {env: remark, title: Remark}
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  amsart:
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  amsbook:
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  amsproc:
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  elsarticle:
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  IEEEtran:
+    - {env: IEEEproof, title: Proof, numbered: false, proof: true}
+  IEEEconf:
+    - {env: IEEEproof, title: Proof, numbered: false, proof: true}
+  aomart:
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  imsart:
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  smfart:
+    - {env: proof, title: Démonstration, numbered: false, proof: true}
+    - {env: demo, title: Démonstration, numbered: false, proof: true}
+  birkjour:
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  revtex4:
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  revtex4-1:
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  revtex4-2:
+    - {env: proof, title: Proof, numbered: false, proof: true}
+packages:
+  amsthm:
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  ntheorem:
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  amsproof:
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  mathabx:
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  proof:
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  IEEEtrantools:
+    - {env: IEEEproof, title: Proof, numbered: false, proof: true}
+  acmart:
+    - {env: proof, title: Proof, numbered: false, proof: true}
+# Environments that are a proof in any paper that uses them, with no declaration that the front end can see.
+proofs: [proof, proof*, pf, pf*, demo, preuve, beweis, IEEEproof, proofof, Proof, myproof, prf, demostracion, dem, proofsketch, sketch]
