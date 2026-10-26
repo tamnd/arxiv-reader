@@ -8,11 +8,13 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/tamnd/arxiv-reader/analysis"
 	"github.com/tamnd/arxiv-reader/census"
+	"github.com/tamnd/arxiv-reader/edges"
 	"github.com/tamnd/arxiv-reader/objects"
 	"github.com/tamnd/arxiv-reader/theorems"
 )
@@ -23,8 +25,8 @@ const GroupAnalysis Group = "D"
 
 // AnalysisRules are the rules of group D that read analysis/census,
 // analysis/objects and analysis/stopped. The rules that read the mentions or
-// the edges (D05, D10, D11, D12, D14, D16, D17, D18) are not here. They arrive
-// with the files they read.
+// the nodes (D05, D11, D12, D14, D16, D17, D18) are not here. They arrive
+// with the files they read. D10 and D19 read analysis/edges.
 var AnalysisRules = []Rule{
 	{
 		ID: "D01", Group: GroupAnalysis, Hard: true,
@@ -63,12 +65,22 @@ var AnalysisRules = []Rule{
 		Says: "an in-paper reference to a theorem-like number or label that resolves to no object",
 	},
 	{
+		ID: "D10", Group: GroupAnalysis, Hard: true,
+		Says: "each edge has a method and a confidence from the closed lists of AX6.1, and no edge whose method is model has the confidence certain or high",
+		Why:  "A model cannot make an edge certain. Only a person can raise a model edge, and the raise is in the edge history.",
+	},
+	{
 		ID: "D13", Group: GroupAnalysis, Hard: true,
 		Says: "each object record names its path, its extractor version and its confidence",
 	},
 	{
 		ID: "D15", Group: GroupAnalysis,
 		Says: "an environment name or title that manifests/environments.yaml does not map",
+	},
+	{
+		ID: "D19", Group: GroupAnalysis,
+		Says: "a cycle in the in-paper uses graph (AX6.3)",
+		Why:  "The in-paper uses graph must be acyclic. In most cases a refers-to was read as uses, and the fix is in the cue lists.",
 	},
 }
 
@@ -119,6 +131,18 @@ func (a Analysis) Run() (Report, error) {
 		if a.Log != nil && len(recs) > 0 {
 			a.Log(recs[0].Paper)
 		}
+	}
+	edgeFiles, err := a.glob("edges", "*.jsonl")
+	if err != nil {
+		return report, err
+	}
+	for _, f := range edgeFiles {
+		es, err := edges.ReadFile(f)
+		if err != nil {
+			return report, err
+		}
+		a.edges(col, a.rel(f), es)
+		report.Records += len(es)
 	}
 	stops, err := a.glob("stopped", "*.json")
 	if err != nil {
@@ -340,6 +364,34 @@ func atoi(s string) int {
 		n = n*10 + int(c-'0')
 	}
 	return n
+}
+
+func (a Analysis) edges(col *collector, file string, es []edges.Edge) {
+	add := func(rule, id, what string) {
+		col.add(Finding{Rule: rule, File: file, Shard: shardOf(file), ID: id, What: what})
+	}
+	cycles := map[int]int{}
+	paper := ""
+	for _, e := range es {
+		paper, _, _ = strings.Cut(e.From, "#")
+		col.checked("D10")
+		id := fmt.Sprintf("%s %s %s", e.From, e.Predicate, e.To)
+		switch {
+		case !slices.Contains(edges.Methods, e.Method):
+			add("D10", id, fmt.Sprintf("the method %q is not in the closed list", e.Method))
+		case !slices.Contains(edges.Confidences, e.Confidence):
+			add("D10", id, fmt.Sprintf("the confidence %q is not in the closed list", e.Confidence))
+		case e.Method == edges.Model && (e.Confidence == edges.Certain || e.Confidence == edges.High):
+			add("D10", id, "a model edge has the confidence "+e.Confidence)
+		}
+		if slices.Contains(e.Flags, edges.FlagCycle) {
+			cycles[e.Evidence.Version]++
+		}
+	}
+	col.checked("D19")
+	for v, n := range cycles {
+		add("D19", fmt.Sprintf("%sv%d", paper, v), fmt.Sprintf("%d uses edges are in a cycle", n))
+	}
 }
 
 func readCensus(file string) (*census.Record, error) {
