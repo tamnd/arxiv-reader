@@ -1,0 +1,17 @@
+% Pattern: file/line-ends. A file from an old Mac ends each line with a CR only. The test gives the file to source.Open with CR line ends.
+% from 1007.4365v1
+% lineends cr
+% want theorem-1 statement/theorem 1
+% want lemma-1 statement/lemma 1
+\documentclass{amsart}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\begin{document}
+% A comment before the first item.
+\begin{theorem}
+A theorem.
+\end{theorem}
+\begin{lemma}
+A lemma.
+\end{lemma}
+\end{document}

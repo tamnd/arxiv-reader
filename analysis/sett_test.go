@@ -1,6 +1,8 @@
 package analysis
 
 import (
+	"bytes"
+	"compress/gzip"
 	"os"
 	"path/filepath"
 	"slices"
@@ -27,6 +29,9 @@ func TestSetT(t *testing.T) {
 			}
 			wants, rules := readWants(string(data))
 			b := &source.Bundle{Files: []source.File{{Name: "main.tex", Data: data}}}
+			if strings.Contains(string(data), "\n% lineends cr\n") {
+				b = oldMac(t, data)
+			}
 			res, err := Analyze(b, Paper{ID: "test." + name, Version: 1, Extractor: "test"}, m)
 			if err != nil {
 				t.Fatal(err)
@@ -64,6 +69,23 @@ func TestSetT(t *testing.T) {
 			}
 		})
 	}
+}
+
+// oldMac gives a file to source.Open with CR line ends, as an e-print from an
+// old Mac comes.
+func oldMac(t *testing.T, data []byte) *source.Bundle {
+	t.Helper()
+	var z bytes.Buffer
+	w := gzip.NewWriter(&z)
+	w.Write(bytes.ReplaceAll(data, []byte("\n"), []byte("\r")))
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	b, err := source.Open(z.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }
 
 // readWants reads the % want and % finding lines of a file of set T.

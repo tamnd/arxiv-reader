@@ -107,6 +107,11 @@ func Open(b []byte) (*Bundle, error) {
 		if err != nil {
 			return nil, err
 		}
+		for i := range files {
+			if textFile(files[i].Name) {
+				oldLineEnds(files[i].Data)
+			}
+		}
 		return &Bundle{Files: files, Tarred: true}, nil
 	}
 	if !looksLikeTeX(plain) {
@@ -117,7 +122,29 @@ func Open(b []byte) (*Bundle, error) {
 	// there is no tar. Every caller wants a name, so one is made up, and it is
 	// the same one every time so that nothing downstream depends on which paper
 	// it came from.
+	oldLineEnds(plain)
 	return &Bundle{Files: []File{{Name: "paper.tex", Data: plain}}}, nil
+}
+
+// textFile tells if a file is TeX text, which is read by lines.
+func textFile(name string) bool {
+	switch strings.ToLower(path.Ext(name)) {
+	case ".tex", ".ltx", ".latex", ".sty", ".cls", ".clo", ".def", ".bbl", ".bib", ".txt", "":
+		return true
+	}
+	return false
+}
+
+// oldLineEnds changes each CR that has no LF after it to an LF. A file from an
+// old Mac ends its lines with a CR only, and a comment then runs to the end of
+// the file, so the census found no items in 1007.4365v1. The length does not
+// change, so an offset into the file stays correct. A CR LF stays as it is.
+func oldLineEnds(b []byte) {
+	for i, c := range b {
+		if c == '\r' && (i+1 == len(b) || b[i+1] != '\n') {
+			b[i] = '\n'
+		}
+	}
 }
 
 func isPDF(b []byte) bool { return bytes.HasPrefix(b, []byte("%PDF-")) }

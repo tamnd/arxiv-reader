@@ -275,3 +275,11 @@ func TestReadSaysHowToGetAnEPrintThatIsNotThere(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+func TestOldLineEndsKeepsTheLengthAndCRLF(t *testing.T) {
+	b := []byte("a\rb\r\nc\r")
+	oldLineEnds(b)
+	if got := string(b); got != "a\nb\r\nc\n" {
+		t.Errorf("got %q", got)
+	}
+}
