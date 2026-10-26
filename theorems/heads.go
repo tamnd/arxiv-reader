@@ -46,6 +46,10 @@ var (
 	fontGroup  = regexp.MustCompile(`^\{\s*\\(bf|bfseries|sc|scshape|it|itshape|sl|slshape|em|textbf)\b\s*`)
 	fontArg    = regexp.MustCompile(`^\\(textbf|textsc|textit|emph|textsl|underline|paragraph\*?|subparagraph\*?|bfseries|itshape)\s*\{`)
 	fontSwitch = regexp.MustCompile(`^\\(bf|bfseries|sc|it|itshape|sl)\b\s*`)
+	// proofCmd is a proof that starts with the command of the proof
+	// environment and no \begin, as in "\proof We show ... \qed". amsthm
+	// and amsart define \proof, and old papers use it so.
+	proofCmd   = regexp.MustCompile(`^\\(?:proof|pf)\*?(?:\s*\[([^\]]{1,120})\])?(?:[^a-zA-Z@]|$)`)
 	plainProof = regexp.MustCompile(`^(Proof|PROOF|Proof of [^.:\n]{1,80}|Sketch of proof|Sketch of the proof|D[ée]monstration|Beweis)\s*[.:]`)
 
 	headNumber = regexp.MustCompile(`^\s*~?\s*((?:\d+(?:\.\d+)*[a-z]?)|(?:[A-Z](?:\.\d+)*)|(?:[IVXLC]+(?:\.\d+)*)|(?:\\ref\s*\{[^}]*\}))(?:\s|\.|:|\(|$|\))`)
@@ -53,6 +57,7 @@ var (
 	headEnd    = regexp.MustCompile(`^\s*[.:]`)
 
 	qedMark    = regexp.MustCompile(`\\(qed|qedsymbol|qedhere|QED|endproof|BOX|Box|blacksquare|square|qquad\s*\\Box|hfill\s*\$\s*\\(?:Box|square|blacksquare)\s*\$|endpf|eop)\b|\$\s*\\(?:Box|square|blacksquare)\s*\$`)
+	envEnd     = regexp.MustCompile(`\\end\s*\{[^{}]{1,64}\}[ \t]*\n`)
 	paraBreak  = regexp.MustCompile(`\n[ \t]*\n|\\par\b`)
 	itemCmd    = regexp.MustCompile(`\\item\b(\s*\[[^\]]*\])?`)
 	proofOfRef = regexp.MustCompile(`(?i)^(?:the\s+)?(?:proof|sketch of (?:the )?proof|outline of (?:the )?proof|démonstration|beweis)(?:\s+of|\s+for|\s+de|\s+du|\s+von)?\s*(.*)$`)
@@ -203,6 +208,23 @@ func headAt(text []byte, i int, t *Titles) (Head, int, bool) {
 		}
 		h.Form = formOf(string(rest[m[2]:m[3]]))
 		return h, i + m[1] + stop + 1, true
+	}
+	if m := proofCmd.FindSubmatchIndex(rest); m != nil {
+		h, ok := Head{}, false
+		if m[2] >= 0 {
+			h, ok = parseHead(stripFonts(string(rest[m[2]:m[3]])), t)
+		}
+		if !ok || !h.Proof {
+			if h, ok = parseHead("Proof", t); !ok {
+				return Head{}, 0, false
+			}
+		}
+		end := m[1]
+		if m[1] > 0 && !isLetter(rest[m[1]-1]) && rest[m[1]-1] != ']' {
+			end--
+		}
+		h.Form = "command"
+		return h, i + end, true
 	}
 	if m := plainProof.FindSubmatchIndex(rest); m != nil {
 		h, ok := parseHead(string(rest[m[2]:m[3]]), t)
@@ -369,6 +391,11 @@ func starts(text []byte, from, to int) []int {
 		out = append(out, from+m[1])
 	}
 	for _, m := range itemCmd.FindAllIndex(body, -1) {
+		out = append(out, from+m[1])
+	}
+	// A head on the line after the end of an environment starts an item, as
+	// a proof head after \end{lemma}.
+	for _, m := range envEnd.FindAllIndex(body, -1) {
 		out = append(out, from+m[1])
 	}
 	return out
