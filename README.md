@@ -1749,6 +1749,31 @@ A version whose licence does not allow text gives structure only: numbers, label
 `ax audit -group D` reads those two planes and checks rules D02, D03, D04, D06, D07, D08, D09, D13 and D15.
 The forms that the census must count are in `testdata/sett/`, one small TeX file for each form with the result it must give, and `go test ./analysis` runs them.
 
+`ax select scope` writes the list of the papers in the math scope, `manifests/scope/math.txt`, from the metadata plane.
+A paper is in scope when one of its categories is a math category, math-ph, or one of the old archives alg-geom, dg-ga, funct-an and q-alg.
+The list holds the ids only, sorted, and its first line gives the counts.
+`ax licence census -scope math` counts the licence classes of the papers in the list, by year and by category, into `reports/licence-math.md`.
+
+```
+$ ax select scope
+794887 papers in scope-math, 145304 by a cross-list only, from 421 months
+$ ax licence census -scope math
+794,887 papers are in scope-math, and 145,304 of them are in scope by a cross-list only. 129,697 are open, and 636,424 are record.
+  open               129,697   16.3%
+  share-alike-nc      12,035    1.5%
+  verbatim            16,731    2.1%
+  record             636,424   80.1%
+```
+
+Some records are wrong at the source. In 19 math papers arXiv dates a version before the version before it, so math/0002124 has v2 on 1999-11-17 and v1 on 2000-02-15. In 73 papers v1 is dated after the month that the id names. The corpus keeps these dates as arXiv gives them, and rules S18 and S20 are right to find them.
+So the metadata audit reads `manifests/waivers-meta.yaml`. Each entry names a record, a rule and the reason. A waived finding is counted in the report and does not fail the build. A waiver with no reason is refused.
+
+```
+$ ax audit -q
+794888 records over 421 months, nothing found
+92 findings waived
+```
+
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
 

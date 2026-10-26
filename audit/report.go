@@ -32,6 +32,9 @@ func (r Report) Text() string {
 	tw.Flush()
 
 	fmt.Fprintf(&b, "\n%s over %s, %s\n", plural(r.Records, r.unit()), plural(r.Shards, r.scope()), summary(r))
+	if n := r.Waived(); n > 0 {
+		fmt.Fprintf(&b, "%s waived\n", plural(n, "finding"))
+	}
 
 	for _, res := range r.Results {
 		if res.Total == 0 {
@@ -68,6 +71,17 @@ func (r Report) Markdown() string {
 	for _, res := range r.Results {
 		fmt.Fprintf(&b, "| %s | %s | %d | %d | %d | %s |\n",
 			res.Rule.ID, res.State(), res.Checked, res.Skipped, res.Total, res.Rule.Says)
+	}
+
+	if n := r.Waived(); n > 0 {
+		b.WriteString("\n## The waivers\n\n")
+		fmt.Fprintf(&b, "%s are waived. A waived finding does not fail its rule. Each waiver names the record, the rule and the reason.\n\n", plural(n, "finding"))
+		b.WriteString("| ID | Waived |\n| --- | ---: |\n")
+		for _, res := range r.Results {
+			if res.Waived > 0 {
+				fmt.Fprintf(&b, "| %s | %d |\n", res.Rule.ID, res.Waived)
+			}
+		}
 	}
 
 	if r.Findings() == 0 {

@@ -146,7 +146,11 @@ func auditMeta(shard string, limit int, only []string, quiet bool) (audit.Report
 		}
 	}
 
-	m := audit.Meta{Plane: plane, Now: time.Now, Cap: limit, Only: only}
+	waivers, err := audit.ReadWaivers(corpus.MetaWaiversPath(plane.Root))
+	if err != nil {
+		return audit.Report{}, err
+	}
+	m := audit.Meta{Plane: plane, Now: time.Now, Cap: limit, Only: only, Waivers: waivers}
 	if !quiet && len(shards) > 1 {
 		done := 0
 		m.Log = func(shard string, records int) {

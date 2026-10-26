@@ -264,6 +264,12 @@ func PolicyPath(root string) string {
 	return path.Join(root, "manifests", "selection.yaml")
 }
 
+// MetaWaiversPath is the waivers of the metadata audit. Each waiver excuses
+// one record from one rule, with the reason.
+func MetaWaiversPath(root string) string {
+	return path.Join(root, "manifests", "waivers-meta.yaml")
+}
+
 // ReportPath is one of the committed reports, named without its extension.
 //
 // Committed, and in the corpus rather than in this repository, because a report
