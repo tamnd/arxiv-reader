@@ -11,6 +11,7 @@ import (
 	"github.com/tamnd/arxiv-reader/internal/prose"
 	"github.com/tamnd/arxiv-reader/objects"
 	"github.com/tamnd/arxiv-reader/theorems"
+	"github.com/tamnd/arxiv-reader/witness"
 )
 
 // Measures are the counts of AX11.4 over a set of census records.
@@ -115,13 +116,70 @@ type Report struct {
 	// record for the latest version.
 	Scope, Extracted, Halted int
 
+	// Witness is the comparison with each outside index (AX4.5, AQ21).
+	Witness map[string]*WitnessRow
+
 	versions, months, codes map[string]*Row
 	patterns                map[string]*Pattern
 }
 
+// WitnessRow compares the census with one outside index.
+type WitnessRow struct {
+	Index string
+	// Both is the versions with a census record that the index has. Other is
+	// the ones where the index read another version, and they are not
+	// compared.
+	Both, Other int
+	// Same, More and Fewer count the versions where the index has the same
+	// count of results as the census has items, more, or fewer.
+	Same, More, Fewer int
+	// Excess is the versions where the index has more than one result more
+	// than the census has items. They go to the queue census-diff.
+	Excess []Diff
+}
+
+// Diff is one version where an index has more results than the census.
+type Diff struct {
+	Paper         string
+	Census, Index int
+}
+
+// CensusItems is the items that the census counts for a version: the
+// theorem-like environments and the manual heads.
+func CensusItems(r *census.Record) int { return r.Occurrences[census.Env] + r.Occurrences[census.Head] }
+
+// AddWitness compares one census record with what an index gives for it.
+func (rp *Report) AddWitness(shard, index string, r *census.Record, w witness.Record) {
+	if rp.Since != "" && MonthOf(shard) < rp.Since {
+		return
+	}
+	row := rp.Witness[index]
+	if row == nil {
+		row = &WitnessRow{Index: index}
+		rp.Witness[index] = row
+	}
+	if w.Version != 0 && w.Version != r.Version {
+		row.Other++
+		return
+	}
+	row.Both++
+	n := CensusItems(r)
+	switch {
+	case w.Count == n:
+		row.Same++
+	case w.Count > n:
+		row.More++
+		if w.Count-n > 1 {
+			row.Excess = append(row.Excess, Diff{Paper: fmt.Sprintf("%sv%d", r.Paper, r.Version), Census: n, Index: w.Count})
+		}
+	default:
+		row.Fewer++
+	}
+}
+
 // NewReport returns an empty report.
 func NewReport(since string) *Report {
-	return &Report{Since: since, Stopped: map[string]int{}, versions: map[string]*Row{}, months: map[string]*Row{}, codes: map[string]*Row{}, patterns: map[string]*Pattern{}}
+	return &Report{Since: since, Stopped: map[string]int{}, Witness: map[string]*WitnessRow{}, versions: map[string]*Row{}, months: map[string]*Row{}, codes: map[string]*Row{}, patterns: map[string]*Pattern{}}
 }
 
 // MonthOf is the month that a shard names, as YYYY-MM. A shard is YYMM, and
@@ -266,6 +324,42 @@ func (rp *Report) Markdown() string {
 				share(r.Strength["strong"]+r.Strength["normal"], r.Papers))
 		}
 	}
+	if len(rp.Witness) > 0 {
+		b.WriteString("\n## The outside witnesses\n\n")
+		b.WriteString("TheoremSearch and TheoremGraph are a third count (AX4.5). They are not ground truth, because they split and merge items in their own ways, and TheoremSearch has no definitions. A version where an index has more than one result more than the census has items goes to the queue census-diff. The comparison answers AQ21.\n\n")
+		b.WriteString("| Index | Versions in both | Same count | Index has more | Index has fewer | Excess over 1 | Other version |\n| --- | ---: | ---: | ---: | ---: | ---: | ---: |\n")
+		var names []string
+		for k := range rp.Witness {
+			names = append(names, k)
+		}
+		sort.Strings(names)
+		for _, k := range names {
+			w := rp.Witness[k]
+			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | %s | %s |\n", k, prose.Thousands(w.Both), share(w.Same, w.Both), share(w.More, w.Both), share(w.Fewer, w.Both), prose.Thousands(len(w.Excess)), prose.Thousands(w.Other))
+		}
+		for _, k := range names {
+			w := rp.Witness[k]
+			if len(w.Excess) == 0 {
+				continue
+			}
+			ex := append([]Diff(nil), w.Excess...)
+			sort.Slice(ex, func(i, j int) bool {
+				di, dj := ex[i].Index-ex[i].Census, ex[j].Index-ex[j].Census
+				if di != dj {
+					return di > dj
+				}
+				return ex[i].Paper < ex[j].Paper
+			})
+			if len(ex) > 50 {
+				ex = ex[:50]
+			}
+			fmt.Fprintf(&b, "\n### census-diff from %s\n\nThe %s versions with the largest excess.\n\n| Version | Census items | %s results |\n| --- | ---: | ---: |\n", k, prose.Thousands(len(ex)), k)
+			for _, d := range ex {
+				fmt.Fprintf(&b, "| %s | %s | %s |\n", d.Paper, prose.Thousands(d.Census), prose.Thousands(d.Index))
+			}
+		}
+	}
+
 	table("By month", "Month", sortedRows(rp.months))
 	table("By code", "Code", sortedRows(rp.codes))
 

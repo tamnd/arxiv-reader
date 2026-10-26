@@ -25,6 +25,9 @@ type Paper struct {
 	Render *census.Render
 	// Waivers is each waiver for the version.
 	Waivers []census.Waiver
+	// Outside is the count of results of each outside index for the paper
+	// (AX4.5), or nil.
+	Outside map[string]int
 }
 
 // Result is the analysis of one version.
@@ -69,10 +72,11 @@ func Analyze(b *source.Bundle, p Paper, m *Manifests) (*Result, error) {
 			prefix = fmt.Sprintf("m%d-", i+1)
 		}
 		var render *census.Render
+		var outside map[string]int
 		if i == 0 {
-			render = p.Render
+			render, outside = p.Render, p.Outside
 		}
-		c := census.Run(census.Input{Paper: p.ID + prefixPaper(i), Version: p.Version, Extractor: p.Extractor, Run: p.Run, Doc: d, Set: set, Titles: m.Resolver.Titles, Aux: aux, Render: render})
+		c := census.Run(census.Input{Paper: p.ID + prefixPaper(i), Version: p.Version, Extractor: p.Extractor, Run: p.Run, Doc: d, Set: set, Titles: m.Resolver.Titles, Aux: aux, Render: render, Outside: outside})
 		// Each record names the census occurrence that starts where it starts.
 		at := map[int]*census.Occurrence{}
 		numbers := map[int]string{}

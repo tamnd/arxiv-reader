@@ -19,6 +19,7 @@ import (
 	"github.com/tamnd/arxiv-reader/metadata"
 	"github.com/tamnd/arxiv-reader/objects"
 	"github.com/tamnd/arxiv-reader/scope"
+	"github.com/tamnd/arxiv-reader/witness"
 )
 
 // censusReport rebuilds reports/census.md from the analysis plane.
@@ -60,6 +61,7 @@ func censusReport(args []string) error {
 		return err
 	}
 	sort.Strings(files)
+	wit := &witness.Cache{Root: root}
 	extracted := map[string]bool{}
 	objs := map[string][]objects.Record{}
 	for _, f := range files {
@@ -87,6 +89,15 @@ func censusReport(args []string) error {
 		}
 		shard := filepath.Base(filepath.Dir(f))
 		rp.Add(shard, codeOf(shard, r.Paper), r, mine)
+		for _, index := range witness.Indexes {
+			w, ok, err := wit.Get(index, shard, r.Paper)
+			if err != nil {
+				return err
+			}
+			if ok {
+				rp.AddWitness(shard, index, r, w)
+			}
+		}
 	}
 	stops, err := filepath.Glob(filepath.Join(root, "analysis", "stopped", "*", "*.json"))
 	if err != nil {

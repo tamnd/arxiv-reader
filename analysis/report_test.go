@@ -6,6 +6,7 @@ import (
 
 	"github.com/tamnd/arxiv-reader/census"
 	"github.com/tamnd/arxiv-reader/objects"
+	"github.com/tamnd/arxiv-reader/witness"
 )
 
 func TestMonthOf(t *testing.T) {
@@ -41,6 +42,18 @@ func TestTheReportCountsTheMeasuresOfAX114(t *testing.T) {
 		if !strings.Contains(md, want) {
 			t.Errorf("the report has no %q:\n%s", want, md)
 		}
+	}
+	rp.AddWitness("2312", "theoremgraph", gappy, witness.Record{Paper: "2312.00002", Version: 1, Count: 4})
+	rp.AddWitness("2312", "theoremgraph", strong, witness.Record{Paper: "2312.00001", Version: 1, Count: 2})
+	rp.AddWitness("2312", "theoremsearch", strong, witness.Record{Paper: "2312.00001", Version: 2, Count: 9})
+	if w := rp.Witness["theoremgraph"]; w.Both != 2 || w.Same != 1 || w.More != 1 || len(w.Excess) != 1 || w.Excess[0].Census != 1 {
+		t.Errorf("theoremgraph %+v", w)
+	}
+	if w := rp.Witness["theoremsearch"]; w.Both != 0 || w.Other != 1 {
+		t.Errorf("a witness of another version is compared: %+v", w)
+	}
+	if md := rp.Markdown(); !strings.Contains(md, "| 2312.00002v1 | 1 | 4 |") {
+		t.Errorf("the report has no census-diff row:\n%s", md)
 	}
 	since := NewReport("2000-01")
 	since.Add("9506", "14", &census.Record{Paper: "alg-geom/9506001", Version: 2, Strength: "normal"}, nil)
