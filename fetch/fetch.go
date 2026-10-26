@@ -20,6 +20,7 @@
 package fetch
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -81,7 +82,10 @@ const HTMLBase = "https://arxiv.org/html/"
 // back is one gzip stream whatever the submission was, which is why nothing
 // here decides what is inside it. The source package does that, after the bytes
 // have arrived.
-const EPrintBase = "https://arxiv.org/e-print/"
+//
+// arXiv moved the route from /e-print/ to /src/, and the old route now sends a
+// redirect. The new route is used, so each e-print is one request and not two.
+const EPrintBase = "https://arxiv.org/src/"
 
 // PDFBase is where arXiv serves the PDF of a paper.
 //
@@ -449,6 +453,9 @@ type request struct {
 	missing func(ref, status string) error
 }
 
+// sourceNotPublic is in the page arXiv sends when the author withheld the source.
+var sourceNotPublic = []byte("Source Not Public")
+
 func (f *Fetcher) do(ctx context.Context, r request) ([]byte, error) {
 	url, ref := r.url, r.ref
 	pace := f.Pace
@@ -493,6 +500,10 @@ func (f *Fetcher) do(ctx context.Context, r request) ([]byte, error) {
 	switch {
 	case resp.StatusCode == http.StatusNotFound:
 		return nil, r.missing(ref, resp.Status)
+	case resp.StatusCode == http.StatusForbidden && bytes.Contains(body, sourceNotPublic):
+		// The author withheld the source. arXiv says so with a 403 and a page,
+		// and a 403 with no such page is not this, so it stays an error.
+		return nil, r.missing(ref, resp.Status+", the source is not public by the choice of the author")
 	case resp.StatusCode != http.StatusOK:
 		return nil, fmt.Errorf("fetch: %s returned %s", url, resp.Status)
 	case int64(len(body)) > r.cap:

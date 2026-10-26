@@ -176,3 +176,36 @@ func TestEPrintNeedsAVersion(t *testing.T) {
 		t.Fatalf("asked for %v", *asked)
 	}
 }
+
+// arXiv sends a 403 and a page when the author withheld the source.
+func TestEPrintSaysSoWhenTheSourceIsNotPublic(t *testing.T) {
+	root := t.TempDir()
+	base, _ := eprints(t, http.StatusForbidden, "<title>Not public 0906.0958v1</title><h1>Source Not Public for 0906.0958v1</h1>")
+	var m Manifest
+
+	_, err := sourceFetcher(base).EPrint(context.Background(), root, &m, Order{
+		Record:  paper("0906.0958", 1, corpus.LicenceCC0, metadata.SourceAbs),
+		Version: 1,
+	})
+	var missing *NoEPrint
+	if !errors.As(err, &missing) {
+		t.Fatalf("got %v, want a version with no e-print", err)
+	}
+}
+
+// A 403 with no such page can be a block, so it is an error and not a fact
+// about the paper.
+func TestEPrintKeepsAnOther403AsAnError(t *testing.T) {
+	root := t.TempDir()
+	base, _ := eprints(t, http.StatusForbidden, "forbidden")
+	var m Manifest
+
+	_, err := sourceFetcher(base).EPrint(context.Background(), root, &m, Order{
+		Record:  paper("0906.0958", 1, corpus.LicenceCC0, metadata.SourceAbs),
+		Version: 1,
+	})
+	var missing *NoEPrint
+	if err == nil || errors.As(err, &missing) {
+		t.Fatalf("got %v, want an error that is not a missing e-print", err)
+	}
+}
