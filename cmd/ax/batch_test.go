@@ -5,11 +5,13 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/tamnd/arxiv-cli/pkg/axid"
 	"github.com/tamnd/arxiv-reader/analysis"
 	"github.com/tamnd/arxiv-reader/corpus"
+	"github.com/tamnd/arxiv-reader/licence"
 )
 
 func TestReadIDsTakesTheFirstFieldAndSkipsComments(t *testing.T) {
@@ -75,5 +77,25 @@ func TestRemoveKeepsFilesOutsideWork(t *testing.T) {
 	}
 	if exists(gone) {
 		t.Error("remove left the download in work/")
+	}
+}
+
+func TestTheQueueKeepsTheOrderOfAX26(t *testing.T) {
+	q := []queued{
+		{ID: "math/0101001", Month: "2001-01", Class: licence.ClassOpen, Old: true},
+		{ID: "2001.00001", Month: "2020-01", Class: licence.ClassShareAlikeNC},
+		{ID: "2001.00002", Month: "2020-01", Class: licence.ClassOpen},
+		{ID: "2312.00001", Month: "2023-12", Class: licence.ClassOpen},
+		{ID: "2312.00009", Month: "2023-12", Class: licence.ClassShareAlikeNC},
+		{ID: "2312.00002", Month: "2023-12", Class: licence.ClassOpen},
+	}
+	orderQueue(q)
+	var got []string
+	for _, x := range q {
+		got = append(got, x.ID)
+	}
+	want := "2312.00002 2312.00001 2001.00002 2312.00009 2001.00001 math/0101001"
+	if s := strings.Join(got, " "); s != want {
+		t.Errorf("got %s, want %s", s, want)
 	}
 }

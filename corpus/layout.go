@@ -270,6 +270,13 @@ func MetaWaiversPath(root string) string {
 	return path.Join(root, "manifests", "waivers-meta.yaml")
 }
 
+// WaiversPath is the waivers of the census (AX4.8). Each waiver excuses one
+// occurrence of one version, or each occurrence of one environment, with a
+// reason from a closed list.
+func WaiversPath(root string) string {
+	return path.Join(root, "manifests", "waivers.yaml")
+}
+
 // ReportPath is one of the committed reports, named without its extension.
 //
 // Committed, and in the corpus rather than in this repository, because a report

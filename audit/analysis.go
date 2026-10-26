@@ -193,6 +193,14 @@ func (a Analysis) census(col *collector, file string, r *census.Record) {
 	for _, p := range r.Phantoms {
 		add("D03", fmt.Sprintf("object %s accounts for no occurrence", p))
 	}
+	for _, w := range r.Waivers {
+		switch {
+		case !analysis.KnownWaiverReason(w.Reason):
+			add("D03", fmt.Sprintf("occurrence %s is waived with the reason %q, which is not in the closed list", w.Occurrence, w.Reason))
+		case strings.TrimSpace(w.By) == "":
+			add("D03", fmt.Sprintf("occurrence %s is waived, and the waiver names nobody", w.Occurrence))
+		}
+	}
 	for _, rule := range []string{"D07", "D08", "D09"} {
 		col.checked(rule)
 	}

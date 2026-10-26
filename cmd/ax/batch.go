@@ -45,10 +45,19 @@ func censusBatch(args []string) error {
 	pace := fs.Duration("pace", fetch.Pace, "the gap to leave between requests to the website")
 	keep := fs.Bool("keep", false, "keep the e-print and the render in work/ after the census")
 	norender := fs.Bool("no-render", false, "do not fetch the render, so the census has the source as its only witness")
+	dry := fs.Bool("n", false, "print the count of the papers and the first ten, and do nothing")
+	scopeList := fs.String("scope", "", "take the open and share-alike papers of this scope list, as math, in the order of AX2.6")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	ids := fs.Args()
+	if *scopeList != "" {
+		more, err := analysisQueue(corpusRoot(), *scopeList)
+		if err != nil {
+			return err
+		}
+		ids = append(ids, more...)
+	}
 	if *list != "" {
 		more, err := readIDs(*list)
 		if err != nil {
@@ -57,10 +66,17 @@ func censusBatch(args []string) error {
 		ids = append(ids, more...)
 	}
 	if len(ids) == 0 {
-		return errors.New("usage: ax census batch [-list file] [-limit n] [-keep] [-no-render] [<id> ...]")
+		return errors.New("usage: ax census batch [-list file] [-scope math] [-limit n] [-keep] [-no-render] [<id> ...]")
 	}
 	if *pace < fetch.Pace {
 		return fmt.Errorf("a pace of %s is faster than the fifteen seconds arXiv asks for on the website, and this reads the website", *pace)
+	}
+	if *dry {
+		fmt.Printf("%d papers in the batch\n", len(ids))
+		for _, id := range ids[:min(10, len(ids))] {
+			fmt.Println(id)
+		}
+		return nil
 	}
 	root := corpusRoot()
 	plane := metadata.Plane{Root: root}
@@ -69,8 +85,13 @@ func censusBatch(args []string) error {
 	if err != nil {
 		return err
 	}
+	waivers, err := analysis.ReadWaivers(corpus.WaiversPath(root))
+	if err != nil {
+		return err
+	}
 	b := &batch{
 		root:     root,
+		waivers:  waivers,
 		plane:    plane,
 		m:        &manifest,
 		pace:     *pace,
@@ -118,6 +139,7 @@ func censusBatch(args []string) error {
 
 type batch struct {
 	root     string
+	waivers  *analysis.Waivers
 	plane    metadata.Plane
 	m        *fetch.Manifest
 	pace     time.Duration
@@ -212,7 +234,7 @@ func (b *batch) one(ctx context.Context, ref string) (state string, did bool, er
 	res.Entry.Holds = fetch.HoldsTeX
 	b.m.Put(res.Entry)
 
-	p := analysis.Paper{ID: rec.ID, Version: v, Extractor: "ax/" + Version, Text: true}
+	p := analysis.Paper{ID: rec.ID, Version: v, Extractor: "ax/" + Version, Text: true, Waivers: b.waivers.For(rec.ID, v)}
 	if b.render && !latest.Created.Before(renderFrom) {
 		if err := b.wait(ctx); err != nil {
 			return "", true, err
