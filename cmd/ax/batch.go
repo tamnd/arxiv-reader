@@ -23,6 +23,7 @@ import (
 	"github.com/tamnd/arxiv-reader/licence"
 	"github.com/tamnd/arxiv-reader/metadata"
 	"github.com/tamnd/arxiv-reader/source"
+	"github.com/tamnd/arxiv-reader/witness"
 )
 
 // renderFrom is the first month that arXiv rendered. It does not render the
@@ -92,6 +93,7 @@ func censusBatch(args []string) error {
 	b := &batch{
 		root:     root,
 		waivers:  waivers,
+		witness:  &witness.Cache{Root: root},
 		plane:    plane,
 		m:        &manifest,
 		pace:     *pace,
@@ -140,6 +142,7 @@ func censusBatch(args []string) error {
 type batch struct {
 	root     string
 	waivers  *analysis.Waivers
+	witness  *witness.Cache
 	plane    metadata.Plane
 	m        *fetch.Manifest
 	pace     time.Duration
@@ -235,6 +238,9 @@ func (b *batch) one(ctx context.Context, ref string) (state string, did bool, er
 	b.m.Put(res.Entry)
 
 	p := analysis.Paper{ID: rec.ID, Version: v, Extractor: "ax/" + Version, Text: true, Waivers: b.waivers.For(rec.ID, v)}
+	if p.Outside, err = b.witness.Counts(corpus.Shard(id), rec.ID); err != nil {
+		return "", true, err
+	}
 	if b.render && !latest.Created.Before(renderFrom) {
 		if err := b.wait(ctx); err != nil {
 			return "", true, err

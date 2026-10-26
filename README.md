@@ -1796,6 +1796,13 @@ $ ax census report
 written to reports/census.md
 ```
 
+`ax witness import -index theoremsearch` and `-index theoremgraph` read the outside indexes of AX8.5 into `analysis/witness/<index>/<YYMM>.jsonl`. For each paper in scope a witness record gives the count of results, the count of each kind and the printed numbers, and no text. The import reads the dataset on Hugging Face at a pinned revision and writes the revision in `import.json`. It reads the parquet file of TheoremSearch with range requests and the CSV files of TheoremGraph as a stream, so nothing goes to the disk. The batch puts the counts in the field `outside` of the census record, and `ax census report` compares them with the census (AX4.5, AQ21). A version where an index has more than one result more than the census has items goes to the queue census-diff in the report.
+
+```
+$ ax witness import -index theoremsearch
+theoremsearch: 1239720 results read, 1160579 kept for 70981 papers in scope over 255 months
+```
+
 `ax gold` makes gold set X of AX11.2, which measures the extractor against papers that people marked.
 `ax gold draw` draws the set from the open papers of the scope: 100 papers from each of 1991-2000, 2001-2010 and 2011-2020, 400 from 2021-2026, and 300 for the form of the heads.
 Inside each group the MSC codes at two digits are in proportion, and each code with 1,000 papers or more gets at least 5.
