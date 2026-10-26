@@ -28,11 +28,15 @@ func licenceCensus(args []string) error {
 	shard := fs.String("shard", "", "one month, so 2106")
 	out := fs.String("o", "", "where to write the report, and the default is reports/licence.md in the corpus")
 	quiet := fs.Bool("q", false, "write the file and print nothing")
+	reason := fs.String("scope", "", "count one scope only, so math, and write reports/licence-math.md")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if len(fs.Args()) != 0 {
 		return fmt.Errorf("ax licence census takes no arguments, so drop %s", fs.Args()[0])
+	}
+	if *reason != "" {
+		return licenceScope(*reason, *out, *quiet)
 	}
 
 	plane := metadata.Plane{Root: corpusRoot()}

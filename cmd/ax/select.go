@@ -24,7 +24,7 @@ import (
 // every row rather than whatever list somebody happened to run the extractor over.
 func runSelect(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: ax select add|drop|explain|list|reasons|seed|status")
+		return errors.New("usage: ax select add|drop|explain|list|reasons|scope|seed|status")
 	}
 	switch args[0] {
 	case "add":
@@ -39,12 +39,14 @@ func runSelect(args []string) error {
 		return selectStatus(args[1:])
 	case "seed":
 		return selectSeed(args[1:])
+	case "scope":
+		return selectScope(args[1:])
 	case "suggest":
 		return errors.New("select suggest is the citation closure over manifests/refs, so it arrives with the reference work")
 	case "reasons":
 		return selectReasons(args[1:])
 	default:
-		return fmt.Errorf("unknown select subcommand %q, which is add, drop, explain, list, reasons, seed or status", args[0])
+		return fmt.Errorf("unknown select subcommand %q, which is add, drop, explain, list, reasons, scope, seed or status", args[0])
 	}
 }
 
