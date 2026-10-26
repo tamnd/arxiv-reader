@@ -1,0 +1,48 @@
+# Phrases that say a paper omits a proof (AX3.6, proof_status omitted).
+# Matching is on lower case text, within two sentences after a statement.
+omitted:
+  - the proof is standard
+  - the proof is straightforward
+  - the proof is routine
+  - the proof is easy
+  - the proof is left to the reader
+  - left to the reader
+  - we omit the proof
+  - we omit the details
+  - the proof is omitted
+  - proof is omitted
+  - we leave the proof
+  - the details are left
+  - is left as an exercise
+  - straightforward verification
+  - an easy exercise
+  - easy to check
+  - easy to see
+  - routine to check
+  - routine verification
+# Phrases that say a statement is known with no source (AX3.7, origin folklore).
+folklore:
+  - well known
+  - well-known
+  - folklore
+  - it is classical that
+  - it is standard that
+  - standard fact
+# Phrases that say a proof is in another place of the paper (proof_status elsewhere).
+elsewhere:
+  - is proved in section
+  - is proven in section
+  - will be proved in section
+  - will be proven in section
+  - proof is given in section
+  - proof is given in appendix
+  - proved in appendix
+  - proven in appendix
+  - the proof of theorem
+  - see section
+# Words in a head that make an item a restatement (AX3.7).
+restated:
+  - restated
+  - restatement
+  - again
+  - repeated

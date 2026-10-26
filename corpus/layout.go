@@ -339,3 +339,25 @@ func LocatorsPath(root string) string {
 func GraphPath(root, shard string) string {
 	return path.Join(root, "graph", shard+".jsonl")
 }
+
+// CensusPath is the census record of one version (AX4.7).
+//
+// It is structure and not text, so it is committed for each licence class.
+func CensusPath(root string, id axid.ID, version int) string {
+	return path.Join(root, "analysis", "census", Shard(id), fmt.Sprintf("%sv%d.json", PathID(id), version))
+}
+
+// AnalysisObjectsPath is the object records that the analysis of the source
+// gives for one paper (AX3.9).
+//
+// It is under analysis/ and is committed, because the object records are the
+// denominator of the corpus and must be versioned (AX12.1).
+func AnalysisObjectsPath(root string, id axid.ID) string {
+	return path.Join(root, "analysis", "objects", Shard(id), PathID(id)+".jsonl")
+}
+
+// EdgesPath is the edge records of one paper (AX6.4). It is committed like
+// the census and the object records.
+func EdgesPath(root string, id axid.ID) string {
+	return path.Join(root, "analysis", "edges", Shard(id), PathID(id)+".jsonl")
+}

@@ -1,0 +1,28 @@
+% Pattern: proof/amsthm/article. A proof that names its statement with \ref
+% (rule 1), and a proof of a part of a statement.
+% want lemma-1 statement/lemma 1 status=here labels=lem:key
+% want theorem-1 statement/theorem 2 status=here labels=thm:main
+% want proof-1 proof - proves=theorem-1 part=(b)
+% want proof-2 proof - proves=lemma-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\begin{document}
+\begin{lemma}\label{lem:key}
+The key lemma.
+\end{lemma}
+\begin{theorem}\label{thm:main}
+The main result.
+\begin{enumerate}
+\item[(a)] The first part.\label{thm:main:a}
+\item[(b)] The second part.\label{thm:main:b}
+\end{enumerate}
+\end{theorem}
+\begin{proof}[Proof of \ref{thm:main:b}]
+The second part.
+\end{proof}
+\begin{proof}[Proof of Lemma \ref{lem:key}]
+The key step.
+\end{proof}
+\end{document}

@@ -77,6 +77,8 @@ func (g Group) Name() string {
 		return "Tags"
 	case GroupObjects:
 		return "Objects"
+	case GroupAnalysis:
+		return "Analysis"
 	}
 	return string(g)
 }

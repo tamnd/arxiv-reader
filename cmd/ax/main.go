@@ -48,6 +48,8 @@ var commands = []command{
 	{"refs", "parse a bibliography and resolve it into the corpus", "M3", runRefs},
 	{"split", "one file per top level section, with front matter", "M3", runSplit},
 	{"tags", "assign, diff and verify the permanent identifiers", "M3", runTags},
+	{"tex", "run the TeX front end on one e-print and print what it found", "AX-M0", runTex},
+	{"census", "count each item of a version and match it to an object record", "AX-M0", runCensus},
 	{"objects", "the sixteen object kinds, results and artefacts", "M6", runObjects},
 	{"graph", "build, query and verify the connected web", "M6", runGraph},
 	{"glossary", "seed, extend and check the controlled vocabulary", "M7", nil},

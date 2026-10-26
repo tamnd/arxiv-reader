@@ -430,11 +430,25 @@ func caption(n *html.Node) string {
 // rendering's own house style, so keeping either would hand every emitter
 // something to strip before it could print the label its own way.
 func tagOf(n *html.Node) string {
-	s := strings.TrimRight(tidy(text(n)), ":. ")
-	if i := strings.LastIndex(s, " "); i >= 0 {
-		s = s[i+1:]
+	return tagNumber(tidy(text(n)))
+}
+
+// tagNumber is the number in the text of a tag. It is the last word with a
+// digit, so that "Theorem 3.1" and "3.1 Theorem" (\swapnumbers) both give 3.1.
+// With no digit, it is the last word, as the A of "Theorem A".
+func tagNumber(s string) string {
+	words := strings.Fields(strings.TrimRight(s, ":. "))
+	if len(words) == 0 {
+		return ""
 	}
-	return strings.Trim(s, "()")
+	pick := words[len(words)-1]
+	for i := len(words) - 1; i >= 0; i-- {
+		if strings.ContainsAny(words[i], "0123456789") {
+			pick = words[i]
+			break
+		}
+	}
+	return strings.Trim(strings.TrimRight(pick, ":."), "()")
 }
 
 // panels are the sub floats inside a float, and nothing else.

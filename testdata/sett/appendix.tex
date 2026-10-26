@@ -1,0 +1,21 @@
+% Pattern: env/newtheorem/article. Numbers after \appendix.
+% want theorem-1 statement/theorem 1.1
+% want theorem-2 statement/theorem A.1 flag=appendix
+% want theorem-3 statement/theorem B.1 flag=appendix
+\documentclass{article}
+\newtheorem{theorem}{Theorem}[section]
+\begin{document}
+\section{Body}
+\begin{theorem}
+In the body.
+\end{theorem}
+\appendix
+\section{First appendix}
+\begin{theorem}
+In appendix A.
+\end{theorem}
+\section{Second appendix}
+\begin{theorem}
+In appendix B.
+\end{theorem}
+\end{document}

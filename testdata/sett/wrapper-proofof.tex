@@ -1,0 +1,26 @@
+% Pattern: proof/wrapper/article. A wrapper of proof, attached by the number
+% in its head (rule 2), far from the statement.
+% want theorem-1 statement/theorem 1 status=here
+% want theorem-2 statement/theorem 2 status=here
+% want proofof-1 proof - proves=theorem-1
+% want proofof-2 proof - proves=theorem-2
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\newenvironment{proofof}[1]{\begin{proof}[Proof of #1]}{\end{proof}}
+\begin{document}
+\begin{theorem}
+First result.
+\end{theorem}
+Some text.
+\begin{theorem}
+Second result.
+\end{theorem}
+\section{Proofs}
+\begin{proofof}{Theorem 1}
+Proof one.
+\end{proofof}
+\begin{proofof}{Theorem~2}
+Proof two.
+\end{proofof}
+\end{document}

@@ -1,0 +1,14 @@
+% Pattern: env/newtheorem/article. The title, not the name, gives the kind.
+% want prop-1 statement/lemma 1
+% want thm-1 definition 2
+\documentclass{article}
+\newtheorem{prop}{Lemma}
+\newtheorem{thm}[prop]{Definition}
+\begin{document}
+\begin{prop}
+A lemma in an environment called prop.
+\end{prop}
+\begin{thm}
+A definition in an environment called thm.
+\end{thm}
+\end{document}

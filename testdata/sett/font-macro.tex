@@ -1,0 +1,45 @@
+% Pattern: head/macro/article and env/titled/article. A paper command that
+% writes its argument in bold, an environment whose first argument is the
+% title, a counter reset at each section, and a paper command for the end of a
+% proof.
+% from 1003.5948
+% want head-1 statement/theorem - status=none
+% want thm-1 statement/claim 1.1 status=here labels=clm:a
+% want head-2 proof - proves=thm-1
+% want thm-2 statement/proposition 2.1 status=here
+% want head-3 proof - proves=thm-2
+\documentclass{article}
+\makeatletter
+\def\parit#1{\smallskip\noindent{\it #1}}
+\def\parbf#1{\smallskip\noindent{\bf #1}}
+\def\qeds{\qed\par\medskip}
+\newcounter{thm}[section]
+\renewcommand{\thethm}{\thesection.\arabic{thm}}
+\def\claim#1{\par\medskip\noindent\refstepcounter{thm}\hbox{\bf \arabic{section}.\arabic{thm}. #1.}\it\ }
+\def\endclaim{\par\medskip}
+\newenvironment{thm}{\claim}{\endclaim}
+\makeatother
+\begin{document}
+\parbf{Main theorem.}
+Every space of this kind has the property.
+
+\section{First}
+\begin{thm}{Claim}\label{clm:a}
+A claim.
+\end{thm}
+
+\parit{Proof.}
+A proof. \qeds
+
+\section{Second}
+\begin{thm}{Proposition}
+A proposition.
+\end{thm}
+
+\begin{figure}
+A figure between the statement and its proof.
+\end{figure}
+
+\parit{Proof.}
+Another proof. \qeds
+\end{document}

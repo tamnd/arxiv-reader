@@ -1,0 +1,17 @@
+% Pattern: env/class/llncs. The class declares the environments. With no
+% option envcountsame, each environment has its own counter.
+% want theorem-1 statement/theorem 1 status=here
+% want proof-1 proof - proves=theorem-1
+% want lemma-1 statement/lemma 1
+\documentclass{llncs}
+\begin{document}
+\begin{theorem}
+A theorem of the class.
+\end{theorem}
+\begin{proof}
+It holds.
+\end{proof}
+\begin{lemma}
+A lemma of the class.
+\end{lemma}
+\end{document}
