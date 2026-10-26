@@ -26,8 +26,13 @@ import (
 // It prints the counts, the gaps and the findings. With -json it prints the
 // census record of AX4.7 instead.
 func runCensus(args []string) error {
-	if len(args) > 0 && args[0] == "batch" {
-		return censusBatch(args[1:])
+	if len(args) > 0 {
+		switch args[0] {
+		case "batch":
+			return censusBatch(args[1:])
+		case "report":
+			return censusReport(args[1:])
+		}
 	}
 	fs := flag.NewFlagSet("ax census", flag.ContinueOnError)
 	render := fs.String("render", "", "the LaTeXML render of the same version, as the second witness")

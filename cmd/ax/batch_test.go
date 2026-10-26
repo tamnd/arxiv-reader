@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/tamnd/arxiv-cli/pkg/axid"
+	"github.com/tamnd/arxiv-reader/analysis"
+	"github.com/tamnd/arxiv-reader/corpus"
 )
 
 func TestReadIDsTakesTheFirstFieldAndSkipsComments(t *testing.T) {
@@ -32,11 +34,11 @@ func TestAStopRecordNamesTheReason(t *testing.T) {
 		t.Fatal(err)
 	}
 	b := &batch{root: root}
-	state, did, err := b.stop(id, "math/0003117", 2, StopNoSource, "the e-print is a PDF")
+	state, did, err := b.stop(id, "math/0003117", 2, analysis.StopNoSource, "the e-print is a PDF")
 	if err != nil || !did || state != "stopped: no-source" {
 		t.Fatalf("got %q %v %v", state, did, err)
 	}
-	p := StopPath(root, id, 2)
+	p := corpus.StopPath(root, id, 2)
 	if want := filepath.Join(root, "analysis", "stopped", "0003", "math-0003117v2.json"); p != want {
 		t.Errorf("the path is %s, want %s", p, want)
 	}
@@ -44,11 +46,11 @@ func TestAStopRecordNamesTheReason(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var s Stop
+	var s analysis.Stop
 	if err := json.Unmarshal(raw, &s); err != nil {
 		t.Fatal(err)
 	}
-	if s.State != "stopped" || s.Reason != StopNoSource || s.By == "" || s.On == "" {
+	if s.State != "stopped" || s.Reason != analysis.StopNoSource || s.By == "" || s.On == "" {
 		t.Errorf("got %+v", s)
 	}
 }

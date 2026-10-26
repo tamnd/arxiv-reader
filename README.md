@@ -1746,7 +1746,7 @@ strength    strong
 
 With `-write` the command writes `analysis/census/<YYMM>/<id>v<n>.json` and `analysis/objects/<YYMM>/<id>.jsonl` in the corpus.
 A version whose licence does not allow text gives structure only: numbers, labels, kinds, spans and hashes, and no body and no name.
-`ax audit -group D` reads those two planes and checks rules D02, D03, D04, D06, D07, D08, D09, D13 and D15.
+`ax audit -group D` reads those two planes and checks rules D01, D02, D03, D04, D06, D07, D08, D09, D13 and D15.
 The forms that the census must count are in `testdata/sett/`, one small TeX file for each form with the result it must give, and `go test ./analysis` runs them.
 
 `ax census batch` takes the latest version of each paper in a list to the state `extracted`, or to `stopped` with a reason.
@@ -1763,6 +1763,19 @@ $ ax census batch -list manifests/gold/x-v1.txt -limit 3
 2/915 alg-geom/9506022 extracted
 3/915 math/0009023 extracted
 915 papers: 0 extracted before, 3 extracted now
+```
+
+`ax census report` counts the analysis plane into `reports/census.md`.
+It gives the measures of AX11.4 for each extractor version: the share of papers with a gap, with a waiver, and with a finding of D07, D08 or D09, the share of statements with the proof_status none, the share of orphan proofs, and the share of items with the kind unknown.
+It also gives the strength, the stopped versions by reason, the counts by month and by MSC code, and the gap patterns with three example papers each.
+With the scope list in the corpus it counts the open and share-alike papers in scope that are extracted, stopped, or not yet done, which is the exit of AX-M3.
+`-since YYMM` reads only the papers from that month, and `-no-scope` does not read the metadata plane.
+Rule D01 of `ax audit -group D` checks each stop record: the state must be `stopped`, the reason must be in the closed list, the record must name the extractor, and a version must not have a census record and a stop record both.
+
+```
+$ ax census report
+7 versions with a census, 0 stopped, 5 of 141732 open papers in scope done
+written to reports/census.md
 ```
 
 `ax gold` makes gold set X of AX11.2, which measures the extractor against papers that people marked.

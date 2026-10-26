@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/tamnd/arxiv-reader/analysis"
 	"github.com/tamnd/arxiv-reader/census"
 	"github.com/tamnd/arxiv-reader/objects"
 	"github.com/tamnd/arxiv-reader/theorems"
@@ -20,11 +21,16 @@ import (
 // records and the object records of the source analysis.
 const GroupAnalysis Group = "D"
 
-// AnalysisRules are the rules of group D that read analysis/census and
-// analysis/objects. The rules that read the mentions, the edges or the scope
-// (D01, D05, D10, D11, D12, D14, D16, D17, D18) are not here. They arrive with
-// the files they read.
+// AnalysisRules are the rules of group D that read analysis/census,
+// analysis/objects and analysis/stopped. The rules that read the mentions or
+// the edges (D05, D10, D11, D12, D14, D16, D17, D18) are not here. They arrive
+// with the files they read.
 var AnalysisRules = []Rule{
+	{
+		ID: "D01", Group: GroupAnalysis, Hard: true,
+		Says: "each paper in scope (AX1.2) has a paper state: a stage of the ladder of 2166-04, or a reason why it stops",
+		Why:  "A paper in scope with a metadata record is at least selected. This rule checks the states that the analysis plane holds: each stop record names a reason from the closed list of AX1.6, and no version is both extracted and stopped.",
+	},
 	{
 		ID: "D02", Group: GroupAnalysis, Hard: true,
 		Says: "each extracted version has a census record, and the census record names the extractor version",
@@ -114,8 +120,40 @@ func (a Analysis) Run() (Report, error) {
 			a.Log(recs[0].Paper)
 		}
 	}
+	stops, err := a.glob("stopped", "*.json")
+	if err != nil {
+		return report, err
+	}
+	for _, f := range stops {
+		s, err := analysis.ReadStop(f)
+		if err != nil {
+			return report, err
+		}
+		report.Records++
+		a.stop(col, a.rel(f), s, have)
+	}
 	report.Results = col.results(AnalysisRules)
 	return report, nil
+}
+
+func (a Analysis) stop(col *collector, file string, s analysis.Stop, have map[string]bool) {
+	ref := fmt.Sprintf("%sv%d", s.Paper, s.Version)
+	add := func(what string) {
+		col.add(Finding{Rule: "D01", File: file, Shard: shardOf(file), ID: ref, What: what})
+	}
+	col.checked("D01")
+	if s.State != analysis.Stopped {
+		add(fmt.Sprintf("the stop record has the state %q, want stopped", s.State))
+	}
+	if !analysis.KnownReason(s.Reason) {
+		add(fmt.Sprintf("the reason %q is not in the closed list of AX1.6", s.Reason))
+	}
+	if have[ref] {
+		add("the version has a census record and a stop record, so it is extracted and stopped")
+	}
+	if s.By == "" {
+		add("the stop record names no extractor version")
+	}
 }
 
 func (a Analysis) glob(plane, pattern string) ([]string, error) {
