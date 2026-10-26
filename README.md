@@ -1765,6 +1765,15 @@ $ ax licence census -scope math
   record             636,424   80.1%
 ```
 
+Some records are wrong at the source. In 19 math papers arXiv dates a version before the version before it, so math/0002124 has v2 on 1999-11-17 and v1 on 2000-02-15. In 73 papers v1 is dated after the month that the id names. The corpus keeps these dates as arXiv gives them, and rules S18 and S20 are right to find them.
+So the metadata audit reads `manifests/waivers-meta.yaml`. Each entry names a record, a rule and the reason. A waived finding is counted in the report and does not fail the build. A waiver with no reason is refused.
+
+```
+$ ax audit -q
+794888 records over 421 months, nothing found
+92 findings waived
+```
+
 The metadata plane is filled from three surfaces, which are the Cornell snapshot on Kaggle, a Hugging Face mirror of it, and arXiv's own OAI-PMH for anything newer than the snapshot.
 Whichever it was read from, the record says so, and the audit is what holds that to be true.
 

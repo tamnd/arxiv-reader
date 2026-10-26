@@ -98,6 +98,9 @@ type Meta struct {
 	Only []string
 	// Log, if set, is called once per month with the records in it.
 	Log func(shard string, records int)
+	// Waivers excuses records from rules. A waived finding is counted and it
+	// does not fail the rule.
+	Waivers Waivers
 }
 
 // Run walks the shards and returns what the rules found.
@@ -106,7 +109,7 @@ type Meta struct {
 // Twelve passes over 3.17 million records is twelve times the reading for the
 // same answer, and the answer is wanted on every push.
 func (m Meta) Run(shards []string) (Report, error) {
-	c := &collector{cap: m.Cap, only: m.Only}
+	c := &collector{cap: m.Cap, only: m.Only, waivers: m.Waivers}
 	if c.cap == 0 {
 		c.cap = 50
 	}
@@ -273,6 +276,8 @@ type collector struct {
 	// them.
 	expects func(rule string) bool
 	skips   map[string]int
+	waivers Waivers
+	waived  map[string]int
 }
 
 // asked says whether the rule should be shown what is being read now.
@@ -325,6 +330,13 @@ func (c *collector) add(f Finding) {
 	if !c.wanted(f.Rule) || !c.asked(f.Rule) {
 		return
 	}
+	if _, ok := c.waivers.Reason(f.Rule, f.ID); ok {
+		if c.waived == nil {
+			c.waived = map[string]int{}
+		}
+		c.waived[f.Rule]++
+		return
+	}
 	if c.totals == nil {
 		c.totals = map[string]int{}
 		c.findings = map[string][]Finding{}
@@ -355,6 +367,7 @@ func (c *collector) results(rules []Rule) []Result {
 			Skipped:  c.skips[rule.ID],
 			Findings: found,
 			Total:    c.totals[rule.ID],
+			Waived:   c.waived[rule.ID],
 		})
 	}
 	return out

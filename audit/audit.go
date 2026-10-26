@@ -166,6 +166,9 @@ type Result struct {
 	// the number there were.
 	Findings []Finding
 	Total    int
+	// Waived is the number of findings that a waiver excuses. They are not in
+	// Total, and they do not fail the rule.
+	Waived int
 }
 
 // State is the rule's state, worked out rather than stored, so it cannot
@@ -238,6 +241,15 @@ func (r Report) Failed() bool {
 		}
 	}
 	return false
+}
+
+// Waived is the number of waived findings across every rule.
+func (r Report) Waived() int {
+	n := 0
+	for _, res := range r.Results {
+		n += res.Waived
+	}
+	return n
 }
 
 // Findings is the total across every rule.
