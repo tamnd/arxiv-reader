@@ -70,9 +70,9 @@ var (
 	partOf     = regexp.MustCompile(`^\s*(?:of\s+)?(?:part\s+)?(\([a-zA-Z0-9]{1,5}\)|\([ivx]{1,5}\))\s*$`)
 )
 
-// Build builds the object records of a document. It also gives the offset of
-// the \begin or the head of each record, for the match with the census.
-func (b *Builder) Build(d *tex.Document, set *theorems.Set) ([]objects.Record, []int) {
+// Build builds the object records of a document. It also gives the extent of
+// each record, for the match with the census and for the edges.
+func (b *Builder) Build(d *tex.Document, set *theorems.Set) ([]objects.Record, []Extent) {
 	if d == nil || d.Body == 0 || d.Tree == nil {
 		return nil, nil
 	}
@@ -93,13 +93,21 @@ func (b *Builder) Build(d *tex.Document, set *theorems.Set) ([]objects.Record, [
 	b.status(d, items)
 	b.origin(items)
 	out := make([]objects.Record, len(items))
-	offs := make([]int, len(items))
+	ext := make([]Extent, len(items))
 	for i, it := range items {
 		it.rec.Order = i + 1
 		out[i] = it.rec
-		offs[i] = it.off
+		ext[i] = Extent{Off: it.off, Inner: it.inner, Close: it.close, End: it.end, Proof: it.proof}
 	}
-	return out, offs
+	return out, ext
+}
+
+// Extent is where an item is in the expanded text: the offset of the \begin
+// or of the head, the offset after the head, the offset of the \end, and the
+// offset after the item. Proof is true for a proof.
+type Extent struct {
+	Off, Inner, Close, End int
+	Proof                  bool
 }
 
 func (b *Builder) envItems(d *tex.Document, set *theorems.Set) []*item {

@@ -131,6 +131,12 @@ func runCensus(args []string) error {
 		for _, o := range res.Objects {
 			fmt.Printf("  object    %-14s %-10s %-24s %-6s proves=%s attach=%d status=%s origin=%s labels=%v flags=%v\n", o.Local, o.Kind, o.Item, o.Number, o.Proves, o.Attach, o.ProofStatus, o.Origin, o.Labels, o.Flags)
 		}
+		for _, e := range res.Edges {
+			fmt.Printf("  edge      %-24s %-12s %-28s %-8s %-9s %-7s line %-5d cue=%s part=%s flags=%v\n", e.From, e.Predicate, e.To, e.Method, e.Confidence, "", e.Evidence.Line, e.Evidence.Cue, e.Part, e.Flags)
+		}
+		for _, c := range res.Cycles {
+			fmt.Printf("  cycle     %v\n", c)
+		}
 	}
 	return nil
 }
@@ -152,7 +158,24 @@ func writeAnalysis(root, paper string, version int, res *analysis.Result) error 
 			return err
 		}
 	}
-	file := corpus.AnalysisObjectsPath(root, id)
+	objs := make([]any, len(res.Objects))
+	for i, r := range res.Objects {
+		objs[i] = r
+	}
+	if err := replaceVersion(corpus.AnalysisObjectsPath(root, id), version, objs); err != nil {
+		return err
+	}
+	es := make([]any, len(res.Edges))
+	for i, e := range res.Edges {
+		es[i] = e
+	}
+	return replaceVersion(corpus.EdgesPath(root, id), version, es)
+}
+
+// replaceVersion writes the records of one version into the file of a paper,
+// and keeps the records of the other versions. A record names its version in
+// the field version, or in evidence.version for an edge.
+func replaceVersion(file string, version int, recs []any) error {
 	var buf bytes.Buffer
 	if old, err := os.ReadFile(file); err == nil {
 		v := fmt.Sprint(version)
@@ -161,9 +184,12 @@ func writeAnalysis(root, paper string, version int, res *analysis.Result) error 
 				continue
 			}
 			var r struct {
-				Version string `json:"version"`
+				Version  json.RawMessage `json:"version"`
+				Evidence struct {
+					Version int `json:"version"`
+				} `json:"evidence"`
 			}
-			if json.Unmarshal(line, &r) == nil && r.Version == v {
+			if json.Unmarshal(line, &r) == nil && (strings.Trim(string(r.Version), `"`) == v || r.Evidence.Version == version) {
 				continue
 			}
 			buf.Write(line)
@@ -172,13 +198,16 @@ func writeAnalysis(root, paper string, version int, res *analysis.Result) error 
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	for _, r := range res.Objects {
+	for _, r := range recs {
 		line, err := json.Marshal(r)
 		if err != nil {
 			return err
 		}
 		buf.Write(line)
 		buf.WriteByte('\n')
+	}
+	if buf.Len() == 0 {
+		return nil
 	}
 	return writeFile(file, buf.Bytes())
 }

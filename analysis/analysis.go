@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/tamnd/arxiv-reader/census"
+	"github.com/tamnd/arxiv-reader/edges"
 	"github.com/tamnd/arxiv-reader/objects"
 	"github.com/tamnd/arxiv-reader/source"
 	"github.com/tamnd/arxiv-reader/tex"
@@ -36,6 +37,10 @@ type Result struct {
 	// Census is one census record for each main file. The first is the
 	// record of the paper.
 	Census []*census.Record
+	// Edges is the edges of each main file (AX06), and Cycles each cycle of
+	// the in-paper uses graph.
+	Edges  []edges.Edge
+	Cycles [][]string
 }
 
 // Manifests is the four manifests that the analysis reads.
@@ -87,11 +92,11 @@ func Analyze(b *source.Bundle, p Paper, m *Manifests) (*Result, error) {
 			}
 		}
 		bld := &Builder{Paper: p.ID, Version: p.Version, Extractor: p.Extractor, Text: p.Text, Titles: m.Resolver.Titles, Phrases: m.Phrases, Prefix: prefix, Numbers: numbers}
-		recs, offs := bld.Build(d, set)
+		recs, ext := bld.Build(d, set)
 		refs := make([]census.Ref, len(recs))
 		for k := range recs {
 			r := &recs[k]
-			if o, ok := at[offs[k]]; ok {
+			if o, ok := at[ext[k].Off]; ok {
 				r.Census = o.ID
 				if r.Number == "" || o.NumberFrom != "head" {
 					r.Number, r.NumberFrom = o.Number, o.NumberFrom
@@ -111,6 +116,14 @@ func Analyze(b *source.Bundle, p Paper, m *Manifests) (*Result, error) {
 			}
 		}
 		rec := c.Match(refs, p.Waivers)
+		items := make([]edges.Item, len(recs))
+		for k, r := range recs {
+			x := ext[k]
+			items[k] = edges.Item{Local: r.Local, Kind: r.Item, Title: r.Title, Number: r.Number, Name: r.Name, Labels: r.Labels, Parts: r.Parts, Proof: x.Proof, Parent: r.Parent, InProof: r.Scope == "local", Proves: r.Proves, ProvesPart: r.ProvesPart, Restates: r.Restates, Off: x.Off, Inner: x.Inner, Close: x.Close, End: x.End}
+		}
+		g := edges.Resolve(edges.Input{Paper: p.ID, Version: p.Version, Extractor: p.Extractor, Prefix: prefix, Doc: d, Items: items, Titles: m.Resolver.Titles})
+		res.Edges = append(res.Edges, g.Edges...)
+		res.Cycles = append(res.Cycles, g.Cycles...)
 		res.Objects = append(res.Objects, recs...)
 		res.Census = append(res.Census, rec)
 	}
