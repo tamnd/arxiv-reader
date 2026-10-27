@@ -14,6 +14,8 @@ import (
 	"github.com/tamnd/arxiv-cli/pkg/axid"
 	"github.com/tamnd/arxiv-reader/corpus"
 	"github.com/tamnd/arxiv-reader/metadata"
+	"github.com/tamnd/arxiv-reader/objects"
+	"github.com/tamnd/arxiv-reader/tags"
 
 	"github.com/tamnd/arxiv-reader/analysis"
 	"github.com/tamnd/arxiv-reader/census"
@@ -158,6 +160,9 @@ func writeAnalysis(root, paper string, version int, res *analysis.Result) error 
 			return err
 		}
 	}
+	if _, err := tagAnalysis(root, id, paper, version, res.Objects); err != nil {
+		return err
+	}
 	objs := make([]any, len(res.Objects))
 	for i, r := range res.Objects {
 		objs[i] = r
@@ -170,6 +175,35 @@ func writeAnalysis(root, paper string, version int, res *analysis.Result) error 
 		es[i] = e
 	}
 	return replaceVersion(corpus.EdgesPath(root, id), version, es)
+}
+
+// tagAnalysis gives a tag to each object of one version and saves the tag
+// register of the analysis plane. It reads the objects file as it is before
+// the new records are written, so the register can be carried from the
+// records it was assigned against.
+func tagAnalysis(root string, id axid.ID, paper string, version int, recs []objects.Record) (analysis.Tagged, error) {
+	path := corpus.AnalysisTagsPath(root, id)
+	old, err := tags.LoadRegister(path)
+	if err != nil {
+		return analysis.Tagged{}, err
+	}
+	have, err := readObjectsOf(root, id)
+	if err != nil {
+		return analysis.Tagged{}, err
+	}
+	content, err := tags.LoadRegister(corpus.TagsPath(root, id))
+	if err != nil {
+		return analysis.Tagged{}, err
+	}
+	t, err := analysis.AssignTags(paper, version, recs, analysis.VersionRecords(have, old.Version), old, content.Taken())
+	if err != nil {
+		return t, err
+	}
+	if len(t.Register.Entries) == 0 {
+		return t, nil
+	}
+	_, err = t.Register.Save(path)
+	return t, err
 }
 
 // replaceVersion writes the records of one version into the file of a paper,

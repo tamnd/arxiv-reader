@@ -380,6 +380,13 @@ func GoldPath(root, set, setVersion string, id axid.ID, version int) string {
 	return path.Join(root, "gold", strings.ToLower(set), setVersion, Shard(id), fmt.Sprintf("%sv%d.json", PathID(id), version))
 }
 
+// AnalysisTagsPath is the tag register of the objects of the analysis plane
+// of one paper (AX3.9). It is apart from the register of the content plane,
+// because the two planes name their objects in two ways.
+func AnalysisTagsPath(root string, id axid.ID) string {
+	return path.Join(root, "analysis", "tags", Shard(id), PathID(id)+".tags")
+}
+
 // EdgesPath is the edge records of one paper (AX6.4). It is committed like
 // the census and the object records.
 func EdgesPath(root string, id axid.ID) string {
