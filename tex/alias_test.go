@@ -112,3 +112,39 @@ func TestAnAliasThatGivesItsArgumentsToTheEnvironment(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
+
+func TestTheArgumentOfACommandThatPrintsNothing(t *testing.T) {
+	src := `\documentclass{amsart}
+\newtheorem{lemma}{Lemma}
+\newcommand{\off}[1]{}
+\newcommand{\two}[2]{}
+\newcommand{\keep}[1]{#1}
+\newcommand{\twice}[1]{}
+\renewcommand{\twice}[1]{#1}
+\begin{document}
+\begin{lemma} One. \end{lemma}
+\off{Text. \begin{lemma} Two. \end{lemma}}
+\two{a}
+{\begin{lemma} Three. \end{lemma}}
+\keep{\begin{lemma} Four. \end{lemma}}
+\twice{\begin{lemma} Five. \end{lemma}}
+\end{document}
+`
+	d, err := tex.ReadFile("main.tex", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, n := range d.Tree.Nodes {
+		if n.Kind == "env" && n.Name == "lemma" {
+			got = append(got, strings.Join(strings.Fields(string(d.Text[n.Inner:n.Close])), " "))
+		}
+	}
+	want := []string{"One.", "Four.", "Five."}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	if strings.Count(string(d.Text), "\n") != strings.Count(src, "\n") {
+		t.Errorf("the text has %d lines, and the source has %d", strings.Count(string(d.Text), "\n"), strings.Count(src, "\n"))
+	}
+}

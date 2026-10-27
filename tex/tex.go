@@ -197,6 +197,9 @@ func build(main string, files, local map[string][]byte, excluded map[string]bool
 	d.Macros = ReadMacros(d.Text[:d.preambleEnd()], local)
 	d.Macros.Add(ReadMacros(d.bodyText(), nil))
 	d.step("macros: %d commands, %d environments", len(d.Macros.Commands), len(d.Macros.Envs))
+	if n := d.drop(); n > 0 {
+		d.step("drop: %d uses of commands that print nothing", n)
+	}
 	if n := d.unalias(); n > 0 {
 		d.step("aliases: %d uses of commands that stand for \\begin or \\end", n)
 	}
