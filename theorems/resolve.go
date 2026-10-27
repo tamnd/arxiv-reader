@@ -163,8 +163,15 @@ func (r *Resolver) Resolve(d *tex.Document) *Set {
 		}
 	}
 	for _, p := range d.Packages {
-		for _, e := range r.Classes.Packages[p] {
-			s.add(r.fromClass(e, "package:"+p), false)
+		// An entry such as ntheorem[standard] is for the package with the option.
+		names := []string{p}
+		for _, o := range d.PackageOptions[p] {
+			names = append(names, p+"["+o+"]")
+		}
+		for _, n := range names {
+			for _, e := range r.Classes.Packages[n] {
+				s.add(r.fromClass(e, "package:"+n), false)
+			}
 		}
 	}
 	for i := 0; i < 3; i++ {

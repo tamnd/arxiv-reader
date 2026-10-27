@@ -136,6 +136,36 @@ packages:
     - {env: proof, title: Proof, numbered: false, proof: true}
   ntheorem:
     - {env: proof, title: Proof, numbered: false, proof: true}
+  # The option standard loads ntheorem.std, which declares each environment with a capital and with a lowercase name.
+  ntheorem[standard]:
+    - {env: Theorem, title: Theorem}
+    - {env: theorem, title: Theorem}
+    - {env: Satz, title: Satz}
+    - {env: satz, title: Satz}
+    - {env: Proposition, title: Proposition}
+    - {env: proposition, title: Proposition}
+    - {env: Lemma, title: Lemma}
+    - {env: lemma, title: Lemma}
+    - {env: Korollar, title: Korollar}
+    - {env: korollar, title: Korollar}
+    - {env: Corollary, title: Corollary}
+    - {env: corollary, title: Corollary}
+    - {env: Example, title: Example}
+    - {env: example, title: Example}
+    - {env: Beispiel, title: Beispiel}
+    - {env: beispiel, title: Beispiel}
+    - {env: Bemerkung, title: Bemerkung}
+    - {env: bemerkung, title: Bemerkung}
+    - {env: Anmerkung, title: Anmerkung}
+    - {env: anmerkung, title: Anmerkung}
+    - {env: Remark, title: Remark}
+    - {env: remark, title: Remark}
+    - {env: Definition, title: Definition}
+    - {env: definition, title: Definition}
+    - {env: Proof, title: Proof, numbered: false, proof: true}
+    - {env: proof, title: Proof, numbered: false, proof: true}
+    - {env: Beweis, title: Beweis, numbered: false, proof: true}
+    - {env: beweis, title: Beweis, numbered: false, proof: true}
   amsproof:
     - {env: proof, title: Proof, numbered: false, proof: true}
   mathabx:

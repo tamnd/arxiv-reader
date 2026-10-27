@@ -45,6 +45,8 @@ type Document struct {
 	Options []string
 	// Packages is each package that the preamble loads, in order.
 	Packages []string
+	// PackageOptions is the options of each package, in the order of the preamble.
+	PackageOptions map[string][]string
 	// Local is each local .sty and .cls file of the submission, cleaned.
 	Local map[string][]byte
 	// Macros is the macro table.
@@ -248,7 +250,7 @@ func (d *Document) Preamble() []byte { return d.Text[:d.preambleEnd()] }
 
 var (
 	classCmd   = regexp.MustCompile(`\\document(?:class|style)\s*(?:\[([^\]]*)\])?\s*\{([^}]*)\}`)
-	packageCmd = regexp.MustCompile(`\\(?:usepackage|RequirePackage)\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}`)
+	packageCmd = regexp.MustCompile(`\\(?:usepackage|RequirePackage)\s*(?:\[([^\]]*)\])?\s*\{([^}]*)\}`)
 )
 
 func (d *Document) findPreamble() {
@@ -263,10 +265,21 @@ func (d *Document) findPreamble() {
 	}
 	seen := map[string]bool{}
 	for _, m := range packageCmd.FindAllSubmatch(pre, -1) {
-		for p := range strings.SplitSeq(string(m[1]), ",") {
-			if p = strings.TrimSpace(p); p != "" && !seen[p] {
+		for p := range strings.SplitSeq(string(m[2]), ",") {
+			if p = strings.TrimSpace(p); p == "" {
+				continue
+			}
+			if !seen[p] {
 				seen[p] = true
 				d.Packages = append(d.Packages, p)
+			}
+			for o := range strings.SplitSeq(string(m[1]), ",") {
+				if o = strings.TrimSpace(o); o != "" {
+					if d.PackageOptions == nil {
+						d.PackageOptions = map[string][]string{}
+					}
+					d.PackageOptions[p] = append(d.PackageOptions[p], o)
+				}
 			}
 		}
 	}
