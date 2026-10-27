@@ -15,6 +15,7 @@ import (
 	"github.com/tamnd/arxiv-reader/corpus"
 	"github.com/tamnd/arxiv-reader/fetch"
 	"github.com/tamnd/arxiv-reader/licence"
+	"github.com/tamnd/arxiv-reader/metadata"
 )
 
 func TestReadIDsTakesTheFirstFieldAndSkipsComments(t *testing.T) {
@@ -140,5 +141,19 @@ func TestTheQueueKeepsTheOrderOfAX26(t *testing.T) {
 	want := "2312.00002 2312.00001 2001.00002 2312.00009 2001.00001 math/0101001"
 	if s := strings.Join(got, " "); s != want {
 		t.Errorf("got %s, want %s", s, want)
+	}
+}
+
+// A paper of the list with no record in the plane is a typed error, so the
+// batch goes on and a redo list does not stop at it each run.
+func TestAPaperOutsideThePlaneIsNotInPlane(t *testing.T) {
+	id, err := axid.Parse("2106.09685")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = record(metadata.Plane{Root: t.TempDir()}, id)
+	var missing *notInPlane
+	if !errors.As(err, &missing) || missing.ID != "2106.09685" {
+		t.Fatalf("got %v, want a paper not in the plane", err)
 	}
 }
