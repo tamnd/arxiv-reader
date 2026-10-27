@@ -34,6 +34,19 @@ type Summary struct {
 	Strength map[string]int `json:"strength"`
 	// StopReasons is the stop records of each reason of AX1.6.
 	StopReasons map[string]int `json:"stop_reasons"`
+	// Areas is the same counts for each MSC code at two digits. Its scope
+	// counts are zero when ScopeCounted is false.
+	Areas map[string]AreaSummary `json:"areas,omitempty"`
+}
+
+// AreaSummary is the counts of one MSC code at two digits.
+type AreaSummary struct {
+	Scope     int `json:"scope"`
+	Extracted int `json:"extracted"`
+	Stopped   int `json:"stopped"`
+	NoState   int `json:"no_state"`
+	Versions  int `json:"versions"`
+	Gaps      int `json:"gaps"`
 }
 
 // Summary returns the counts of the report.
@@ -55,7 +68,24 @@ func (rp *Report) Summary(scopeCounted bool) Summary {
 	for k, v := range rp.Stopped {
 		s.StopReasons[k] = v
 	}
+	area := func(code string) AreaSummary {
+		if s.Areas == nil {
+			s.Areas = map[string]AreaSummary{}
+		}
+		return s.Areas[code]
+	}
+	for code, r := range rp.codes {
+		a := area(code)
+		a.Versions, a.Gaps = r.Papers, r.Gaps
+		s.Areas[code] = a
+	}
 	if scopeCounted {
+		for code, x := range rp.Areas {
+			a := area(code)
+			a.Scope, a.Extracted, a.Stopped = x.Scope, x.Extracted, x.Halted
+			a.NoState = x.Scope - x.Extracted - x.Halted
+			s.Areas[code] = a
+		}
 		s.Scope, s.Extracted, s.Stopped = rp.Scope, rp.Extracted, rp.Halted
 		s.NoState = rp.Scope - rp.Extracted - rp.Halted
 		s.Closed, s.ClosedOutside = rp.Closed, rp.ClosedOutside

@@ -76,3 +76,31 @@ func TestTheSummaryHasTheNumbersOfAX15(t *testing.T) {
 		t.Errorf("a summary with no scope has %+v", s)
 	}
 }
+
+func TestTheSummaryHasTheNumbersOfEachArea(t *testing.T) {
+	rp := NewReport("")
+	rp.Add("2312", "14", &census.Record{Paper: "2312.00001", Version: 1, Strength: "strong"}, nil)
+	rp.Add("2312", "11", &census.Record{Paper: "2312.00002", Version: 1, Strength: "normal", Gaps: []census.Gap{{Occurrence: "env-1"}, {Occurrence: "env-2"}}}, nil)
+	rp.AddScope("14", true, false)
+	rp.AddScope("14", false, false)
+	rp.AddScope("11", true, false)
+	rp.AddScope("11", false, true)
+	rp.AddScope("05", false, false)
+	s := rp.Summary(true)
+	if s.Scope != 5 || s.Extracted != 2 || s.Stopped != 1 || s.NoState != 2 {
+		t.Errorf("got %+v", s)
+	}
+	want := map[string]AreaSummary{
+		"14": {Scope: 2, Extracted: 1, NoState: 1, Versions: 1},
+		"11": {Scope: 2, Extracted: 1, Stopped: 1, Versions: 1, Gaps: 2},
+		"05": {Scope: 1, NoState: 1},
+	}
+	for code, w := range want {
+		if s.Areas[code] != w {
+			t.Errorf("the area %s has %+v, and it must have %+v", code, s.Areas[code], w)
+		}
+	}
+	if s := rp.Summary(false); s.Areas["05"].Scope != 0 || s.Areas["11"].Gaps != 2 {
+		t.Errorf("a summary with no scope has the areas %+v", s.Areas)
+	}
+}

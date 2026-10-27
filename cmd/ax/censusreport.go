@@ -146,14 +146,12 @@ func censusReport(args []string) error {
 					}
 					return nil
 				}
-				rp.Scope++
 				ref := fmt.Sprintf("%sv%d", r.ID, latest.Version)
-				switch {
-				case extracted[ref]:
-					rp.Extracted++
-				case stopped[ref]:
-					rp.Halted++
+				code := gold.CodeOf(r)
+				if code == "" {
+					code = "unknown"
 				}
+				rp.AddScope(code, extracted[ref], stopped[ref])
 				return nil
 			})
 			if err != nil {
