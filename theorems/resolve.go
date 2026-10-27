@@ -75,6 +75,11 @@ func (s *Set) add(d *Declaration, replace bool) {
 	if _, ok := s.Envs[d.Env]; !ok {
 		s.Order = append(s.Order, d.Env)
 	}
+	if d.Item == "proof" {
+		// A class can declare proof with \newtheorem or \spnewtheorem. It
+		// still writes proofs, and LaTeXML renders them as proofs.
+		d.Proof = true
+	}
 	s.Envs[d.Env] = d
 }
 
@@ -164,9 +169,7 @@ func (r *Resolver) Resolve(d *tex.Document) *Set {
 	for i := 0; i < 3; i++ {
 		r.wrappers(s, d)
 	}
-	for _, d := range s.Envs {
-		d.Counter = s.counterOf(d)
-	}
+	r.Used(s, d)
 	return s
 }
 
