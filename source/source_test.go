@@ -146,8 +146,9 @@ func TestOpenRefusesAnEntryThatMeansSomethingElseOnAnotherMachine(t *testing.T) 
 
 func TestMainTakesTheREADMEsWordInEitherFormat(t *testing.T) {
 	for what, readme := range map[string]File{
-		"json": text("00README.json", `{"sources":[{"filename":"second.tex","usage":"toplevelfile"}]}`),
-		"xxx":  text("00README.XXX", "second.tex toplevelfile\nfirst.tex ignore\n"),
+		"json":                   text("00README.json", `{"sources":[{"filename":"second.tex","usage":"toplevelfile"}]}`),
+		"json, the current form": text("00README.json", `{"process":{"compiler":"pdflatex"},"sources":[{"filename":"second.tex","usage":"toplevel"},{"filename":"first.tex","usage":"ignore"}],"spec_version":1}`),
+		"xxx":                    text("00README.XXX", "second.tex toplevelfile\nfirst.tex ignore\n"),
 	} {
 		b := opened(t, readme, text("first.tex", body), text("second.tex", body))
 		main, err := b.Main()

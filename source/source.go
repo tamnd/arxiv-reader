@@ -359,7 +359,7 @@ func (b *Bundle) declared() (string, bool) {
 		if json.Unmarshal(raw, &doc) == nil {
 			for _, list := range [][]readmeEntry{doc.Sources, doc.Process.Sources} {
 				for _, e := range list {
-					if strings.EqualFold(e.Usage, "toplevelfile") && e.Filename != "" {
+					if isToplevel(e.Usage) && e.Filename != "" {
 						return e.Filename, true
 					}
 				}
@@ -381,6 +381,13 @@ func (b *Bundle) declared() (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// isToplevel tells if the usage of a 00README.json entry names a top level
+// file. The current form of arXiv is "toplevel", and an older one is
+// "toplevelfile", as in 00README.XXX.
+func isToplevel(usage string) bool {
+	return strings.EqualFold(usage, "toplevel") || strings.EqualFold(usage, "toplevelfile")
 }
 
 type readmeEntry struct {
