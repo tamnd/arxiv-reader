@@ -309,14 +309,6 @@ func rank(c string) int {
 	return len(Confidences)
 }
 
-// lower is the next confidence down.
-func lower(c string) string {
-	if i := rank(c); i+1 < len(Confidences) {
-		return Confidences[i+1]
-	}
-	return c
-}
-
 func (r *resolver) where(off int) (string, int) {
 	p := r.in.Doc.Pos(off)
 	return p.File, p.Line

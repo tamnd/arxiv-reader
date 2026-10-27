@@ -3,6 +3,7 @@ module github.com/tamnd/arxiv-reader
 go 1.27.1
 
 require (
+	github.com/parquet-go/parquet-go v0.32.0
 	github.com/tamnd/arxiv-cli v0.2.0
 	golang.org/x/net v0.59.0
 	golang.org/x/text v0.42.0
@@ -15,7 +16,6 @@ require (
 	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/parquet-go/bitpack v1.0.0 // indirect
 	github.com/parquet-go/jsonlite v1.0.0 // indirect
-	github.com/parquet-go/parquet-go v0.32.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/twpayne/go-geom v1.6.1 // indirect
 	golang.org/x/sys v0.48.0 // indirect
