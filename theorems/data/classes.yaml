@@ -64,6 +64,24 @@ classes:
     - {env: case, title: Case}
     - {env: claim, title: Claim, numbered: false}
     - {env: proof, title: Proof, numbered: false, proof: true}
+  svproc:
+    - {env: theorem, title: Theorem}
+    - {env: case, title: Case}
+    - {env: conjecture, title: Conjecture}
+    - {env: corollary, title: Corollary}
+    - {env: definition, title: Definition}
+    - {env: example, title: Example}
+    - {env: exercise, title: Exercise}
+    - {env: lemma, title: Lemma}
+    - {env: note, title: Note}
+    - {env: problem, title: Problem}
+    - {env: property, title: Property}
+    - {env: proposition, title: Proposition}
+    - {env: question, title: Question}
+    - {env: solution, title: Solution}
+    - {env: remark, title: Remark}
+    - {env: claim, title: Claim, numbered: false}
+    - {env: proof, title: Proof, numbered: false, proof: true}
   svmono:
     - {env: theorem, title: Theorem}
     - {env: lemma, title: Lemma}
