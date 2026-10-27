@@ -17,6 +17,8 @@ type Macro struct {
 	Body       string `json:"body"`
 	// How is the command that defined it: newcommand, def, let or operator.
 	How string `json:"how"`
+	// File is the local style file of the definition, or "" for the paper.
+	File string `json:"file,omitempty"`
 }
 
 // Env is one environment that a paper defines with \newenvironment.
@@ -99,7 +101,7 @@ func (m *Macros) read(text []byte, file string) {
 				}
 			}
 			n, _ := strconv.Atoi(strings.TrimSpace(a.Values[1]))
-			m.Commands[name] = &Macro{Name: name, Args: n, Default: a.Values[2], HasDefault: a.Has[2], Body: a.Values[3], How: "newcommand"}
+			m.Commands[name] = &Macro{Name: name, Args: n, Default: a.Values[2], HasDefault: a.Has[2], Body: a.Values[3], How: "newcommand", File: file}
 		case "def", "gdef", "edef", "xdef":
 			a, end, ok := ReadArgs(text, at, "c")
 			if !ok || !strings.HasPrefix(a.Values[0], `\`) {
@@ -114,7 +116,7 @@ func (m *Macros) read(text []byte, file string) {
 			if !gok {
 				continue
 			}
-			m.Commands[a.Values[0]] = &Macro{Name: a.Values[0], Args: len(params) / 2, Body: string(text[in : e-1]), How: "def"}
+			m.Commands[a.Values[0]] = &Macro{Name: a.Values[0], Args: len(params) / 2, Body: string(text[in : e-1]), How: "def", File: file}
 		case "let":
 			a, end, ok := ReadArgs(text, at, "c")
 			if !ok {
@@ -128,7 +130,7 @@ func (m *Macros) read(text []byte, file string) {
 			if !ok || !strings.HasPrefix(b.Values[0], `\`) {
 				continue
 			}
-			m.Commands[a.Values[0]] = &Macro{Name: a.Values[0], Body: b.Values[0], How: "let"}
+			m.Commands[a.Values[0]] = &Macro{Name: a.Values[0], Body: b.Values[0], How: "let", File: file}
 		case "DeclareMathOperator":
 			a, _, ok := ReadArgs(text, at, "*cm")
 			if !ok {
@@ -138,7 +140,7 @@ func (m *Macros) read(text []byte, file string) {
 			if a.Star {
 				op += "*"
 			}
-			m.Commands[a.Values[0]] = &Macro{Name: a.Values[0], Body: op + "{" + a.Values[1] + "}", How: "operator"}
+			m.Commands[a.Values[0]] = &Macro{Name: a.Values[0], Body: op + "{" + a.Values[1] + "}", How: "operator", File: file}
 		case "newenvironment", "renewenvironment":
 			a, _, ok := ReadArgs(text, at, "*moomm")
 			if !ok {
@@ -156,7 +158,7 @@ func (m *Macros) read(text []byte, file string) {
 				continue
 			}
 			n := strings.Count(a.Values[1], "m") + strings.Count(a.Values[1], "o")
-			m.Commands[a.Values[0]] = &Macro{Name: a.Values[0], Args: n, Body: a.Values[2], How: "newcommand"}
+			m.Commands[a.Values[0]] = &Macro{Name: a.Values[0], Args: n, Body: a.Values[2], How: "newcommand", File: file}
 		}
 	}
 }
