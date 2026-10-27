@@ -3,6 +3,7 @@ package census
 import (
 	"testing"
 
+	"github.com/tamnd/arxiv-reader/extract"
 	"github.com/tamnd/arxiv-reader/tex"
 	"github.com/tamnd/arxiv-reader/theorems"
 )
@@ -35,5 +36,18 @@ func TestRenderCountsByInnerName(t *testing.T) {
 	}
 	if len(rc.Envs) != 1 || rc.Envs[0] != (EnvCount{Env: "lemma", Source: 3, Render: 1}) {
 		t.Fatalf("the envs are %+v, and only lemma must differ", rc.Envs)
+	}
+}
+
+// TestARenderedProofTheoremIsAProof reads a proof that a class declares with \newtheorem, which LaTeXML renders as a theorem, as in math/0009023v3.
+func TestARenderedProofTheoremIsAProof(t *testing.T) {
+	p := &extract.Paper{Sections: []extract.Section{{Blocks: []extract.Block{
+		{Kind: extract.KindTheorem, Env: "theorem", Tag: "1.1"},
+		{Kind: extract.KindTheorem, Env: "proof"},
+		{Kind: extract.KindProof},
+	}}}}
+	r := FromRender(p)
+	if len(r.Theorems) != 1 || r.Proofs != 2 {
+		t.Fatalf("the render has %d theorems and %d proofs, want 1 and 2", len(r.Theorems), r.Proofs)
 	}
 }
