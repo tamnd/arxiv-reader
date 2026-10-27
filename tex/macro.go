@@ -21,10 +21,14 @@ type Macro struct {
 
 // Env is one environment that a paper defines with \newenvironment.
 type Env struct {
-	Name  string `json:"name"`
-	Args  int    `json:"args,omitempty"`
-	Begin string `json:"begin"`
-	End   string `json:"end"`
+	Name string `json:"name"`
+	Args int    `json:"args,omitempty"`
+	// Default is the value of the first argument when the use does not give
+	// it. The first argument is then optional, as in [1][Proof].
+	Default    string `json:"default,omitempty"`
+	HasDefault bool   `json:"-"`
+	Begin      string `json:"begin"`
+	End        string `json:"end"`
 	// Off is the offset of the declaration in the text it was read from.
 	Off int `json:"-"`
 }
@@ -143,7 +147,7 @@ func (m *Macros) read(text []byte) {
 			if _, have := m.Envs[name]; !have {
 				m.EnvOrder = append(m.EnvOrder, name)
 			}
-			m.Envs[name] = &Env{Name: name, Args: n, Begin: a.Values[3], End: a.Values[4], Off: loc[0]}
+			m.Envs[name] = &Env{Name: name, Args: n, Default: a.Values[2], HasDefault: a.Has[2], Begin: a.Values[3], End: a.Values[4], Off: loc[0]}
 		case "NewDocumentCommand", "RenewDocumentCommand", "DeclareDocumentCommand":
 			a, _, ok := ReadArgs(text, at, "cmm")
 			if !ok {
