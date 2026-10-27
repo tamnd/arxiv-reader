@@ -28,10 +28,14 @@ func FromRender(p *extract.Paper) *Render {
 	var walk func([]extract.Block)
 	walk = func(bs []extract.Block) {
 		for _, b := range bs {
-			switch b.Kind {
-			case extract.KindTheorem:
+			switch {
+			case b.Kind == extract.KindTheorem && strings.EqualFold(b.Env, "proof"):
+				// A class that declares proof with \newtheorem renders each
+				// proof as a theorem, and the source counts it as a proof.
+				r.Proofs++
+			case b.Kind == extract.KindTheorem:
 				r.Theorems = append(r.Theorems, RenderItem{Env: b.Env, Number: strings.TrimSpace(b.Tag)})
-			case extract.KindProof:
+			case b.Kind == extract.KindProof:
 				r.Proofs++
 			}
 			walk(b.Blocks)

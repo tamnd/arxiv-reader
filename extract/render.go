@@ -131,6 +131,11 @@ func sections(n *html.Node) []Section {
 		}
 		kind, level, ok := headingOf(c)
 		if !ok {
+			if hasClass(c, "ltx_abstract") {
+				// An abstract that the source does not close holds the rest of
+				// the paper, so its sections are the sections of the paper.
+				out = append(out, sections(c)...)
+			}
 			continue
 		}
 		title := firstClass(c, "ltx_title")

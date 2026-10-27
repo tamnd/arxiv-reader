@@ -489,3 +489,29 @@ func TestAPaperWithNoFaultsIsKept(t *testing.T) {
 		t.Fatal("rejected a paper with nothing wrong with it")
 	}
 }
+
+// TestAnAbstractThatHoldsThePaper reads the sections of an abstract that the
+// source does not close, as in 0706.0357v71.
+func TestAnAbstractThatHoldsThePaper(t *testing.T) {
+	page := `<html><body><article class="ltx_document">
+<h1 class="ltx_title ltx_title_document">T</h1>
+<div class="ltx_abstract"><p class="ltx_p">We say little.</p>
+<section id="S1" class="ltx_section"><h2 class="ltx_title ltx_title_section"><span class="ltx_tag ltx_tag_section">1 </span>One</h2>
+<div id="S1.Thmthm1" class="ltx_theorem ltx_theorem_thm"><h6 class="ltx_title ltx_runin ltx_title_theorem"><span class="ltx_tag ltx_tag_theorem">Theorem 1.1.</span></h6><div class="ltx_para"><p class="ltx_p">True.</p></div></div>
+</section>
+<section id="S2" class="ltx_section"><h2 class="ltx_title ltx_title_section"><span class="ltx_tag ltx_tag_section">2 </span>Two</h2><div class="ltx_para"><p class="ltx_p">More.</p></div></section>
+</div></article></body></html>`
+	p, err := Parse([]byte(page), "0706.0357", 71)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Abstract) != 1 || p.Abstract[0].Text != "We say little." {
+		t.Errorf("the abstract is %+v", p.Abstract)
+	}
+	if len(p.Sections) != 2 || p.Sections[0].ID != "S1" || p.Sections[1].ID != "S2" {
+		t.Fatalf("got the sections %+v", p.Sections)
+	}
+	if bs := p.Sections[0].Blocks; len(bs) != 1 || bs[0].Kind != KindTheorem || bs[0].Env != "thm" {
+		t.Errorf("section 1 holds %+v", bs)
+	}
+}
