@@ -288,7 +288,18 @@ func record(plane metadata.Plane, id axid.ID) (metadata.Record, error) {
 			return s, nil
 		}
 	}
-	return metadata.Record{}, fmt.Errorf("%s is not in the plane at %s, so there is nothing saying what its licence is", id.Canonical, plane.Dir())
+	return metadata.Record{}, &notInPlane{ID: id.Canonical, Dir: plane.Dir()}
+}
+
+// notInPlane is a paper with no record in the metadata plane. A list can name
+// such a paper, for example one that a run outside the scope extracted, so a
+// batch goes on with the next paper.
+type notInPlane struct {
+	ID, Dir string
+}
+
+func (n *notInPlane) Error() string {
+	return fmt.Sprintf("%s is not in the plane at %s, so there is nothing saying what its licence is", n.ID, n.Dir)
 }
 
 // fetchVerify checks every file the manifest names against its hash.

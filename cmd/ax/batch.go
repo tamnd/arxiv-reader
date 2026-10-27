@@ -123,6 +123,11 @@ func censusBatch(args []string) error {
 			fmt.Fprintf(os.Stderr, "ax: %s: %v, so the batch goes on with the next paper\n", ref, err)
 			state, err = "changed", nil
 		}
+		var missing *notInPlane
+		if errors.As(err, &missing) {
+			fmt.Fprintf(os.Stderr, "ax: %v, so the batch goes on with the next paper\n", err)
+			state, err = "not in the plane", nil
+		}
 		if err != nil {
 			if ctx.Err() != nil {
 				break
@@ -146,6 +151,9 @@ func censusBatch(args []string) error {
 	}
 	if n := counts["changed"]; n > 0 {
 		fmt.Printf(", %d changed at the source", n)
+	}
+	if n := counts["not in the plane"]; n > 0 {
+		fmt.Printf(", %d not in the plane", n)
 	}
 	fmt.Println()
 	return ctx.Err()
