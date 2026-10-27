@@ -405,34 +405,57 @@ func splitKeys(s string) []string {
 // A paper can write \newcommand{\thm}[2]{\newtheorem{#1}{#2}} and then
 // \thm{lem}{Lemma}. Such a declaration is the usual cause of a contiguity gap
 // (AX4.4), so each call of a macro whose body declares a theorem is expanded
-// and read.
+// and read. The calls in the local .sty and .cls files are read too, because a
+// class such as siamart declares its theorems with \newsiamthm.
 func (r *Resolver) macroDecls(s *Set, d *tex.Document) {
-	for name, m := range d.Macros.Commands {
-		if m.Args == 0 || !declCmd.MatchString(m.Body) {
-			continue
-		}
+	r.macroCalls(s, d, d.Text, "paper", true)
+	for _, name := range sortedNames(d.Local) {
+		r.macroCalls(s, d, d.Local[name], "local:"+name, false)
+	}
+}
+
+// macroCalls expands each call in text of a macro that declares a theorem. The
+// offset of a declaration is the offset of its call only when text is the
+// paper.
+func (r *Resolver) macroCalls(s *Set, d *tex.Document, text []byte, from string, paper bool) {
+	for _, name := range sortedNames(declMacros(d.Macros)) {
+		m := d.Macros.Commands[name]
 		call := regexp.MustCompile(regexp.QuoteMeta(name) + `\b`)
-		for _, loc := range call.FindAllIndex(d.Text, -1) {
-			if before(d.Text, loc[0], "newcommand") || before(d.Text, loc[0], "def") {
+		for _, loc := range call.FindAllIndex(text, -1) {
+			if before(text, loc[0], "newcommand") || before(text, loc[0], "def") {
 				continue
 			}
 			end := loc[1]
 			for k := 0; k < m.Args; k++ {
-				_, e, ok := tex.ReadArgs(d.Text, end, "m")
+				_, e, ok := tex.ReadArgs(text, end, "m")
 				if !ok {
 					break
 				}
 				end = e
 			}
-			expanded := d.Macros.Expand(string(d.Text[loc[0]:end]))
+			expanded := d.Macros.Expand(string(text[loc[0]:end]))
 			sub := &Set{Envs: map[string]*Declaration{}, Aliases: s.Aliases, NumberWithin: s.NumberWithin}
-			r.scan(sub, []byte(expanded), "paper", -1)
+			r.scan(sub, []byte(expanded), from, -1)
 			for _, e := range sub.List() {
-				e.Off, e.Form = loc[0], "macro:"+name
+				e.Off, e.Form = -1, "macro:"+name
+				if paper {
+					e.Off = loc[0]
+				}
 				s.add(e, false)
 			}
 		}
 	}
+}
+
+// declMacros is the set of the macros with arguments whose body declares a theorem.
+func declMacros(ms *tex.Macros) map[string][]byte {
+	out := map[string][]byte{}
+	for name, m := range ms.Commands {
+		if m.Args > 0 && declCmd.MatchString(m.Body) {
+			out[name] = nil
+		}
+	}
+	return out
 }
 
 // before tells if the text just before off ends with word, with spaces,
