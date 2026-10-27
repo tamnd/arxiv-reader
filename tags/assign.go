@@ -48,13 +48,19 @@ type Plan struct {
 // prevent: a reference that breaks is visible and a reference silently pointed at
 // the wrong theorem is not.
 func Assign(paper string, objects []Object, old Register) (Plan, error) {
+	return AssignWith(paper, objects, old, nil)
+}
+
+// AssignWith is Assign with more tags that the paper has already used, in
+// another register, and that a new tag must not take.
+func AssignWith(paper string, objects []Object, old Register, taken []Tag) (Plan, error) {
 	if len(objects) == 0 {
 		return Plan{}, ErrNoObjects
 	}
 	byLocal := old.ByLocal()
 	seen := map[string]bool{}
 	p := Plan{Register: Register{Entries: old.Entries, Version: old.Version}, Assigned: map[string]Tag{}}
-	space := NewSpace(paper, old.Taken())
+	space := NewSpace(paper, append(old.Taken(), taken...))
 	for _, o := range objects {
 		if seen[o.Local] {
 			return Plan{}, fmt.Errorf("tags: %s is the identifier of two objects in %s, the second of them in %s", o.Local, paper, o.File)

@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"text/tabwriter"
 
 	"github.com/tamnd/arxiv-cli/pkg/axid"
+	"github.com/tamnd/arxiv-reader/analysis"
 	"github.com/tamnd/arxiv-reader/corpus"
 	"github.com/tamnd/arxiv-reader/extract"
 	"github.com/tamnd/arxiv-reader/fetch"
@@ -34,9 +36,74 @@ func runTags(args []string) error {
 		return tagsDiff(args[1:])
 	case "report":
 		return tagsReport(args[1:])
+	case "analysis":
+		return tagsAnalysis(args[1:])
 	default:
-		return fmt.Errorf("unknown tags subcommand %q, the subcommands are assign, diff and report", args[0])
+		return fmt.Errorf("unknown tags subcommand %q, the subcommands are assign, diff, report and analysis", args[0])
 	}
+}
+
+// tagsAnalysis gives a tag to each object of the latest version in the
+// objects files of the analysis plane, and writes the tags back into the
+// files. The census does this for each new version. This command is for the
+// object files that a census wrote before the census gave tags.
+func tagsAnalysis(args []string) error {
+	fs := flag.NewFlagSet("ax tags analysis", flag.ContinueOnError)
+	all := fs.Bool("all", false, "tag each paper of the analysis plane")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	root := corpusRoot()
+	papers := fs.Args()
+	if *all == (len(papers) > 0) {
+		return errors.New("usage: ax tags analysis -all, or ax tags analysis <id> [...]")
+	}
+	if *all {
+		files, err := filepath.Glob(filepath.Join(root, "analysis", "objects", "*", "*.jsonl"))
+		if err != nil {
+			return err
+		}
+		sort.Strings(files)
+		for _, f := range files {
+			recs, err := readObjectFile(f)
+			if err != nil {
+				return err
+			}
+			if len(recs) > 0 {
+				papers = append(papers, recs[0].Paper)
+			}
+		}
+	}
+	var kept, added, buried, done int
+	for _, p := range papers {
+		id, err := axid.Parse(p)
+		if err != nil {
+			return err
+		}
+		recs, err := readObjectsOf(root, id)
+		if err != nil {
+			return err
+		}
+		v := latestVersion(recs)
+		if v == 0 {
+			continue
+		}
+		cur := analysis.VersionRecords(recs, v)
+		t, err := tagAnalysis(root, id, id.Canonical, v, cur)
+		if err != nil {
+			return fmt.Errorf("%sv%d: %w", id.Canonical, v, err)
+		}
+		out := make([]any, len(cur))
+		for i, r := range cur {
+			out[i] = r
+		}
+		if err := replaceVersion(corpus.AnalysisObjectsPath(root, id), v, out); err != nil {
+			return err
+		}
+		kept, added, buried, done = kept+t.Kept, added+t.Added, buried+t.Buried, done+1
+	}
+	fmt.Printf("%s tagged: %d tags kept, %d new, %d tombstoned\n", prose.Count(done, "paper"), kept, added, buried)
+	return nil
 }
 
 // tagsAssign reads a paper's content files, gives every object a tag, and writes

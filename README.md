@@ -1143,6 +1143,17 @@ Each revision is matched again at report time and not read back from what the ma
 A version the cache does not hold is skipped rather than fetched, so this reads the disk and never the network, and `reports/tags.md` lists each paper's cached versions next to its tags, which is what says why a paper with four versions has one revision in it.
 A corpus with one version of everything has compared nothing, and the report says so rather than printing a rate of nought, which would claim every name was read off when nothing had looked.
 
+The analysis plane has its own tags (AX3.9). `ax census batch` gives a tag to each object of `analysis/objects` when it writes the objects, and keeps the register in `analysis/tags/<YYMM>/<id>.tags`. The same four passes carry the register to a new version, so a lemma keeps its tag when a new lemma comes before it, and an object that is gone gets a tombstone. A new tag never takes a tag of the content plane of the same paper. The tag is what a mention of math2 is named by, as `ax://paper/<id>#<tag>`.
+
+```
+$ ax tags analysis -all
+398 papers tagged: 0 tags kept, 15618 new, 0 tombstoned
+$ ax tags analysis -all
+398 papers tagged: 15618 tags kept, 0 new, 0 tombstoned
+```
+
+`ax tags analysis` tags the objects files that were written before the tags were there. A second run changes nothing. It reads the latest version of each file and writes it back with the tags.
+
 `ax run` is all of that for a thousand papers instead of one.
 
 ```

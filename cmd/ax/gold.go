@@ -124,7 +124,13 @@ func goldDraw(args []string) error {
 }
 
 func readObjectsOf(root string, id axid.ID) ([]objects.Record, error) {
-	b, err := os.ReadFile(corpus.AnalysisObjectsPath(root, id))
+	return readObjectFile(corpus.AnalysisObjectsPath(root, id))
+}
+
+// readObjectFile reads an objects file of the analysis plane, or nothing when
+// there is no file.
+func readObjectFile(file string) ([]objects.Record, error) {
+	b, err := os.ReadFile(file)
 	if errors.Is(err, iofs.ErrNotExist) {
 		return nil, nil
 	}
