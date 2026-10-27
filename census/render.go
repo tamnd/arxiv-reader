@@ -2,6 +2,7 @@ package census
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/tamnd/arxiv-reader/extract"
@@ -61,7 +62,8 @@ func (c *Census) alignRender() {
 	src := map[string][]*Occurrence{}
 	for _, o := range c.Items() {
 		if o.Type == Env {
-			src[o.Env] = append(src[o.Env], o)
+			env := c.renderName(o.Env)
+			src[env] = append(src[env], o)
 		}
 	}
 	for env, os := range src {
@@ -78,28 +80,60 @@ func (c *Census) alignRender() {
 	}
 }
 
-// renderCounts compares the counts of the source and of the render (AX4.5).
-func (c *Census) renderCounts() (theorems, proofs int, agree bool) {
-	if c.In.Render == nil {
-		return 0, 0, false
+// renderName is the name that LaTeXML gives to an environment of the source.
+// A wrapper renders as the environment that it opens.
+func (c *Census) renderName(env string) string {
+	if c.In.Set != nil {
+		if d := c.In.Set.Get(env); d != nil && d.Inner != "" {
+			return d.Inner
+		}
 	}
-	theorems, proofs = len(c.In.Render.Theorems), c.In.Render.Proofs
-	src, srcProofs := 0, 0
+	return env
+}
+
+// renderCounts compares the counts of the source and of the render (AX4.5).
+func (c *Census) renderCounts() *RenderCount {
+	if c.In.Render == nil {
+		return &RenderCount{}
+	}
+	rc := &RenderCount{Theorems: len(c.In.Render.Theorems), Proofs: c.In.Render.Proofs}
+	byEnv := map[string]*EnvCount{}
+	count := func(env string) *EnvCount {
+		e := byEnv[env]
+		if e == nil {
+			e = &EnvCount{Env: env}
+			byEnv[env] = e
+		}
+		return e
+	}
+	for _, t := range c.In.Render.Theorems {
+		count(t.Env).Render++
+	}
 	for _, o := range c.Items() {
 		switch {
 		case o.Type == Env:
-			src++
+			rc.SourceTheorems++
+			count(c.renderName(o.Env)).Source++
 		case o.Type == Proof && o.Env != "head":
-			srcProofs++
+			rc.SourceProofs++
 		}
 	}
-	diff := abs(theorems - src)
-	agree = diff <= 1 && float64(diff) <= 0.02*float64(max(src, 1))+1
-	agree = agree && abs(proofs-srcProofs) <= 1
+	src := rc.SourceTheorems
+	diff := abs(rc.Theorems - src)
+	rc.Agree = diff <= 1 && float64(diff) <= 0.02*float64(max(src, 1))+1
+	rc.Agree = rc.Agree && abs(rc.Proofs-rc.SourceProofs) <= 1
 	if diff > 1 && float64(diff) > 0.02*float64(src) {
-		c.Findings = append(c.Findings, Finding{Rule: "D08", Message: fmt.Sprintf("the source has %d theorem environments and the render has %d", src, theorems)})
+		c.Findings = append(c.Findings, Finding{Rule: "D08", Message: fmt.Sprintf("the source has %d theorem environments and the render has %d", src, rc.Theorems)})
 	}
-	return theorems, proofs, agree
+	if !rc.Agree {
+		for _, e := range byEnv {
+			if e.Source != e.Render {
+				rc.Envs = append(rc.Envs, *e)
+			}
+		}
+		sort.Slice(rc.Envs, func(i, j int) bool { return rc.Envs[i].Env < rc.Envs[j].Env })
+	}
+	return rc
 }
 
 func abs(x int) int {
