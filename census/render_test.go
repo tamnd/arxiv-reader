@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/tamnd/arxiv-reader/extract"
+	"github.com/tamnd/arxiv-reader/source"
 	"github.com/tamnd/arxiv-reader/tex"
 	"github.com/tamnd/arxiv-reader/theorems"
 )
@@ -83,5 +84,57 @@ We use induction. \qed
 	rc := Run(in).renderCounts()
 	if rc.SourceProofs != 2 || !rc.Agree {
 		t.Fatalf("the counts are %+v, and the source must have the 2 proofs of the command", rc)
+	}
+}
+
+// TestAWrapperWithATextHeadIsNotInTheRender reads the proof of 2405.09294v1, which a style file defines with \newenvironment and a bold head. LaTeXML renders it as a paragraph that starts with the head, so the render has no proof.
+func TestAWrapperWithATextHeadIsNotInTheRender(t *testing.T) {
+	src := []byte(`\documentclass{article}
+\newtheorem{lemma}{Lemma}
+\newenvironment{proof}{\vskip1ex\noindent{\bf Proof:}\hskip.5em}{\hfill$\Box$}
+\begin{document}
+\begin{lemma} A. \end{lemma}
+\begin{proof} The case is clear. \end{proof}
+\begin{lemma} B. \end{lemma}
+\begin{proof} We use induction. \end{proof}
+\end{document}
+`)
+	d, err := tex.ReadFile("main.tex", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := theorems.NewResolver()
+	in := Input{Paper: "2601.00001", Version: 1, Doc: d, Set: r.Resolve(d), Titles: r.Titles}
+	if p := in.Set.Get("proof"); p == nil || !p.Proof || p.From != "wrapper" {
+		t.Fatalf("proof is %+v, and it must be a wrapper", p)
+	}
+	in.Render = &Render{Theorems: []RenderItem{{Env: "lemma", Number: "1"}, {Env: "lemma", Number: "2"}}}
+	rc := Run(in).renderCounts()
+	if rc.SourceProofs != 0 || rc.SourceTheorems != 2 || !rc.Agree {
+		t.Fatalf("the counts are %+v, and the proofs of the wrapper must not count", rc)
+	}
+}
+
+// TestAWrapperOfALocalClassIsInTheRender reads the proof of 2306.00590v2, which the local class sigma.cls defines again. LaTeXML does not read the class, so it renders the proofs with its binding of amsthm.
+func TestAWrapperOfALocalClassIsInTheRender(t *testing.T) {
+	cls := []byte(`\RequirePackage{amsthm}
+\renewenvironment{proof}[1][\proofname]{\par\noindent{\bf #1.}}{\qed}
+`)
+	main := []byte(`\documentclass{sigma}
+\newtheorem{lemma}{Lemma}
+\begin{document}
+\begin{lemma} A. \end{lemma}
+\begin{proof} The case is clear. \end{proof}
+\end{document}
+`)
+	ds, err := tex.Read(&source.Bundle{Tarred: true, Files: []source.File{{Name: "main.tex", Data: main}, {Name: "sigma.cls", Data: cls}}})
+	if err != nil || len(ds) == 0 {
+		t.Fatalf("the read gave %d documents and the error %v", len(ds), err)
+	}
+	r := theorems.NewResolver()
+	in := Input{Paper: "2601.00001", Version: 1, Doc: ds[0], Set: r.Resolve(ds[0]), Titles: r.Titles}
+	in.Render = &Render{Theorems: []RenderItem{{Env: "lemma", Number: "1"}}, Proofs: 1}
+	if rc := Run(in).renderCounts(); rc.SourceProofs != 1 || !rc.Agree {
+		t.Fatalf("the counts are %+v, and the proof of the class must count", rc)
 	}
 }

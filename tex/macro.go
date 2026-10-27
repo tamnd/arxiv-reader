@@ -31,6 +31,8 @@ type Env struct {
 	End        string `json:"end"`
 	// Off is the offset of the declaration in the text it was read from.
 	Off int `json:"-"`
+	// File is the local style file of the declaration, or "" for the paper.
+	File string `json:"file,omitempty"`
 }
 
 // Macros is the macro table of a paper.
@@ -71,13 +73,13 @@ var defParams = regexp.MustCompile(`^(?:#[1-9])*`)
 func ReadMacros(text []byte, local map[string][]byte) *Macros {
 	m := NewMacros()
 	for _, name := range sortedKeys(local) {
-		m.read(local[name])
+		m.read(local[name], name)
 	}
-	m.read(text)
+	m.read(text, "")
 	return m
 }
 
-func (m *Macros) read(text []byte) {
+func (m *Macros) read(text []byte, file string) {
 	for _, loc := range defineCmd.FindAllSubmatchIndex(text, -1) {
 		if escaped(text, loc[0]) {
 			continue
@@ -147,7 +149,7 @@ func (m *Macros) read(text []byte) {
 			if _, have := m.Envs[name]; !have {
 				m.EnvOrder = append(m.EnvOrder, name)
 			}
-			m.Envs[name] = &Env{Name: name, Args: n, Default: a.Values[2], HasDefault: a.Has[2], Begin: a.Values[3], End: a.Values[4], Off: loc[0]}
+			m.Envs[name] = &Env{Name: name, Args: n, Default: a.Values[2], HasDefault: a.Has[2], Begin: a.Values[3], End: a.Values[4], Off: loc[0], File: file}
 		case "NewDocumentCommand", "RenewDocumentCommand", "DeclareDocumentCommand":
 			a, _, ok := ReadArgs(text, at, "cmm")
 			if !ok {
