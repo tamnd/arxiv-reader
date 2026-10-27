@@ -94,24 +94,6 @@ func TestTheSvprocClassDefinesItsEnvironments(t *testing.T) {
 	for _, env := range []string{"definition", "example", "lemma", "remark"} {
 		if e := s.Get(env); e == nil || e.Proof || e.From != "class:svproc" {
 			t.Errorf("%s is %+v, and it must come from the class svproc", env, e)
-func TestTheOptionStandardOfNtheorem(t *testing.T) {
-	read := func(opts string) *Set {
-		t.Helper()
-		d, err := tex.ReadFile("main.tex", []byte(`\documentclass{scrartcl}
-\usepackage`+opts+`{ntheorem}
-\begin{document}
-\begin{remark} A remark. \end{remark}
-\end{document}
-`))
-		if err != nil {
-			t.Fatal(err)
-		}
-		return NewResolver().Resolve(d)
-	}
-	s := read("[standard,thmmarks]")
-	for _, env := range []string{"theorem", "Remark", "remark", "definition"} {
-		if e := s.Get(env); e == nil || e.Proof || e.From != "package:ntheorem[standard]" {
-			t.Errorf("%s is %+v, and it must come from ntheorem with the option standard", env, e)
 		}
 	}
 	if p := s.Get("proof"); p == nil || !p.Proof {
@@ -141,6 +123,32 @@ func TestALocalClassThatLoadsAClassOfTheTable(t *testing.T) {
 	}
 	if e := s.Get("lemma"); e != nil && e.Counter != "theorem" {
 		t.Errorf("lemma uses the counter %q, and it must use theorem", e.Counter)
+	}
+}
+
+func TestTheOptionStandardOfNtheorem(t *testing.T) {
+	read := func(opts string) *Set {
+		t.Helper()
+		d, err := tex.ReadFile("main.tex", []byte(`\documentclass{scrartcl}
+\usepackage`+opts+`{ntheorem}
+\begin{document}
+\begin{remark} A remark. \end{remark}
+\end{document}
+`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return NewResolver().Resolve(d)
+	}
+	s := read("[standard,thmmarks]")
+	for _, env := range []string{"theorem", "Remark", "remark", "definition"} {
+		if e := s.Get(env); e == nil || e.Proof || e.From != "package:ntheorem[standard]" {
+			t.Errorf("%s is %+v, and it must come from ntheorem with the option standard", env, e)
+		}
+	}
+	if p := s.Get("proof"); p == nil || !p.Proof {
+		t.Errorf("proof is %+v, and it must be a proof", p)
+	}
 	if e := read("[thmmarks]").Get("remark"); e != nil {
 		t.Errorf("remark is %+v, and ntheorem without the option standard does not declare it", e)
 	}
