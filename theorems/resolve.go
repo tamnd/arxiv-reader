@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -515,8 +516,13 @@ func (r *Resolver) wrappers(s *Set, d *tex.Document) {
 		if _, ok := s.Envs[name]; ok {
 			continue
 		}
+		inner := ""
 		if m := innerEnv.FindStringSubmatch(e.Begin); m != nil {
-			inner := strings.TrimSpace(m[1])
+			inner = strings.TrimSpace(m[1])
+		} else {
+			inner = innerCommand(s, e.Begin, e.End)
+		}
+		if inner != "" {
 			in, ok := s.Envs[inner]
 			if !ok && r.Classes.IsProofName(inner) {
 				in = &Declaration{Env: inner, Title: "Proof", Proof: true, Item: "proof"}
@@ -563,6 +569,29 @@ func (r *Resolver) wrappers(s *Set, d *tex.Document) {
 			s.add(w, false)
 		}
 	}
+}
+
+var cmdCall = regexp.MustCompile(`\\([A-Za-z@]+)`)
+
+// innerCommand gives the environment that a wrapper opens with its command
+// and closes with \end<name>, as in the pattern
+//
+//	\newenvironment{customthm}[1]
+//	  {\renewcommand\theinnercustomthm{#1}\innercustomthm}
+//	  {\endinnercustomthm}
+//
+// It gives "" when the begin code calls no command of a declared environment.
+func innerCommand(s *Set, begin, end string) string {
+	for _, m := range cmdCall.FindAllStringSubmatch(begin, -1) {
+		name := m[1]
+		if _, ok := s.Envs[name]; !ok {
+			continue
+		}
+		if ends := cmdCall.FindAllStringSubmatch(end, -1); slices.ContainsFunc(ends, func(c []string) bool { return c[1] == "end"+name }) {
+			return name
+		}
+	}
+	return ""
 }
 
 // titleHead finds #1 inside a bold, italic or small caps group or argument.

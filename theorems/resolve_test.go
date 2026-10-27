@@ -153,3 +153,23 @@ func TestTheOptionStandardOfNtheorem(t *testing.T) {
 		t.Errorf("remark is %+v, and ntheorem without the option standard does not declare it", e)
 	}
 }
+
+// TestAWrapperThatCallsTheCommandOfTheEnvironment reads the wrapper of 2503.22636v1, which opens its theorem with \innercustomthm and not with \begin.
+func TestAWrapperThatCallsTheCommandOfTheEnvironment(t *testing.T) {
+	d, err := tex.ReadFile("main.tex", []byte(`\documentclass{amsart}
+\newtheorem{innercustomthm}{Theorem}
+\newenvironment{customthm}[1]
+  {\renewcommand\theinnercustomthm{#1}\innercustomthm}
+  {\endinnercustomthm}
+\begin{document}
+\begin{customthm}{A} Each fan is Ehrhart. \end{customthm}
+\end{document}
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := NewResolver().Resolve(d).Get("customthm")
+	if w == nil || w.Inner != "innercustomthm" || w.From != "wrapper" || w.Proof {
+		t.Fatalf("customthm is %+v, and it must be a wrapper of innercustomthm", w)
+	}
+}
