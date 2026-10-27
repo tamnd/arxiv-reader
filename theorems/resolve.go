@@ -169,8 +169,24 @@ func (r *Resolver) Resolve(d *tex.Document) *Set {
 	for i := 0; i < 3; i++ {
 		r.wrappers(s, d)
 	}
-	r.Used(s, d)
+	r.usedProofs(s, d)
+	for _, d := range s.Envs {
+		d.Counter = s.counterOf(d)
+	}
 	return s
+}
+
+// usedProofs adds an entry for each environment that the body uses, that has
+// no declaration, and whose name is a proof name. A class can define proof
+// with \def\proof, which the resolver does not read, and a paper writes its
+// proofs with it.
+func (r *Resolver) usedProofs(s *Set, d *tex.Document) {
+	for _, n := range d.Tree.Nodes {
+		if _, ok := s.Envs[n.Name]; ok || n.Kind != "env" || !r.Classes.IsProofName(n.Name) {
+			continue
+		}
+		s.add(&Declaration{Env: n.Name, Title: "Proof", Proof: true, Item: "proof", From: "used", Off: -1}, false)
+	}
 }
 
 func (r *Resolver) fromClass(e classEnv, from string) *Declaration {
