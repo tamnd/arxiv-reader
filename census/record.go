@@ -104,6 +104,19 @@ type RenderCount struct {
 	Theorems int  `json:"theorems"`
 	Proofs   int  `json:"proofs"`
 	Agree    bool `json:"agree"`
+	// SourceTheorems and SourceProofs are the counts of the source path.
+	SourceTheorems int `json:"source_theorems"`
+	SourceProofs   int `json:"source_proofs"`
+	// Envs is each environment whose two counts differ, when the counts of
+	// the paper do not agree. It is the input of the queue census-diff.
+	Envs []EnvCount `json:"envs,omitempty"`
+}
+
+// EnvCount is the two counts of one environment, by its name in the render.
+type EnvCount struct {
+	Env    string `json:"env"`
+	Source int    `json:"source"`
+	Render int    `json:"render"`
 }
 
 // Match matches the occurrences to the object records, and gives the census
@@ -226,8 +239,7 @@ func (c *Census) Match(objs []Ref, waivers []Waiver) *Record {
 		}
 	}
 	if in.Render != nil {
-		t, p, agree := c.renderCounts()
-		r.Render = &RenderCount{Theorems: t, Proofs: p, Agree: agree}
+		r.Render = c.renderCounts()
 	}
 	for _, f := range c.Findings {
 		if f.Rule == "D07" && (strings.Contains(f.Message, "comes after") || strings.Contains(f.Message, "first in its scope")) {
