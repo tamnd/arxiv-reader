@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/tamnd/arxiv-cli/pkg/axid"
+	"github.com/tamnd/arxiv-reader/bib"
 	"github.com/tamnd/arxiv-reader/corpus"
 	"github.com/tamnd/arxiv-reader/cues"
 	"github.com/tamnd/arxiv-reader/metadata"
@@ -176,6 +177,13 @@ func writeAnalysis(root, paper string, version int, res *analysis.Result) error 
 		es[i] = e
 	}
 	if err := replaceVersion(corpus.EdgesPath(root, id), version, es); err != nil {
+		return err
+	}
+	bs := make([]any, len(res.Bib))
+	for i, e := range res.Bib {
+		bs[i] = bib.Record{Paper: paper, Version: version, Entry: e}
+	}
+	if err := replaceVersion(corpus.BibPath(root, id), version, bs); err != nil {
 		return err
 	}
 	ps := make([]any, len(res.Prose))

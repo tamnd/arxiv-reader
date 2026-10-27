@@ -5,6 +5,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/tamnd/arxiv-reader/bib"
 	"github.com/tamnd/arxiv-reader/census"
 	"github.com/tamnd/arxiv-reader/cues"
 	"github.com/tamnd/arxiv-reader/edges"
@@ -44,6 +45,9 @@ type Result struct {
 	Cycles [][]string
 	// Prose is the candidate sentences of the prose items (AX7.4 step 1).
 	Prose []cues.Candidate
+	// Bib is the entries of the bibliography, with the identifiers that they
+	// print (AX5.7 step 1).
+	Bib []bib.Entry
 }
 
 // Manifests is the four manifests that the analysis reads.
@@ -78,7 +82,7 @@ func Analyze(b *source.Bundle, p Paper, m *Manifests) (*Result, error) {
 			aux = append(aux, f.Data)
 		}
 	}
-	res := &Result{}
+	res := &Result{Bib: bib.FromSource(b.Files)}
 	for i, d := range docs {
 		set := m.Resolver.Resolve(d)
 		prefix := ""

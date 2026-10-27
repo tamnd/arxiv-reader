@@ -1813,6 +1813,8 @@ written to reports/census.md
 
 `ax census -write` also marks the candidate sentences of the prose items of AX7.4 and writes them to `analysis/prose/<YYMM>/<id>.jsonl`. A candidate is a sentence outside the items with a cue of `manifests/prose.yaml`, as "we say that" or "it is not known whether", or a sentence with an emphasized term and "if" or "such that". Each record has the kind of the cue, the cue, the section and the span of the sentence, and no text. Three dots in a cue match one to eight words. The understand role reads these candidates in AX7.4 step 2.
 
+It also reads the bibliography of the source for the cited results of AX5.7 and writes it to `analysis/bib/<YYMM>/<id>.jsonl`. It reads `\bibitem` entries in a `.tex` or a `.bbl` file, the `\entry` blocks of a biblatex `.bbl` file, and the entries of a `.bib` file. The entries of a `.bib` file only add to the other forms, because a `.bib` file often has entries that the paper does not cite. Each record has the key, the arXiv id, the DOI and the year that the entry prints, and no text. The importer of math2 uses them to find the cited paper in the corpus.
+
 `ax graph report` counts the edges into `reports/graph.md`. These are the checks of AX6.7: the share of statements with an incoming uses or proves edge, the share of proofs that use nothing, the versions with a cycle, and the share of each method, confidence and predicate. The report gives them for each MSC code at two digits and for each month. A share that moves by more than 5 points from one month to the next, for one code, is listed as a finding.
 
 ```
