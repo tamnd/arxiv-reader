@@ -154,7 +154,9 @@ func looksLikeTeX(b []byte) bool {
 	if len(head) > 1<<20 {
 		head = head[:1<<20]
 	}
-	for _, marker := range []string{`\documentclass`, `\documentstyle`, `\begin{document}`, `\input`} {
+	// A file in Plain TeX has \bye or \magnification. It is TeX, and the front
+	// end says that it is Plain TeX.
+	for _, marker := range []string{`\documentclass`, `\documentstyle`, `\begin{document}`, `\input`, `\bye`, `\magnification`} {
 		if bytes.Contains(head, []byte(marker)) {
 			return true
 		}

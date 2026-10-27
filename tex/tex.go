@@ -86,6 +86,22 @@ func (d *Document) Pos(off int) Pos { return pos(d.segs, d.Text, off) }
 // ErrNoDocument is the error for a main file with no \begin{document}.
 var ErrNoDocument = errors.New("tex: the main file has no \\begin{document}")
 
+// ErrPlainTeX is the error for a main file in Plain TeX. The front end reads
+// only LaTeX, so it does not find the structure of such a paper.
+var ErrPlainTeX = errors.New("tex: the main file is Plain TeX, and the front end reads only LaTeX")
+
+// plainMarks are the commands that a file in Plain TeX has and a LaTeX file
+// does not need.
+var plainMarks = regexp.MustCompile(`\\(bye|magnification)\b`)
+
+var latexMarks = regexp.MustCompile(`\\(documentclass|documentstyle)\b`)
+
+// isPlainTeX reports whether the text is Plain TeX: it has \bye or
+// \magnification and no \documentclass or \documentstyle.
+func isPlainTeX(text []byte) bool {
+	return plainMarks.Match(text) && !latexMarks.Match(text)
+}
+
 // Read runs the front end on each main file of a submission.
 func Read(b *source.Bundle) ([]*Document, error) {
 	mains, err := b.Mains()
@@ -186,6 +202,9 @@ func build(main string, files, local map[string][]byte, excluded map[string]bool
 	d.Tree = BuildTree(d.Text, d.Body, d.End)
 	d.step("tree: %d nodes", len(d.Tree.Nodes))
 	if d.Body == 0 {
+		if isPlainTeX(d.Text) {
+			return d, ErrPlainTeX
+		}
 		return d, ErrNoDocument
 	}
 	return d, nil

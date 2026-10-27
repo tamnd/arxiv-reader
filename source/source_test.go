@@ -284,3 +284,16 @@ func TestOldLineEndsKeepsTheLengthAndCRLF(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+// A paper in Plain TeX is a TeX file, and the front end has to be the one
+// that says it cannot read it, so that the stop record names the real cause.
+func TestOpenReadsAFileInPlainTeX(t *testing.T) {
+	plain := "%Plain TeX file.\n\\magnification=1200\n\\def\\R{{\\bf R}}\nA paper about nothing in particular.\n\\bye\n"
+	b, err := Open(gz(t, []byte(plain)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(b.Files) != 1 || b.Files[0].Name != "paper.tex" {
+		t.Fatalf("holds %v", b.Names())
+	}
+}
