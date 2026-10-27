@@ -2,6 +2,7 @@ package theorems
 
 import (
 	"fmt"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -156,9 +157,9 @@ func (r *Resolver) Resolve(d *tex.Document) *Set {
 	}
 	r.scan(s, d.Text, "paper", 0)
 	r.macroDecls(s, d)
-	if envs, ok := r.Classes.Classes[d.Class]; ok {
-		for _, e := range envs {
-			s.add(r.fromClass(e, "class:"+d.Class), false)
+	if cls := r.tableClass(d); cls != "" {
+		for _, e := range r.Classes.Classes[cls] {
+			s.add(r.fromClass(e, "class:"+cls), false)
 		}
 	}
 	for _, p := range d.Packages {
@@ -174,6 +175,33 @@ func (r *Resolver) Resolve(d *tex.Document) *Set {
 		d.Counter = s.counterOf(d)
 	}
 	return s
+}
+
+var loadClassCmd = regexp.MustCompile(`\\LoadClass(?:WithOptions)?\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}`)
+
+// tableClass gives the class of the table that the document uses. A local
+// class such as l4dc2026.cls is often a few lines that load a class of the
+// table with \LoadClass, so the resolver follows \LoadClass in the local
+// class files. It gives "" when no class of the chain is in the table.
+func (r *Resolver) tableClass(d *tex.Document) string {
+	c := d.Class
+	for range 4 {
+		if _, ok := r.Classes.Classes[c]; ok {
+			return c
+		}
+		var m [][]byte
+		for _, name := range sortedNames(d.Local) {
+			if path.Base(name) == c+".cls" {
+				m = loadClassCmd.FindSubmatch(d.Local[name])
+				break
+			}
+		}
+		if m == nil {
+			return ""
+		}
+		c = strings.TrimSpace(string(m[1]))
+	}
+	return ""
 }
 
 // usedProofs adds an entry for each environment that the body uses, that has

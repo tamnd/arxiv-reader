@@ -100,3 +100,28 @@ func TestTheSvprocClassDefinesItsEnvironments(t *testing.T) {
 		t.Errorf("proof is %+v, and it must be a proof", p)
 	}
 }
+
+func TestALocalClassThatLoadsAClassOfTheTable(t *testing.T) {
+	cls := []byte(`\NeedsTeXFormat{LaTeX2e}
+\ProvidesClass{l4dc2026}
+\LoadClass[pmlr]{jmlr}
+`)
+	main := []byte(`\documentclass{l4dc2026}
+\begin{document}
+\begin{lemma} Each tree is a graph. \end{lemma}
+\end{document}
+`)
+	ds, err := tex.Read(&source.Bundle{Tarred: true, Files: []source.File{{Name: "main.tex", Data: main}, {Name: "l4dc2026.cls", Data: cls}}})
+	if err != nil || len(ds) == 0 {
+		t.Fatalf("the read gave %d documents and the error %v", len(ds), err)
+	}
+	s := NewResolver().Resolve(ds[0])
+	for _, env := range []string{"theorem", "lemma", "proposition"} {
+		if e := s.Get(env); e == nil || e.Proof || e.From != "class:jmlr" {
+			t.Errorf("%s is %+v, and it must come from the class jmlr", env, e)
+		}
+	}
+	if e := s.Get("lemma"); e != nil && e.Counter != "theorem" {
+		t.Errorf("lemma uses the counter %q, and it must use theorem", e.Counter)
+	}
+}
