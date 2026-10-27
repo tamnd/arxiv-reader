@@ -3,6 +3,7 @@ package extract
 import (
 	"bytes"
 	"errors"
+	"slices"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -35,7 +36,7 @@ func Parse(body []byte, id string, version int) (*Paper, error) {
 	if a := firstClass(article, "ltx_abstract"); a != nil {
 		p.Abstract = blocks(a)
 	}
-	p.Sections = sections(article)
+	p.Sections = paperSections(article)
 	p.Bibliography = bibliography(article)
 	p.Faults = faults(article)
 	p.Unparsed = countClass(article, "ltx_math_unparsed")
@@ -129,27 +130,75 @@ func sections(n *html.Node) []Section {
 		if c.Type != html.ElementNode {
 			continue
 		}
-		kind, level, ok := headingOf(c)
-		if !ok {
-			if hasClass(c, "ltx_abstract") {
-				// An abstract that the source does not close holds the rest of
-				// the paper, so its sections are the sections of the paper.
-				out = append(out, sections(c)...)
-			}
+		if s, ok := sectionOf(c); ok {
+			out = append(out, s)
 			continue
 		}
-		title := firstClass(c, "ltx_title")
-		s := Section{
-			ID:       attr(c, "id"),
-			Kind:     kind,
-			Level:    level,
-			Tag:      tagOf(firstClass(title, "ltx_tag")),
-			Title:    inline(title),
-			Blocks:   blocks(c),
-			Sections: sections(c),
+		if hasClass(c, "ltx_abstract") || hasClass(c, "ltx_part") {
+			// An abstract that the source does not close holds the rest of
+			// the paper, so its sections are the sections of the paper. A part
+			// has no level of its own in a Section, so its sections are the
+			// sections of the paper too.
+			out = append(out, sections(c)...)
 		}
-		out = append(out, s)
 	}
+	return out
+}
+
+func sectionOf(c *html.Node) (Section, bool) {
+	kind, level, ok := headingOf(c)
+	if !ok {
+		return Section{}, false
+	}
+	title := firstClass(c, "ltx_title")
+	return Section{
+		ID:       attr(c, "id"),
+		Kind:     kind,
+		Level:    level,
+		Tag:      tagOf(firstClass(title, "ltx_tag")),
+		Title:    inline(title),
+		Blocks:   blocks(c),
+		Sections: sections(c),
+	}, true
+}
+
+// frontMatter is the classes of the article that are front matter and not
+// text of the paper.
+var frontMatter = []string{"ltx_abstract", "ltx_dates", "ltx_keywords", "ltx_classification"}
+
+// paperSections reads the sections of the article. A paper with no \section has its
+// text directly in the article, and a paper can have text before its first
+// section. Each run of such blocks is a section with no title, in its place
+// in the page, so that the reader loses no theorem or paragraph of it.
+func paperSections(article *html.Node) []Section {
+	var out []Section
+	var loose []Block
+	flush := func() {
+		if len(loose) > 0 {
+			out = append(out, Section{Kind: "section", Level: 1, Blocks: loose})
+			loose = nil
+		}
+	}
+	for c := article.FirstChild; c != nil; c = c.NextSibling {
+		if c.Type != html.ElementNode {
+			continue
+		}
+		if s, ok := sectionOf(c); ok {
+			flush()
+			out = append(out, s)
+			continue
+		}
+		if hasClass(c, "ltx_abstract") || hasClass(c, "ltx_part") {
+			flush()
+			out = append(out, sections(c)...)
+			continue
+		}
+		if slices.ContainsFunc(frontMatter, func(class string) bool { return hasClass(c, class) }) {
+			continue
+		}
+		loose = append(loose, nodeBlocks(c)...)
+	}
+	flush()
 	return out
 }
 
@@ -174,39 +223,46 @@ func blocks(n *html.Node) []Block {
 			// Collected by sections, which walks the same children.
 			continue
 		}
-		switch {
-		case hasClass(c, "ltx_title"), hasClass(c, "ltx_tag"), hasClass(c, "ltx_TOC"),
-			hasClass(c, "ltx_pagination"), hasClass(c, "ltx_bibliography"), hasClass(c, "ltx_authors"):
-			continue
-		case hasClass(c, "ltx_theorem"):
-			out = append(out, theorem(c))
-		case hasClass(c, "ltx_proof"):
-			out = append(out, proof(c))
-		case hasClass(c, "ltx_equationgroup"), hasClass(c, "ltx_equation"):
-			out = append(out, equation(c))
-		case hasClass(c, "ltx_table"):
-			out = append(out, float(c, KindTable))
-		case hasClass(c, "ltx_figure"):
-			out = append(out, float(c, KindFigure))
-		case hasClass(c, "ltx_float"):
-			out = append(out, float(c, floatKind(c)))
-		case hasClass(c, "ltx_listing"):
-			out = append(out, listing(c))
-		case hasClass(c, "ltx_itemize"), hasClass(c, "ltx_enumerate"), hasClass(c, "ltx_description"):
-			out = append(out, list(c))
-		case hasClass(c, "ltx_quote"):
-			out = append(out, Block{Kind: KindQuote, ID: attr(c, "id"), Text: inline(c)})
-		case hasClass(c, "ltx_tabular"):
-			// A tabular with no float around it, which is what a table inside a
-			// figure panel is.
-			out = append(out, tabular(c, Block{Kind: KindTable, ID: attr(c, "id")}))
-		case c.Data == "p" && hasClass(c, "ltx_p"):
-			if t := inline(c); t != "" {
-				out = append(out, Block{Kind: KindParagraph, ID: attr(c, "id"), Text: t})
-			}
-		default:
-			out = append(out, blocks(c)...)
+		out = append(out, nodeBlocks(c)...)
+	}
+	return out
+}
+
+// nodeBlocks reads one node that is not a heading.
+func nodeBlocks(c *html.Node) []Block {
+	var out []Block
+	switch {
+	case hasClass(c, "ltx_title"), hasClass(c, "ltx_tag"), hasClass(c, "ltx_TOC"),
+		hasClass(c, "ltx_pagination"), hasClass(c, "ltx_bibliography"), hasClass(c, "ltx_authors"):
+		return nil
+	case hasClass(c, "ltx_theorem"):
+		out = append(out, theorem(c))
+	case hasClass(c, "ltx_proof"):
+		out = append(out, proof(c))
+	case hasClass(c, "ltx_equationgroup"), hasClass(c, "ltx_equation"):
+		out = append(out, equation(c))
+	case hasClass(c, "ltx_table"):
+		out = append(out, float(c, KindTable))
+	case hasClass(c, "ltx_figure"):
+		out = append(out, float(c, KindFigure))
+	case hasClass(c, "ltx_float"):
+		out = append(out, float(c, floatKind(c)))
+	case hasClass(c, "ltx_listing"):
+		out = append(out, listing(c))
+	case hasClass(c, "ltx_itemize"), hasClass(c, "ltx_enumerate"), hasClass(c, "ltx_description"):
+		out = append(out, list(c))
+	case hasClass(c, "ltx_quote"):
+		out = append(out, Block{Kind: KindQuote, ID: attr(c, "id"), Text: inline(c)})
+	case hasClass(c, "ltx_tabular"):
+		// A tabular with no float around it, which is what a table inside a
+		// figure panel is.
+		out = append(out, tabular(c, Block{Kind: KindTable, ID: attr(c, "id")}))
+	case c.Data == "p" && hasClass(c, "ltx_p"):
+		if t := inline(c); t != "" {
+			out = append(out, Block{Kind: KindParagraph, ID: attr(c, "id"), Text: t})
 		}
+	default:
+		out = append(out, blocks(c)...)
 	}
 	return out
 }
