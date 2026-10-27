@@ -202,6 +202,19 @@ type NotRendered struct {
 	Status string
 }
 
+// TooLarge is a body over the cap of its kind. The file is not read, and
+// another request gets the same file, so a batch goes on with the next paper
+// and does not ask again in the next run.
+type TooLarge struct {
+	URL  string
+	Cap  int64
+	What string
+}
+
+func (t *TooLarge) Error() string {
+	return fmt.Sprintf("fetch: %s is over %d bytes, which is not %s", t.URL, t.Cap, t.What)
+}
+
 func (n *NotRendered) Error() string {
 	return fmt.Sprintf("fetch: arXiv has no HTML rendering of %s (%s), which is normal before December 2023 and for submissions with no TeX source, so this paper is on the source path", n.Ref, n.Status)
 }
@@ -507,7 +520,7 @@ func (f *Fetcher) do(ctx context.Context, r request) ([]byte, error) {
 	case resp.StatusCode != http.StatusOK:
 		return nil, fmt.Errorf("fetch: %s returned %s", url, resp.Status)
 	case int64(len(body)) > r.cap:
-		return nil, fmt.Errorf("fetch: %s is over %d bytes, which is not %s", url, r.cap, r.what)
+		return nil, &TooLarge{URL: url, Cap: r.cap, What: r.what}
 	}
 	return body, nil
 }
