@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/tamnd/arxiv-cli/pkg/axid"
@@ -22,6 +23,11 @@ func runFetch(args []string) error {
 	if len(args) < 1 {
 		return errors.New("usage: ax fetch render <id>v<n> [...], ax fetch source <id>v<n> [...], ax fetch native <id>v<n> [...], or ax fetch verify")
 	}
+	for _, a := range args {
+		if a == "-mode" || a == "--mode" || strings.HasPrefix(a, "-mode=") || strings.HasPrefix(a, "--mode=") {
+			return errAnalysisMode
+		}
+	}
 	switch args[0] {
 	case "render":
 		return fetchDownload(fetch.RouteRender, args[1:])
@@ -35,6 +41,13 @@ func runFetch(args []string) error {
 		return fmt.Errorf("unknown fetch subcommand %q, which is render, source, native or verify", args[0])
 	}
 }
+
+// errAnalysisMode is the answer to ax fetch --mode analysis. Way R2 of AX2.5
+// reads the e-print of a record paper in memory and keeps only its structure.
+// Whether the corpus may do that is open question AQ01, so the command is
+// refused until AQ01 has an answer. The open and share-alike papers are read by
+// ax run analysis, which needs no such answer.
+var errAnalysisMode = errors.New("ax fetch --mode analysis is refused until AQ01 is settled (AX2.5): way R2 reads a record paper, and AQ01 decides if the corpus may do that. Use ax run analysis for the open and share-alike papers")
 
 // fetchDownload downloads one surface of the versions it is given.
 //

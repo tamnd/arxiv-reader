@@ -122,6 +122,8 @@ Those two are the NumPy paper and the second LIGO detection, and between them th
 One is a tar of five files with the document in `paper.tex`, and the other is a PDF the authors produced themselves, which arXiv accepts and which leaves nothing to read as source.
 Nothing announces which of the two arrived, so it is worked out from the bytes, and it is worked out as soon as they land rather than at extraction time, because somebody fetching a hundred papers wants to know which of them have no source before the extraction starts rather than after.
 
+`ax fetch --mode analysis` is refused. That mode is way R2 of AX2.5, which reads a `record` paper in memory and keeps only its structure, and open question AQ01 decides if the corpus may do that. The `open` and `share-alike` papers are read by `ax run analysis`, which does not need that answer.
+
 Which file the document starts from is the other question a tarball asks, and it is four passes in the order of how much they are worth believing.
 A `00README` naming a top level file is the first, because the submitter saying so outright is the only answer that is not a guess.
 Then the files that hold both a preamble and a body, which answers most submissions on its own.
