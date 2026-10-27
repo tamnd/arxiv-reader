@@ -393,6 +393,12 @@ func EdgesPath(root string, id axid.ID) string {
 	return path.Join(root, "analysis", "edges", Shard(id), PathID(id)+".jsonl")
 }
 
+// BibPath is the entries of the bibliography of one paper (AX5.7 step 1). A
+// record has the key, the arXiv id, the DOI and the year, and no text.
+func BibPath(root string, id axid.ID) string {
+	return path.Join(root, "analysis", "bib", Shard(id), PathID(id)+".jsonl")
+}
+
 // ProsePath is the candidate sentences of the prose items of one paper
 // (AX7.4 step 1). A record has the span of the sentence and no text.
 func ProsePath(root string, id axid.ID) string {
