@@ -19,6 +19,8 @@ type Render struct {
 	// prints the name of such an environment as an error, as {lem}, and has
 	// no theorem or proof for it.
 	Undefined map[string]bool
+	// Text is the length in bytes of the text of the render, as Markdown.
+	Text int
 }
 
 // undefinedEnv is the text of the error that LaTeXML writes for an
@@ -47,6 +49,7 @@ func FromRender(p *extract.Paper) *Render {
 			case b.Kind == extract.KindProof:
 				r.Proofs++
 			}
+			r.Text += len(b.Text)
 			walk(b.Blocks)
 		}
 	}
@@ -70,12 +73,42 @@ func FromRender(p *extract.Paper) *Render {
 	return r
 }
 
+// truncated tells if LaTeXML stopped early on the paper, so the render is
+// only the start of it. The text of such a render is less than a tenth of the
+// text of the source body, and it has less than half of the theorems. A render
+// that is only short, because LaTeXML drew the theorems of a box as text, keeps
+// most of the text, so the first condition keeps it. A render that is cut
+// short is not a second witness (AX4.6), so the census takes no number from it
+// and the counts are not a finding of D08.
+func (c *Census) truncated() bool {
+	r, d := c.In.Render, c.In.Doc
+	if r == nil || d == nil || d.End <= d.Body {
+		return false
+	}
+	body := 0
+	for _, b := range d.Text[d.Body:d.End] {
+		if b != ' ' && b != '\n' && b != '\t' {
+			body++
+		}
+	}
+	src := 0
+	for _, o := range c.Items() {
+		if o.Type == Env {
+			src++
+		}
+	}
+	return src >= 10 && 2*len(r.Theorems) < src && 10*r.Text < body
+}
+
 // alignRender gives the numbers of the render to the env occurrences.
 //
 // The k-th occurrence of an environment in the source is the k-th theorem of
 // that environment in the render. When the counts of an environment differ,
 // its numbers are not taken, and the check of AX4.5 reports the difference.
 func (c *Census) alignRender() {
+	if c.truncated() {
+		return
+	}
 	byEnv := map[string][]RenderItem{}
 	for _, t := range c.In.Render.Theorems {
 		byEnv[t.Env] = append(byEnv[t.Env], t)
@@ -213,6 +246,10 @@ func (c *Census) renderCounts() *RenderCount {
 			// renders the command \proof of amsthm as a proof.
 			rc.SourceProofs++
 		}
+	}
+	if c.truncated() {
+		rc.Truncated = true
+		return rc
 	}
 	src := rc.SourceTheorems
 	diff := abs(rc.Theorems - src)

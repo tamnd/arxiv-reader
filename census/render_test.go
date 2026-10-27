@@ -1,6 +1,8 @@
 package census
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/tamnd/arxiv-reader/extract"
@@ -258,4 +260,43 @@ func TestATheoremOfTcolorboxIsNotInTheRender(t *testing.T) {
 	if rc := Run(in).renderCounts(); rc.SourceTheorems != 1 || !rc.Agree {
 		t.Fatalf("the counts are %+v, and the boxes must not count", rc)
 	}
+}
+
+// TestARenderThatStopsEarlyIsNotAWitness reads a paper like math/0003117v2,
+// whose render stops in section 1 and has 2 of the 278 theorems of the source.
+// The render is cut short, so it gives no D08 and no numbers. A render with
+// the same few theorems and the full text is a D08.
+func TestARenderThatStopsEarlyIsNotAWitness(t *testing.T) {
+	var b strings.Builder
+	b.WriteString("\\documentclass{article}\n\\newtheorem{lemma}{Lemma}\n\\begin{document}\n")
+	for i := 0; i < 20; i++ {
+		fmt.Fprintf(&b, "\\section{Part %d}\n%s\n\\begin{lemma} Each step holds. \\end{lemma}\n", i, strings.Repeat("The text of the part goes on. ", 20))
+	}
+	b.WriteString("\\end{document}\n")
+	d, err := tex.ReadFile("main.tex", []byte(b.String()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := theorems.NewResolver()
+	in := Input{Paper: "2601.00001", Version: 1, Doc: d, Set: r.Resolve(d), Titles: r.Titles}
+	in.Render = &Render{Theorems: []RenderItem{{Env: "lemma", Number: "1"}, {Env: "lemma", Number: "2"}}, Text: 600}
+	c := Run(in)
+	rc := c.renderCounts()
+	if !rc.Truncated || rc.Agree || hasD08(c.Findings) {
+		t.Fatalf("the counts are %+v and the findings %v, and the render is cut short", rc, c.Findings)
+	}
+	in.Render.Text = 12000
+	c = Run(in)
+	if rc := c.renderCounts(); rc.Truncated || !hasD08(c.Findings) {
+		t.Fatalf("the counts are %+v and the findings %v, and a render with the full text is a witness", rc, c.Findings)
+	}
+}
+
+func hasD08(fs []Finding) bool {
+	for _, f := range fs {
+		if f.Rule == "D08" {
+			return true
+		}
+	}
+	return false
 }
