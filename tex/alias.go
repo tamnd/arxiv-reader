@@ -7,8 +7,12 @@ import (
 )
 
 // fullAlias is the body of a command that stands for one \begin or \end of a
-// named environment, as \newcommand{\bthm}{\begin{theorem}}.
-var fullAlias = regexp.MustCompile(`^\\(begin|end)\s*\{[^{}\\]{1,64}\}$`)
+// named environment, as \newcommand{\bthm}{\begin{theorem}}, or for a short
+// text with one of them in it, as \def\eprf{\qed \end{proof}}.
+var fullAlias = regexp.MustCompile(`^[^#]{0,80}\\(begin|end)\s*\{[^{}\\]{1,64}\}[^#]{0,80}$`)
+
+// beginEnd finds each \begin and \end in the body of an alias.
+var beginEnd = regexp.MustCompile(`\\(begin|end)\b`)
 
 // envName is the argument of a command that stands for \begin or \end alone.
 var envName = regexp.MustCompile(`^\{\s*[A-Za-z@*]{1,64}\s*\}`)
@@ -25,7 +29,7 @@ func (m *Macros) structureAliases() map[string]string {
 			continue
 		}
 		body := strings.TrimSpace(c.Body)
-		if body == `\begin` || body == `\end` || fullAlias.MatchString(body) {
+		if body == `\begin` || body == `\end` || (fullAlias.MatchString(body) && len(beginEnd.FindAllStringIndex(body, -1)) == 1) {
 			out[name] = body
 		}
 	}

@@ -55,3 +55,31 @@ Three $a \> b$ is a medium space, not an end.
 		t.Errorf("the end of the body did not move with the text")
 	}
 }
+
+func TestAnAliasWithTextAroundTheEnd(t *testing.T) {
+	src := `\documentclass{amsart}
+\usepackage{amsthm}
+\def\qed{QED}
+\def\prf{\begin{proof}}
+\def\eprf{\qed \end{proof}}
+\def\two{\begin{proof}\end{proof}}
+\begin{document}
+\prf One.\eprf
+\prf Two.\eprf
+\end{document}
+`
+	d, err := tex.ReadFile("main.tex", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, n := range d.Tree.Nodes {
+		if n.Kind == "env" {
+			got = append(got, n.Name+" "+strings.Join(strings.Fields(string(d.Text[n.Inner:n.Close])), " "))
+		}
+	}
+	want := []string{"proof One.\\qed", "proof Two.\\qed"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
