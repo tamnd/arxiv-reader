@@ -515,3 +515,38 @@ func TestAnAbstractThatHoldsThePaper(t *testing.T) {
 		t.Errorf("section 1 holds %+v", bs)
 	}
 }
+
+// TestTheTextOutsideTheSections reads a page with text before its first section, a part, and a note of the title, as 2510.07095v1 and 2009.11127v9 have.
+func TestTheTextOutsideTheSections(t *testing.T) {
+	page := `<html><body><article class="ltx_document">
+<h1 class="ltx_title ltx_title_document">T<span class="ltx_note ltx_role_thanks"><span class="ltx_note_outer"><span class="ltx_note_content">Thanks to all.</span></span></span></h1>
+<div class="ltx_abstract"><p class="ltx_p">We say little.</p></div>
+<div class="ltx_para"><p class="ltx_p">First words.</p></div>
+<div id="Thmthm1" class="ltx_theorem ltx_theorem_thm"><h6 class="ltx_title ltx_runin ltx_title_theorem"><span class="ltx_tag ltx_tag_theorem">Theorem 1.</span></h6><div class="ltx_para"><p class="ltx_p">True.</p></div></div>
+<span class="ltx_note ltx_role_email"><span class="ltx_note_outer"><span class="ltx_note_content">a@b.c</span></span></span>
+<section id="Pt1" class="ltx_part"><h1 class="ltx_title ltx_title_part">Part I</h1>
+<section id="S1" class="ltx_section"><h2 class="ltx_title ltx_title_section"><span class="ltx_tag ltx_tag_section">1 </span>One</h2>
+<div id="S1.Thmthm1" class="ltx_theorem ltx_theorem_lem"><h6 class="ltx_title ltx_runin ltx_title_theorem"><span class="ltx_tag ltx_tag_theorem">Lemma 1.1.</span></h6><div class="ltx_para"><p class="ltx_p">Also true.</p></div></div>
+</section></section>
+<div class="ltx_acknowledgements"><p class="ltx_p">We thank the referee.</p></div>
+</article></body></html>`
+	p, err := Parse([]byte(page), "2510.07095", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Lead) != 2 || p.Lead[0].Text != "First words." || p.Lead[1].Kind != KindTheorem || p.Lead[1].Env != "thm" {
+		t.Fatalf("the lead is %+v", p.Lead)
+	}
+	if len(p.Sections) != 2 || p.Sections[0].ID != "S1" || p.Sections[1].Title != "" {
+		t.Fatalf("got the sections %+v", p.Sections)
+	}
+	if bs := p.Sections[0].Blocks; len(bs) != 1 || bs[0].Env != "lem" {
+		t.Errorf("section 1 holds %+v", bs)
+	}
+	if bs := p.Sections[1].Blocks; len(bs) != 1 || bs[0].Text != "We thank the referee." {
+		t.Errorf("the last section holds %+v", bs)
+	}
+	if n := p.Counts()[KindTheorem]; n != 2 {
+		t.Errorf("the paper has %d theorems, and it must have 2", n)
+	}
+}

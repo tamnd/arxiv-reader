@@ -332,6 +332,9 @@ func printPaper(p *extract.Paper, outline bool) {
 	}
 	fmt.Fprintf(tw, "  authors\t%s\n", authorNames(p.Authors))
 	fmt.Fprintf(tw, "  abstract\t%d block\n", len(p.Abstract))
+	if len(p.Lead) > 0 {
+		fmt.Fprintf(tw, "  lead\t%d block\n", len(p.Lead))
+	}
 	fmt.Fprintf(tw, "  headings\t%d\n", p.Headings())
 	fmt.Fprintf(tw, "  blocks\t%s\n", counted(p.Counts()))
 	fmt.Fprintf(tw, "  references\t%d\n", len(p.Bibliography))
@@ -419,7 +422,7 @@ func printOutline(p *extract.Paper) {
 		}
 	}
 	fmt.Println()
-	blocks(p.Abstract, "  ")
+	blocks(p.Front(), "  ")
 	sections(p.Sections, "")
 }
 

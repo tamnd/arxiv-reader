@@ -48,7 +48,7 @@ func FromRender(p *extract.Paper) *Render {
 			sections(s.Sections)
 		}
 	}
-	walk(p.Abstract)
+	walk(p.Front())
 	sections(p.Sections)
 	return r
 }

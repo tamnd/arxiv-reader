@@ -209,3 +209,22 @@ func TestALinkIntoAGroupedEquationIsRewritten(t *testing.T) {
 		t.Fatalf("the link was not rewritten:\n%s", body)
 	}
 }
+
+// TestAPaperWithNoSectionHasItsTextInTheBody reads a short note whose text is directly in the article. Before, the file 01_body.md of such a paper was empty.
+func TestAPaperWithNoSectionHasItsTextInTheBody(t *testing.T) {
+	page := `<html><body><article class="ltx_document">
+<h1 class="ltx_title ltx_title_document">T</h1>
+<div class="ltx_para"><p class="ltx_p">The whole note.</p></div>
+</article></body></html>`
+	p, err := Parse([]byte(page), "2501.00001", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fs, err := Files(p, Front{Paper: "2501.00001", Version: "v1", Lang: "en"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fs) != 2 || fs[1].Name != "01_body.md" || !strings.Contains(fs[1].Doc.Body, "The whole note.") || strings.Contains(fs[0].Doc.Body, "The whole note.") {
+		t.Fatalf("the files are %+v", fs)
+	}
+}
