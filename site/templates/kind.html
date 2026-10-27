@@ -1,0 +1,7 @@
+{{template "top" .}}{{$g := .Group}}
+<nav class="crumbs"><a href="/">Home</a> › {{$g.Title}}</nav>
+<h1><span class="dot big k-{{$g.Color}}"></span>{{$g.Title}}</h1>
+<p class="lead">{{num (len $g.Items)}} items, by paper. Type in the filter to find a name.</p>
+<input class="filter" type="search" placeholder="Filter by name or paper" aria-label="Filter">
+<div class="klist">{{$last := ""}}{{range $g.Items}}{{if ne .Paper.ID $last}}{{if $last}}</ul></section>{{end}}<section class="kpaper"><h3><a href="/paper/{{.Paper.PathID}}/">{{.Paper.Title}}</a> <span class="mono n">{{.Paper.ID}}</span></h3><ul>{{end}}{{$last = .Paper.ID}}<li><a href="{{.Href}}">{{.Head}}</a>{{with .Name}} <span class="iname">({{.}})</span>{{end}}</li>{{end}}{{if $last}}</ul></section>{{end}}</div>
+{{template "bottom" .}}

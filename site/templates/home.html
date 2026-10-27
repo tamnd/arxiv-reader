@@ -1,0 +1,29 @@
+{{template "top" .}}
+<section class="hero">
+  <h1>The mathematics inside arXiv papers</h1>
+  <p class="lead">Each definition, theorem, lemma, proof, conjecture and problem of {{num .Site.Stats.Papers}} mathematics papers, read from the LaTeX source of the paper, numbered as the paper numbers them, and linked to the items it uses.</p>
+</section>
+<section class="stats">
+  <a class="stat" href="/papers/"><b>{{num .Site.Stats.Papers}}</b><span>papers</span></a>
+  <a class="stat k-definition" href="/kind/definitions/"><b>{{num (.Site.Count "definition")}}</b><span>definitions</span></a>
+  <a class="stat k-statement" href="/kind/theorems/"><b>{{num (.Site.Count "statement")}}</b><span>statements</span></a>
+  <a class="stat k-proof" href="/papers/"><b>{{num (.Site.Count "proof")}}</b><span>proofs</span></a>
+  <a class="stat k-problem" href="/kind/problems/"><b>{{num (.Site.Count "problem")}}</b><span>problems</span></a>
+  <a class="stat k-conjecture" href="/kind/conjectures/"><b>{{num (.Site.Count "conjecture")}}</b><span>conjectures</span></a>
+</section>
+{{with .Site.Census "scope"}}<p class="note">The corpus counts {{num .}} papers in scope. This site has the papers that the pipeline has extracted so far, and it grows each hour. {{num $.Site.Stats.WithText}} of the {{num $.Site.Stats.Papers}} papers have a licence that lets the site show their text.{{if lt $.Site.Stats.WithText $.Site.Stats.Papers}} For the others it shows the structure and links to arXiv.{{end}} <a href="/licences/">How the licences work</a>.</p>{{end}}
+<div class="cols">
+<section>
+  <h2>Recent papers</h2>
+  <ol class="plist">{{range .Site.Recent}}{{template "paperrow" .}}{{end}}</ol>
+  <p><a class="more" href="/papers/">All {{num .Site.Stats.Papers}} papers →</a></p>
+</section>
+<aside>
+  <h2>Browse by item</h2>
+  <ul class="kinds">{{range .Site.Groups}}<li><a href="/kind/{{.Slug}}/"><span class="dot k-{{.Color}}"></span>{{.Title}}</a> <span class="n">{{num (len .Items)}}</span></li>{{end}}</ul>
+  <h2>Categories</h2>
+  <ul class="cats">{{range $i, $c := .Site.Categories}}{{if lt $i 24}}<li><a href="/category/{{$c.Cat}}/">{{$c.Cat}}</a> <span class="n">{{$c.Papers}}</span></li>{{end}}{{end}}</ul>
+  <p><a class="more" href="/categories/">All categories →</a></p>
+</aside>
+</div>
+{{template "bottom" .}}

@@ -1,0 +1,14 @@
+{{define "item"}}<article class="item k-{{.Group}}" id="{{.Anchor}}">
+  <header class="ihead">
+    <span class="badge k-{{.Group}}">{{.Type}}</span>
+    <h3><a href="#{{.Anchor}}">{{.Head}}</a>{{with .Name}} <span class="iname">({{.}})</span>{{end}}</h3>
+    {{with .Tag}}<a class="tag mono" href="#{{.}}" title="The permanent tag of this item">{{.}}</a>{{end}}
+  </header>
+  {{if .Paper.Text}}<div class="ibody">{{.Body}}</div>{{else}}<p class="closed-note">The licence of this paper does not let this site show the text. <a href="https://arxiv.org/abs/{{.Paper.Arxiv}}">Read it on arXiv</a>.</p>{{end}}
+  {{if or .Uses .UsedBy}}<div class="irefs">{{with .Uses}}<span class="lab">Uses</span> {{range $i, $l := .}}{{if $i}}, {{end}}<a href="{{$l.Href}}">{{$l.Text}}</a>{{end}}{{end}}{{if and .Uses .UsedBy}} <span class="sep">·</span> {{end}}{{with .UsedBy}}<span class="lab">Used by</span> {{range $i, $l := .}}{{if $i}}, {{end}}<a href="{{$l.Href}}">{{$l.Text}}</a>{{end}}{{end}}</div>{{end}}
+  {{range .Proofs}}<details class="proof" id="{{.Anchor}}"{{if not .Paper.Text}} open{{end}}>
+    <summary><span class="badge k-proof">{{.Type}}</span>{{with .Name}} <span class="iname">({{.}})</span>{{end}} <span class="hint">of {{.Proved.Head}}</span></summary>
+    {{if .Paper.Text}}<div class="ibody">{{.Body}}</div>{{else}}<p class="closed-note">The text of the proof is on arXiv.</p>{{end}}
+    {{with .Uses}}<div class="irefs"><span class="lab">Uses</span> {{range $i, $l := .}}{{if $i}}, {{end}}<a href="{{$l.Href}}">{{$l.Text}}</a>{{end}}</div>{{end}}
+  </details>{{end}}
+</article>{{end}}

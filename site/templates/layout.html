@@ -1,0 +1,59 @@
+{{define "top"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{if eq .Section "home"}}arXiv reader{{else}}{{.Title}} · arXiv reader{{end}}</title>
+{{with .Desc}}<meta name="description" content="{{.}}">{{end}}
+<link rel="canonical" href="{{url .Path}}">
+<link rel="stylesheet" href="/assets/katex/katex.min.css">
+<link rel="stylesheet" href="/assets/style.css">
+<link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<script defer src="/assets/katex/katex.min.js"></script>
+<script defer src="/assets/site.js"></script>
+</head>
+<body>
+<header class="top">
+  <button class="menu" aria-label="Menu" aria-controls="nav" aria-expanded="false">☰</button>
+  <a class="brand" href="/"><span class="logo">∂</span> arXiv reader</a>
+  <div class="search">
+    <input id="q" type="search" placeholder="Search papers, theorems, definitions" autocomplete="off" aria-label="Search">
+    <ol id="hits" hidden></ol>
+  </div>
+  <button class="theme" aria-label="Change the colour theme" title="Light or dark">◐</button>
+</header>
+<div class="frame">
+<nav id="nav" class="side">
+  <h3>Read</h3>
+  <a href="/"{{if eq .Section "home"}} class="on"{{end}}>Home</a>
+  <a href="/papers/"{{if eq .Section "papers"}} class="on"{{end}}>All papers</a>
+  <a href="/categories/"{{if eq .Section "categories"}} class="on"{{end}}>Categories</a>
+  <h3>Items</h3>
+  {{$g := .Group}}{{range .Site.Groups}}<a href="/kind/{{.Slug}}/"{{if eq . $g}} class="on"{{end}}><span class="dot k-{{.Color}}"></span>{{.Title}}<span class="n">{{num (len .Items)}}</span></a>
+  {{end}}
+  <h3>Project</h3>
+  <a href="/licences/"{{if eq .Section "licences"}} class="on"{{end}}>Licences</a>
+  <a href="/about/"{{if eq .Section "about"}} class="on"{{end}}>About</a>
+  <a href="https://github.com/tamnd/arxiv">Data on GitHub</a>
+  <a href="https://github.com/tamnd/arxiv-reader">Code on GitHub</a>
+</nav>
+<main>
+{{end}}
+
+{{define "bottom"}}
+</main>
+</div>
+<footer class="foot">
+  <p>The text of each paper belongs to its authors and is shown under the licence of the paper, which the page of the paper names. The structure, the tags and the pages of this site are published under <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. The metadata comes from arXiv under <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a>. This site is not affiliated with arXiv. Thank you to arXiv for use of its open access interoperability.</p>
+  <p>Built on {{.Site.Date}}{{with .Site.Commit}} from <a href="https://github.com/tamnd/arxiv/commit/{{.}}">{{printf "%.7s" .}}</a>{{end}}. <a href="/licences/">Licences</a> · <a href="/about/">About</a></p>
+</footer>
+</body>
+</html>
+{{end}}
+
+{{define "paperrow"}}<li class="prow">
+  <a class="ptitle" href="/paper/{{.PathID}}/">{{.Title}}</a>
+  <div class="pmeta"><span>{{authors .Meta.Authors}}</span> · <span class="mono">{{.ID}}</span>{{with .Meta.Categories}} · <span>{{index . 0}}</span>{{end}} · <span class="lic{{if not .Text}} closed{{end}}">{{lname .Licence}}</span></div>
+  <div class="pcounts">{{with index .Counts "definition"}}<span class="chip k-definition">{{.}} {{plural . "definition" "definitions"}}</span>{{end}}{{with index .Counts "statement"}}<span class="chip k-statement">{{.}} {{plural . "statement" "statements"}}</span>{{end}}{{with index .Counts "proof"}}<span class="chip k-proof">{{.}} {{plural . "proof" "proofs"}}</span>{{end}}{{with index .Counts "problem"}}<span class="chip k-problem">{{.}} {{plural . "problem" "problems"}}</span>{{end}}{{with index .Counts "conjecture"}}<span class="chip k-conjecture">{{.}} {{plural . "conjecture" "conjectures"}}</span>{{end}}</div>
+</li>{{end}}

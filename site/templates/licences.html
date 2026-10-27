@@ -1,0 +1,18 @@
+{{template "top" .}}
+<h1>Licences</h1>
+<p class="lead">Each version of an arXiv paper has the licence that its authors chose. The site shows the text of a paper only when that licence lets the corpus publish it.</p>
+<table class="tbl">
+<thead><tr><th>Licence of the version</th><th>Class</th><th>Papers</th><th>What the site shows</th></tr></thead>
+<tbody>{{range .Site.LicenceRows}}<tr><td>{{if .Licence}}<a href="{{lurl .Licence}}">{{lname .Licence}}</a>{{else}}{{lname .Licence}}{{end}}</td><td>{{if .Access}}{{.Access}}{{else}}record{{end}}</td><td>{{.Papers}}</td><td>{{if .Text}}The text and the structure{{else}}The structure only{{end}}</td></tr>{{end}}</tbody>
+</table>
+<h2>The rules</h2>
+<ul class="prose">
+<li>The licence is the licence of the version that the corpus read, and not of the latest version.</li>
+<li>For CC0, CC BY and CC BY-SA the site shows the text, and names the authors, the version, the licence and the changes on the page of the paper. A page made from a CC BY-SA paper is CC BY-SA too.</li>
+<li>For CC BY-NC-SA and CC BY-NC-ND the site shows the text with no change to its words, for no commercial use, under the licence of the paper.</li>
+<li>For the arXiv licence (arXiv.org perpetual, non-exclusive license 1.0), and for a version with no licence on record, the site shows no text. It shows the kind, the number, the name and the tag of each item, the links between the items, and a link to the paper on arXiv.</li>
+<li>The structure, the tags and the code of the site are the work of the corpus, and they are published under CC BY 4.0.</li>
+<li>The titles, the authors and the abstracts are arXiv metadata, which arXiv publishes under CC0 1.0.</li>
+</ul>
+<p>An author who wants a page changed or removed can open an issue at <a href="https://github.com/tamnd/arxiv/issues">github.com/tamnd/arxiv</a>.</p>
+{{template "bottom" .}}
