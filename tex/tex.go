@@ -179,6 +179,9 @@ func build(main string, files, local map[string][]byte, excluded map[string]bool
 	d.Macros = ReadMacros(d.Text[:d.preambleEnd()], local)
 	d.Macros.Add(ReadMacros(d.bodyText(), nil))
 	d.step("macros: %d commands, %d environments", len(d.Macros.Commands), len(d.Macros.Envs))
+	if n := d.unalias(); n > 0 {
+		d.step("aliases: %d uses of commands that stand for \\begin or \\end", n)
+	}
 	d.findPreamble()
 	d.Tree = BuildTree(d.Text, d.Body, d.End)
 	d.step("tree: %d nodes", len(d.Tree.Nodes))
