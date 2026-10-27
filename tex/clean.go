@@ -176,12 +176,16 @@ var excludeDecl = regexp.MustCompile(`\\excludecomment\s*\{([^}]+)\}`)
 // Excluded reads the comment environments that a paper declares.
 //
 // It reads the raw files, because the declaration can be in any of them and
-// the cleaning of each file needs the full list first.
+// the cleaning of each file needs the full list first. A declaration after a
+// % on its line is a comment and does not count.
 func Excluded(files ...[]byte) map[string]bool {
 	out := map[string]bool{}
 	for _, f := range files {
-		for _, m := range excludeDecl.FindAllSubmatch(f, -1) {
-			for name := range strings.SplitSeq(string(m[1]), ",") {
+		for _, m := range excludeDecl.FindAllSubmatchIndex(f, -1) {
+			if commentedOut(f, m[0]) {
+				continue
+			}
+			for name := range strings.SplitSeq(string(f[m[2]:m[3]]), ",") {
 				if name = strings.TrimSpace(name); name != "" {
 					out[name] = true
 				}
@@ -189,4 +193,15 @@ func Excluded(files ...[]byte) map[string]bool {
 		}
 	}
 	return out
+}
+
+// commentedOut tells if a % that is not escaped comes before the offset on
+// its line.
+func commentedOut(b []byte, at int) bool {
+	for j := at - 1; j >= 0 && b[j] != '\n'; j-- {
+		if b[j] == '%' && !escaped(b, j) {
+			return true
+		}
+	}
+	return false
 }
