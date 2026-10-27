@@ -118,6 +118,9 @@ type Report struct {
 	// Closed is the papers in scope that are not open or share-alike, and
 	// ClosedOutside the ones with a structure from TheoremGraph (way R1).
 	Closed, ClosedOutside int
+	// Areas is the open and share-alike papers in scope of each MSC code at
+	// two digits, when the scope is known.
+	Areas map[string]*AreaScope
 
 	// Size is the files and the bytes of each part of the analysis plane, for
 	// AQ10.
@@ -127,6 +130,35 @@ type Report struct {
 
 	versions, months, codes map[string]*Row
 	patterns                map[string]*Pattern
+}
+
+// AreaScope is the papers in scope of one MSC code at two digits.
+type AreaScope struct {
+	Scope, Extracted, Halted int
+}
+
+// AddScope counts one open or share-alike paper in scope, with its MSC code at
+// two digits and whether its latest version has a census record or a stop
+// record.
+func (rp *Report) AddScope(code string, extracted, stopped bool) {
+	if rp.Areas == nil {
+		rp.Areas = map[string]*AreaScope{}
+	}
+	a := rp.Areas[code]
+	if a == nil {
+		a = &AreaScope{}
+		rp.Areas[code] = a
+	}
+	rp.Scope++
+	a.Scope++
+	switch {
+	case extracted:
+		rp.Extracted++
+		a.Extracted++
+	case stopped:
+		rp.Halted++
+		a.Halted++
+	}
 }
 
 // PlaneSize is the size of one part of the analysis plane.
