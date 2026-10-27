@@ -15,7 +15,15 @@ type Render struct {
 	Theorems []RenderItem
 	// Proofs is the count of ltx_proof elements.
 	Proofs int
+	// Undefined is each environment that LaTeXML did not know. The render
+	// prints the name of such an environment as an error, as {lem}, and has
+	// no theorem or proof for it.
+	Undefined map[string]bool
 }
+
+// undefinedEnv is the text of the error that LaTeXML writes for an
+// environment that it does not know.
+var undefinedEnv = regexp.MustCompile(`^\{([A-Za-z@*]{1,64})\}$`)
 
 // RenderItem is one theorem of the render.
 type RenderItem struct {
@@ -51,6 +59,14 @@ func FromRender(p *extract.Paper) *Render {
 	}
 	walk(p.Front())
 	sections(p.Sections)
+	for _, f := range p.Faults {
+		if m := undefinedEnv.FindStringSubmatch(f.Text); m != nil {
+			if r.Undefined == nil {
+				r.Undefined = map[string]bool{}
+			}
+			r.Undefined[m[1]] = true
+		}
+	}
 	return r
 }
 
@@ -173,6 +189,10 @@ func (c *Census) renderCounts() *RenderCount {
 		case c.textWrapper(o.Env), o.Type == Proof && c.textProof(o.Env):
 			// LaTeXML runs the code of the wrapper, so the render has the
 			// head as text and no theorem or proof.
+		case c.In.Render.Undefined[o.Env]:
+			// The render has an error and no theorem or proof for an
+			// environment that LaTeXML does not know, as one that a local
+			// class declares.
 		case o.Type == Env:
 			rc.SourceTheorems++
 			count(c.renderName(o.Env)).Source++

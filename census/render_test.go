@@ -203,3 +203,31 @@ func TestAProofOfALocalStyleIsInTheRender(t *testing.T) {
 		t.Fatalf("the counts are %+v, and the proof of jr.sty must count", rc)
 	}
 }
+
+// TestAnEnvironmentThatTheRenderDoesNotKnow reads 2604.07243v3, whose theorems the local class jgcc.cls declares. LaTeXML does not read the class, so the render prints {lem} as an error and has no theorem.
+func TestAnEnvironmentThatTheRenderDoesNotKnow(t *testing.T) {
+	r := FromRender(&extract.Paper{Faults: []extract.Fault{{Where: "S1", Text: "{lem}"}, {Where: "S1", Text: `\address`}, {Where: "S2", Text: "{lem}"}}})
+	if len(r.Undefined) != 1 || !r.Undefined["lem"] {
+		t.Fatalf("the undefined environments are %v, want lem", r.Undefined)
+	}
+	src := []byte(`\documentclass{amsart}
+\newtheorem{lem}{Lemma}
+\newtheorem{thm}{Theorem}
+\begin{document}
+\begin{lem} A. \end{lem}
+\begin{lem} B. \end{lem}
+\begin{thm} C. \end{thm}
+\end{document}
+`)
+	d, err := tex.ReadFile("main.tex", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := theorems.NewResolver()
+	in := Input{Paper: "2604.07243", Version: 3, Doc: d, Set: res.Resolve(d), Titles: res.Titles}
+	r.Theorems = []RenderItem{{Env: "thm", Number: "1"}}
+	in.Render = r
+	if rc := Run(in).renderCounts(); rc.SourceTheorems != 1 || !rc.Agree {
+		t.Fatalf("the counts are %+v, and the lemmas must not count", rc)
+	}
+}
