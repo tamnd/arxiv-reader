@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/tamnd/arxiv-reader/fingerprint"
 	"github.com/tamnd/arxiv-reader/objects"
@@ -417,9 +418,68 @@ func splitHead(opt string) (string, []string) {
 	}
 	name := citeIn.ReplaceAllString(opt, "")
 	name = labelIn.ReplaceAllString(name, "")
-	name = strings.TrimSpace(strings.Trim(strings.TrimSpace(name), ",;:()[]"))
-	name = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(name), "see"))
-	return name, cites
+	return headName(name), cites
+}
+
+var (
+	emptyGroup = regexp.MustCompile(`\{\s*\}`)
+	headRef    = regexp.MustCompile(`\\(ref|eqref|cref|Cref|autoref|pageref|hyperref)\b`)
+	controlIn  = regexp.MustCompile(`\\[a-zA-Z]+\*?`)
+	// locator is a head that only points to an item of another text, as
+	// "Theorem 1" or "Lemma 2.3 and 2.4". It is not a name.
+	locator = regexp.MustCompile(`(?i)^(theorem|thm|lemma|lem|proposition|prop|corollary|cor|definition|def|remark|example|conjecture|claim|section|sec|chapter|ch|equation|eq|page|p|pp)s?\.?\s*[0-9a-z]+([.\-–][0-9a-z]+)*(\s*(,|and|&)\s*[0-9a-z]+([.\-–][0-9a-z]+)*)*$`)
+)
+
+// connectives are the words that join a citation to the head, as in "see
+// [12]" or "cf. [3, Theorem 2]". When the citation goes, they are not part of
+// the name.
+var connectives = map[string]bool{
+	"see": true, "cf": true, "cf.": true, "e.g.": true, "e.g": true, "eg": true, "compare": true, "also": true,
+	"and": true, "in": true, "of": true, "from": true, "by": true, "after": true, "following": true,
+	"with": true, "on": true, "i.e.": true, "resp.": true, "for": true, "to": true,
+}
+
+// headName gives the name of an item from its head text with the citations
+// and the labels removed. A head that is only a cross-reference, a locator
+// as "Theorem 1", the words that joined a citation, or one letter, as the
+// "A" of "Theorem A", gives no name.
+func headName(s string) string {
+	for {
+		t := emptyGroup.ReplaceAllString(s, "")
+		if t == s {
+			break
+		}
+		s = t
+	}
+	s = strings.Join(strings.Fields(strings.ReplaceAll(s, "~", " ")), " ")
+	if headRef.MatchString(s) {
+		return ""
+	}
+	for {
+		t := strings.TrimSpace(strings.Trim(s, ",;:()[]{} "))
+		ws := strings.Fields(t)
+		if len(ws) > 0 && connectives[strings.ToLower(ws[0])] {
+			ws = ws[1:]
+		}
+		if len(ws) > 0 && connectives[strings.ToLower(ws[len(ws)-1])] {
+			ws = ws[:len(ws)-1]
+		}
+		t = strings.Join(ws, " ")
+		if t == s {
+			break
+		}
+		s = t
+	}
+	letters := 0
+	for _, r := range controlIn.ReplaceAllString(s, "") {
+		if unicode.IsLetter(r) {
+			letters++
+		}
+	}
+	if letters < 2 || locator.MatchString(s) {
+		return ""
+	}
+	return s
 }
 
 // labels gives the labels of an item and its parts (AX3.5). A label before
