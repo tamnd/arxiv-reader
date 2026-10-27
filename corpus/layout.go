@@ -392,3 +392,9 @@ func AnalysisTagsPath(root string, id axid.ID) string {
 func EdgesPath(root string, id axid.ID) string {
 	return path.Join(root, "analysis", "edges", Shard(id), PathID(id)+".jsonl")
 }
+
+// ProsePath is the candidate sentences of the prose items of one paper
+// (AX7.4 step 1). A record has the span of the sentence and no text.
+func ProsePath(root string, id axid.ID) string {
+	return path.Join(root, "analysis", "prose", Shard(id), PathID(id)+".jsonl")
+}

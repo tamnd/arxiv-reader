@@ -1811,6 +1811,8 @@ written to reports/census.md
 
 `ax census -write` also resolves the edges of AX6 between the items of the paper and writes them to `analysis/edges/<YYMM>/<id>.jsonl`. Each edge has a predicate, a method, a confidence and the place of its cue, and no text of the paper. The methods are attach, ref, text, cite, position, scope and term. A cycle in the in-paper uses graph gets the flag `cycle`. Rule D10 of `ax audit -group D` checks the method and the confidence of each edge, and rule D19 lists each version with a cycle.
 
+`ax census -write` also marks the candidate sentences of the prose items of AX7.4 and writes them to `analysis/prose/<YYMM>/<id>.jsonl`. A candidate is a sentence outside the items with a cue of `manifests/prose.yaml`, as "we say that" or "it is not known whether", or a sentence with an emphasized term and "if" or "such that". Each record has the kind of the cue, the cue, the section and the span of the sentence, and no text. Three dots in a cue match one to eight words. The understand role reads these candidates in AX7.4 step 2.
+
 `ax graph report` counts the edges into `reports/graph.md`. These are the checks of AX6.7: the share of statements with an incoming uses or proves edge, the share of proofs that use nothing, the versions with a cycle, and the share of each method, confidence and predicate. The report gives them for each MSC code at two digits and for each month. A share that moves by more than 5 points from one month to the next, for one code, is listed as a finding.
 
 ```
