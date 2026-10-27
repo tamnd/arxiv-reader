@@ -78,3 +78,25 @@ func TestAClassThatDeclaresWithItsOwnMacro(t *testing.T) {
 		}
 	}
 }
+
+func TestTheSvprocClassDefinesItsEnvironments(t *testing.T) {
+	d, err := tex.ReadFile("main.tex", []byte(`\documentclass{svproc}
+\begin{document}
+\begin{definition} A graph is a set with a relation. \end{definition}
+\begin{example} The empty graph. \end{example}
+\begin{proof} Clear. \end{proof}
+\end{document}
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := NewResolver().Resolve(d)
+	for _, env := range []string{"definition", "example", "lemma", "remark"} {
+		if e := s.Get(env); e == nil || e.Proof || e.From != "class:svproc" {
+			t.Errorf("%s is %+v, and it must come from the class svproc", env, e)
+		}
+	}
+	if p := s.Get("proof"); p == nil || !p.Proof {
+		t.Errorf("proof is %+v, and it must be a proof", p)
+	}
+}
