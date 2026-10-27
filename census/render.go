@@ -118,7 +118,9 @@ func (c *Census) renderCounts() *RenderCount {
 		case o.Type == Env:
 			rc.SourceTheorems++
 			count(c.renderName(o.Env)).Source++
-		case o.Type == Proof && o.Env != "head":
+		case o.Type == Proof && (o.Env != "head" || o.HasFlag("command")):
+			// A head such as "Proof." is text in the render, but LaTeXML
+			// renders the command \proof of amsthm as a proof.
 			rc.SourceProofs++
 		}
 	}

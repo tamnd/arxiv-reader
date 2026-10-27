@@ -51,3 +51,37 @@ func TestARenderedProofTheoremIsAProof(t *testing.T) {
 		t.Fatalf("the render has %d theorems and %d proofs, want 1 and 2", len(r.Theorems), r.Proofs)
 	}
 }
+
+// TestTheProofCommandCountsAsARenderedProof reads proofs that start with the command \proof of amsthm, as in 2507.13548v1. LaTeXML renders them as proofs, and it renders a head "Proof." as text.
+func TestTheProofCommandCountsAsARenderedProof(t *testing.T) {
+	src := []byte(`\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{lemma}{Lemma}
+\begin{document}
+\begin{lemma} A. \end{lemma}
+
+\proof
+The case is clear. \qed
+
+\begin{lemma} B. \end{lemma}
+
+\proof
+We use induction. \qed
+
+\begin{lemma} C. \end{lemma}
+
+\noindent Proof. It is trivial. \qed
+\end{document}
+`)
+	d, err := tex.ReadFile("main.tex", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := theorems.NewResolver()
+	in := Input{Paper: "2601.00001", Version: 1, Doc: d, Set: r.Resolve(d), Titles: r.Titles}
+	in.Render = &Render{Theorems: []RenderItem{{Env: "lemma", Number: "1"}, {Env: "lemma", Number: "2"}, {Env: "lemma", Number: "3"}}, Proofs: 2}
+	rc := Run(in).renderCounts()
+	if rc.SourceProofs != 2 || !rc.Agree {
+		t.Fatalf("the counts are %+v, and the source must have the 2 proofs of the command", rc)
+	}
+}

@@ -77,7 +77,8 @@ type Occurrence struct {
 	// Pos is the file and the first line, and Last is the last line.
 	Pos  tex.Pos `json:"pos"`
 	Last int     `json:"last,omitempty"`
-	// Flags is conditional, appendix, unclosed.
+	// Flags is conditional, appendix, unclosed, and for a head section or
+	// command.
 	Flags []string `json:"flags,omitempty"`
 	// Result is the match result of AX4.3.
 	Result string `json:"result,omitempty"`
@@ -281,8 +282,8 @@ func (c *Census) heads() {
 		if h.Number != "" {
 			o.NumberFrom = "head"
 		}
-		if h.Form == "section" {
-			o.Flags = append(o.Flags, "section")
+		if h.Form == "section" || h.Form == "command" {
+			o.Flags = append(o.Flags, h.Form)
 		}
 	}
 }
