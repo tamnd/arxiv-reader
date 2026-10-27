@@ -115,7 +115,7 @@ func (p *Paper) Label(byID map[string]string) int {
 			sections(ss[i].Sections)
 		}
 	}
-	blocks(p.Abstract)
+	blocks(p.Front())
 	sections(p.Sections)
 	return n
 }
@@ -146,7 +146,7 @@ func (p Paper) Labelled() int {
 			sections(s.Sections)
 		}
 	}
-	blocks(p.Abstract)
+	blocks(p.Front())
 	sections(p.Sections)
 	return n
 }

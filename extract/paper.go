@@ -218,6 +218,10 @@ type Paper struct {
 	Title    string
 	Authors  []Author
 	Abstract []Block
+	// Lead is the text before the first section, which is not the abstract,
+	// or the whole text of a paper with no section. Only the render path
+	// reads it yet.
+	Lead     []Block
 	Sections []Section
 	// Pages is the whole paper's page range, "1-20", and FrontPages is the pages
 	// the abstract was read off. Both are empty on every path but the native one,
@@ -314,6 +318,11 @@ func (p Paper) Reject() (Rejection, bool) {
 	return Rejection{}, false
 }
 
+// Front is the blocks before the first section: the abstract, then the lead.
+func (p Paper) Front() []Block {
+	return append(append([]Block{}, p.Abstract...), p.Lead...)
+}
+
 // Counts is how many of each kind of block a paper holds, over every section
 // at every depth.
 func (p Paper) Counts() map[Kind]int {
@@ -325,7 +334,7 @@ func (p Paper) Counts() map[Kind]int {
 			walk(b.Blocks)
 		}
 	}
-	walk(p.Abstract)
+	walk(p.Front())
 	var sections func([]Section)
 	sections = func(ss []Section) {
 		for _, s := range ss {

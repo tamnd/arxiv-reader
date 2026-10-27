@@ -49,6 +49,10 @@ func Files(p *Paper, base Front, pics Pictures) ([]File, error) {
 	w := &body{names: n, pics: pics}
 	w.objects++ // The front itself, which is one of the sixteen kinds.
 	w.blocks(p.Abstract, within{})
+	if len(p.Sections) > 0 {
+		// The text before the first section is front matter of the file.
+		w.blocks(p.Lead, within{})
+	}
 	out := []File{{Name: "00_front.md", Doc: Document{Front: count(front, w), Body: w.String()}}}
 
 	// A paper with no sections at all is a short note, and it gets one file
@@ -64,6 +68,7 @@ func Files(p *Paper, base Front, pics Pictures) ([]File, error) {
 		// of them.
 		f.SourcePages = p.Pages
 		w := &body{names: n, pics: pics}
+		w.blocks(p.Lead, within{})
 		out = append(out, File{Name: "01_body.md", Doc: Document{Front: count(f, w), Body: w.String()}})
 		return out, nil
 	}

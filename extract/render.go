@@ -36,7 +36,7 @@ func Parse(body []byte, id string, version int) (*Paper, error) {
 	if a := firstClass(article, "ltx_abstract"); a != nil {
 		p.Abstract = blocks(a)
 	}
-	p.Sections = paperSections(article)
+	p.Lead, p.Sections = paperSections(article)
 	p.Bibliography = bibliography(article)
 	p.Faults = faults(article)
 	p.Unparsed = countClass(article, "ltx_math_unparsed")
@@ -162,22 +162,27 @@ func sectionOf(c *html.Node) (Section, bool) {
 	}, true
 }
 
-// frontMatter is the classes of the article that are front matter and not
-// text of the paper.
-var frontMatter = []string{"ltx_abstract", "ltx_dates", "ltx_keywords", "ltx_classification"}
+// frontMatter is the classes of the article that are front matter or
+// metadata and not text of the paper. A note directly in the article is a
+// note of the title or of an author.
+var frontMatter = []string{"ltx_abstract", "ltx_dates", "ltx_keywords", "ltx_classification", "ltx_note", "ltx_rdf", "ltx_pubnotes", "ltx_index"}
 
-// paperSections reads the sections of the article. A paper with no \section has its
-// text directly in the article, and a paper can have text before its first
-// section. Each run of such blocks is a section with no title, in its place
-// in the page, so that the reader loses no theorem or paragraph of it.
-func paperSections(article *html.Node) []Section {
-	var out []Section
+// paperSections reads the sections of the article, and the blocks before the
+// first section. A paper with no \section has all its text directly in the
+// article, and a paper can have text before its first section. A run of such
+// blocks after a section is a section with no title, in its place in the page,
+// so that the reader loses no theorem or paragraph of the paper.
+func paperSections(article *html.Node) (lead []Block, out []Section) {
 	var loose []Block
 	flush := func() {
-		if len(loose) > 0 {
+		switch {
+		case len(loose) == 0:
+		case len(out) == 0:
+			lead = append(lead, loose...)
+		default:
 			out = append(out, Section{Kind: "section", Level: 1, Blocks: loose})
-			loose = nil
 		}
+		loose = nil
 	}
 	for c := article.FirstChild; c != nil; c = c.NextSibling {
 		if c.Type != html.ElementNode {
@@ -199,7 +204,7 @@ func paperSections(article *html.Node) []Section {
 		loose = append(loose, nodeBlocks(c)...)
 	}
 	flush()
-	return out
+	return lead, out
 }
 
 // blocks reads everything directly under a node, in reading order.
