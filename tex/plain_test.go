@@ -17,3 +17,11 @@ func TestAFileInPlainTeXSaysSo(t *testing.T) {
 		t.Errorf("LaTeX with no body gave %v, want %v", err, tex.ErrNoDocument)
 	}
 }
+
+// TestAnExcludeCommentAfterAPercentSign reads 2404.06445v3, whose preamble has the line % \excludecomment{proof}.
+func TestAnExcludeCommentAfterAPercentSign(t *testing.T) {
+	got := tex.Excluded([]byte("% \\excludecomment{proof}\n\\excludecomment{answer}\nThe rate is 5\\% \\excludecomment{hint}\n"))
+	if len(got) != 2 || !got["answer"] || !got["hint"] || got["proof"] {
+		t.Fatalf("got %v, want answer and hint", got)
+	}
+}
