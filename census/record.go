@@ -104,6 +104,9 @@ type RenderCount struct {
 	Theorems int  `json:"theorems"`
 	Proofs   int  `json:"proofs"`
 	Agree    bool `json:"agree"`
+	// Truncated is a render that LaTeXML stopped early, so it is not a second
+	// witness and its counts are not compared.
+	Truncated bool `json:"truncated,omitempty"`
 	// SourceTheorems and SourceProofs are the counts of the source path.
 	SourceTheorems int `json:"source_theorems"`
 	SourceProofs   int `json:"source_proofs"`

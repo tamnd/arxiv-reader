@@ -238,7 +238,7 @@ func (a Analysis) census(col *collector, file string, r *census.Record) {
 			add(f.Rule, what)
 		}
 	}
-	if r.Render != nil && !r.Render.Agree && !hasRule(r.Findings, "D08") {
+	if r.Render != nil && !r.Render.Agree && !r.Render.Truncated && !hasRule(r.Findings, "D08") {
 		msg := fmt.Sprintf("the render has %d theorems and %d proofs, and the source counts do not agree", r.Render.Theorems, r.Render.Proofs)
 		if r.Render.SourceTheorems+r.Render.SourceProofs > 0 {
 			// A record from before v0.5.11 has no source counts.
