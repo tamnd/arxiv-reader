@@ -166,6 +166,17 @@ func (c *Census) textProof(env string) bool {
 
 var commandCall = regexp.MustCompile(`\\[A-Za-z@]+`)
 
+// boxed tells if the environment is a theorem of tcolorbox. LaTeXML draws
+// the box as a picture with the head as text, so the render has no theorem
+// for it, as in 2508.01642v1.
+func (c *Census) boxed(env string) bool {
+	if c.In.Set == nil {
+		return false
+	}
+	d := c.In.Set.Get(env)
+	return d != nil && d.Form == "newtcbtheorem"
+}
+
 // renderCounts compares the counts of the source and of the render (AX4.5).
 func (c *Census) renderCounts() *RenderCount {
 	if c.In.Render == nil {
@@ -186,9 +197,10 @@ func (c *Census) renderCounts() *RenderCount {
 	}
 	for _, o := range c.Items() {
 		switch {
-		case c.textWrapper(o.Env), o.Type == Proof && c.textProof(o.Env):
-			// LaTeXML runs the code of the wrapper, so the render has the
-			// head as text and no theorem or proof.
+		case c.textWrapper(o.Env), o.Type == Proof && c.textProof(o.Env), c.boxed(o.Env):
+			// LaTeXML runs the code of the wrapper, or draws the box of
+			// tcolorbox, so the render has the head as text and no theorem
+			// or proof.
 		case c.In.Render.Undefined[o.Env]:
 			// The render has an error and no theorem or proof for an
 			// environment that LaTeXML does not know, as one that a local
