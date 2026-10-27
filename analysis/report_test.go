@@ -61,3 +61,18 @@ func TestTheReportCountsTheMeasuresOfAX114(t *testing.T) {
 		t.Error("a report since 2000 counted a paper from 1995")
 	}
 }
+
+func TestTheSummaryHasTheNumbersOfAX15(t *testing.T) {
+	rp := NewReport("")
+	rp.Add("2312", "14", &census.Record{Paper: "2312.00001", Version: 1, Strength: "strong"}, nil)
+	rp.Add("2312", "11", &census.Record{Paper: "2312.00002", Version: 1, Strength: "normal", Gaps: []census.Gap{{Occurrence: "env-1"}, {Occurrence: "env-2"}}}, nil)
+	rp.AddStop(Stop{Paper: "2312.00003", Version: 1, State: Stopped, Reason: StopLicence})
+	rp.Scope, rp.Extracted, rp.Halted, rp.Closed, rp.ClosedOutside = 10, 2, 1, 5, 4
+	s := rp.Summary(true)
+	if s.NoState != 7 || s.Versions != 2 || s.Gaps != 2 || s.WithGap != 1 || s.Strength["strong"] != 1 || s.StopReasons[StopLicence] != 1 || s.ClosedOutside != 4 {
+		t.Errorf("got %+v", s)
+	}
+	if s := rp.Summary(false); s.ScopeCounted || s.Scope != 0 || s.NoState != 0 || s.Versions != 2 {
+		t.Errorf("a summary with no scope has %+v", s)
+	}
+}

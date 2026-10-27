@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/tamnd/arxiv-cli/pkg/axid"
@@ -191,12 +192,21 @@ func censusReport(args []string) error {
 	if err := writeFile(path, []byte(md)); err != nil {
 		return err
 	}
+	// The counts go next to the report as JSON, for m2 corpus status.
+	sum, err := json.MarshalIndent(rp.Summary(!*noScope && rp.Scope > 0), "", "  ")
+	if err != nil {
+		return err
+	}
+	jsonPath := strings.TrimSuffix(path, filepath.Ext(path)) + ".json"
+	if err := writeFile(jsonPath, append(sum, '\n')); err != nil {
+		return err
+	}
 	fmt.Printf("%d versions with a census, %d stopped", rp.All.Papers, len(stopped))
 	if rp.Scope > 0 {
 		fmt.Printf(", %d of %d open papers in scope done", rp.Extracted+rp.Halted, rp.Scope)
 	}
 	fmt.Println()
-	fmt.Fprintf(os.Stderr, "written to %s\n", path)
+	fmt.Fprintf(os.Stderr, "written to %s and %s\n", path, jsonPath)
 	return nil
 }
 
