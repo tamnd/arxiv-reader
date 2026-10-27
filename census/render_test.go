@@ -179,3 +179,27 @@ func TestAProofThatThePaperDefinesAgainIsNotInTheRender(t *testing.T) {
 		}
 	}
 }
+
+// TestAProofOfALocalStyleIsInTheRender reads the proof of 2508.01642v1, which the local file jr.sty defines with the code of amsthm. The render has the proofs.
+func TestAProofOfALocalStyleIsInTheRender(t *testing.T) {
+	sty := []byte(`\newenvironment{proof}[1][Proof]{\par\normalfont\trivlist\item[\hskip\labelsep\itshape #1.]}{\endtrivlist}
+`)
+	main := []byte(`\documentclass{amsart}
+\usepackage{jr}
+\newtheorem{lemma}{Lemma}
+\begin{document}
+\begin{lemma} A. \end{lemma}
+\begin{proof} The case is clear. \end{proof}
+\end{document}
+`)
+	ds, err := tex.Read(&source.Bundle{Tarred: true, Files: []source.File{{Name: "main.tex", Data: main}, {Name: "jr.sty", Data: sty}}})
+	if err != nil || len(ds) == 0 {
+		t.Fatal(err)
+	}
+	r := theorems.NewResolver()
+	in := Input{Paper: "2508.01642", Version: 1, Doc: ds[0], Set: r.Resolve(ds[0]), Titles: r.Titles}
+	in.Render = &Render{Theorems: []RenderItem{{Env: "lemma", Number: "1"}}, Proofs: 1}
+	if rc := Run(in).renderCounts(); rc.SourceProofs != 1 || !rc.Agree {
+		t.Fatalf("the counts are %+v, and the proof of jr.sty must count", rc)
+	}
+}

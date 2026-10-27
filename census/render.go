@@ -113,9 +113,10 @@ func (c *Census) textWrapper(env string) bool {
 // textProof tells if the paper defines a proof environment again with its own
 // head, as \def\proof{{\it Proof.}\ } with \def\endproof, or as
 // \renewenvironment{proof}{\par\noindent{\itshape Proof.}}{}. LaTeXML runs the
-// definition of the paper or of a local .sty file, so the render has the head
-// as text and no proof. A definition that opens another environment, or that
-// calls a command that \let saved from the old one, still makes a proof.
+// definition of the paper, so the render has the head as text and no proof. A
+// definition that opens another environment, or that calls a command that \let
+// saved from the old one, still makes a proof. A definition in a local style
+// file does not count: the render of 2508.01642v1 has the proofs of jr.sty.
 func (c *Census) textProof(env string) bool {
 	if c.In.Set == nil || c.In.Doc == nil || c.In.Doc.Macros == nil {
 		return false
@@ -133,7 +134,7 @@ func (c *Census) textProof(env string) bool {
 	} else {
 		return false
 	}
-	if strings.HasSuffix(strings.ToLower(file), ".cls") || strings.Contains(begin, `\begin`) {
+	if file != "" || strings.Contains(begin, `\begin`) {
 		return false
 	}
 	for _, call := range commandCall.FindAllString(begin, -1) {
