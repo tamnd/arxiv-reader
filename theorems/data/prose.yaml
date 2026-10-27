@@ -1,5 +1,7 @@
 # Cue patterns for prose items (AX7.4).
 # Each cue is a lower case phrase. The understand role reads the sentences that hold a cue.
+# Three dots in a cue match one to eight words, so "define ... to be" matches "define the rank of M to be".
+# The cue finder also marks a sentence with an emphasized term and "if" or "such that" as a definition, with the cue "emphasis".
 # The census does not count prose items, because code cannot count them (AX1.4).
 definition:
   - we say that
@@ -14,10 +16,16 @@ definition:
   - will be called
   - we denote by
   - denote by
+  - we write
+  - define ... to be
+  - by a ... we mean
+  - by an ... we mean
+  - we refer to ... as
 conjecture:
   - we conjecture
   - it is conjectured
   - conjecturally
+  - we expect that
 problem:
   - it is not known whether
   - it is unknown whether
@@ -25,6 +33,11 @@ problem:
   - an open question
   - remains open
   - we ask whether
+  - it is an open problem
+  - it is an open question
+  - it is open whether
+  - we do not know
+  - it is unclear whether
 claim:
   - we claim that
   - we show that

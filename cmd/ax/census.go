@@ -13,6 +13,7 @@ import (
 
 	"github.com/tamnd/arxiv-cli/pkg/axid"
 	"github.com/tamnd/arxiv-reader/corpus"
+	"github.com/tamnd/arxiv-reader/cues"
 	"github.com/tamnd/arxiv-reader/metadata"
 	"github.com/tamnd/arxiv-reader/objects"
 	"github.com/tamnd/arxiv-reader/tags"
@@ -174,7 +175,14 @@ func writeAnalysis(root, paper string, version int, res *analysis.Result) error 
 	for i, e := range res.Edges {
 		es[i] = e
 	}
-	return replaceVersion(corpus.EdgesPath(root, id), version, es)
+	if err := replaceVersion(corpus.EdgesPath(root, id), version, es); err != nil {
+		return err
+	}
+	ps := make([]any, len(res.Prose))
+	for i, c := range res.Prose {
+		ps[i] = cues.Record{Paper: paper, Version: version, Candidate: c}
+	}
+	return replaceVersion(corpus.ProsePath(root, id), version, ps)
 }
 
 // tagAnalysis gives a tag to each object of one version and saves the tag

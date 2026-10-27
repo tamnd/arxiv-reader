@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/tamnd/arxiv-reader/census"
+	"github.com/tamnd/arxiv-reader/cues"
 	"github.com/tamnd/arxiv-reader/edges"
 	"github.com/tamnd/arxiv-reader/objects"
 	"github.com/tamnd/arxiv-reader/source"
@@ -41,17 +42,25 @@ type Result struct {
 	// the in-paper uses graph.
 	Edges  []edges.Edge
 	Cycles [][]string
+	// Prose is the candidate sentences of the prose items (AX7.4 step 1).
+	Prose []cues.Candidate
 }
 
 // Manifests is the four manifests that the analysis reads.
 type Manifests struct {
 	Resolver *theorems.Resolver
 	Phrases  theorems.Phrases
+	Cues     *cues.Cues
 }
 
 // DefaultManifests is the first version of the four manifests.
 func DefaultManifests() *Manifests {
-	return &Manifests{Resolver: theorems.NewResolver(), Phrases: theorems.DefaultPhrases()}
+	b, _ := theorems.Manifest("prose.yaml")
+	c, err := cues.Parse(b)
+	if err != nil {
+		panic(err)
+	}
+	return &Manifests{Resolver: theorems.NewResolver(), Phrases: theorems.DefaultPhrases(), Cues: c}
 }
 
 // Analyze runs the front end, the builder and the census on an e-print.
@@ -124,6 +133,13 @@ func Analyze(b *source.Bundle, p Paper, m *Manifests) (*Result, error) {
 		g := edges.Resolve(edges.Input{Paper: p.ID, Version: p.Version, Extractor: p.Extractor, Prefix: prefix, Doc: d, Items: items, Titles: m.Resolver.Titles})
 		res.Edges = append(res.Edges, g.Edges...)
 		res.Cycles = append(res.Cycles, g.Cycles...)
+		if m.Cues != nil {
+			spans := make([]tex.Region, len(ext))
+			for k, x := range ext {
+				spans[k] = tex.Region{From: x.Off, To: x.End}
+			}
+			res.Prose = append(res.Prose, m.Cues.Find(d, spans, prefix)...)
+		}
 		res.Objects = append(res.Objects, recs...)
 		res.Census = append(res.Census, rec)
 	}
