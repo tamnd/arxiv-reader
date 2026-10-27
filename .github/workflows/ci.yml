@@ -70,7 +70,7 @@ jobs:
       # above. staticcheck reads the compiler's export data and a release older
       # than the toolchain gives up with "export data version 4 is greater than
       # maximum supported version 2" rather than a finding.
-      - run: go install honnef.co/go/tools/cmd/staticcheck@v0.8.1
+      - run: go install honnef.co/go/tools/cmd/staticcheck@v0.8.2
       - run: staticcheck ./...
 
   vulncheck:
