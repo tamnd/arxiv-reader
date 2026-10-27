@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -11,6 +13,7 @@ import (
 	"github.com/tamnd/arxiv-cli/pkg/axid"
 	"github.com/tamnd/arxiv-reader/analysis"
 	"github.com/tamnd/arxiv-reader/corpus"
+	"github.com/tamnd/arxiv-reader/fetch"
 	"github.com/tamnd/arxiv-reader/licence"
 )
 
@@ -77,6 +80,23 @@ func TestARedoKeepsTheCensusRecordWhenItStops(t *testing.T) {
 	}
 	if !exists(census) {
 		t.Error("the redo removed the census record")
+	}
+}
+
+func TestABatchGoesOnOnlyWhenTheSourceChangedAtArXiv(t *testing.T) {
+	for _, c := range []struct {
+		err  error
+		want bool
+	}{
+		{&fetch.Changed{Where: "at the source"}, true},
+		{fmt.Errorf("one: %w", &fetch.Changed{Where: "at the source"}), true},
+		{&fetch.Changed{Where: "on disk"}, false},
+		{errors.New("the network is down"), false},
+		{nil, false},
+	} {
+		if got := changedAtSource(c.err); got != c.want {
+			t.Errorf("%v: got %v, want %v", c.err, got, c.want)
+		}
 	}
 }
 

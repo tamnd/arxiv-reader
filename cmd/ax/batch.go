@@ -47,6 +47,7 @@ func censusBatch(args []string) error {
 	pace := fs.Duration("pace", fetch.Pace, "the gap to leave between requests to the website")
 	keep := fs.Bool("keep", false, "keep the e-print and the render in work/ after the census")
 	redo := fs.Bool("redo", false, "do each paper again, also when it has a census record or a stop record")
+	accept := fs.Bool("accept", false, "record the new bytes of a source that changed at arXiv, instead of going on to the next paper")
 	norender := fs.Bool("no-render", false, "do not fetch the render, so the census has the source as its only witness")
 	dry := fs.Bool("n", false, "print the count of the papers and the first ten, and do nothing")
 	scopeList := fs.String("scope", "", "take the open and share-alike papers of this scope list, as math, in the order of AX2.6")
@@ -101,6 +102,7 @@ func censusBatch(args []string) error {
 		pace:     *pace,
 		keep:     *keep,
 		redo:     *redo,
+		accept:   *accept,
 		render:   !*norender,
 		resolver: &licence.Resolver{UserAgent: userAgent(), Pace: *pace},
 		fetcher:  &fetch.Fetcher{UserAgent: userAgent(), Pace: *pace},
@@ -117,6 +119,10 @@ func censusBatch(args []string) error {
 			break
 		}
 		state, did, err := b.one(ctx, ref)
+		if changedAtSource(err) {
+			fmt.Fprintf(os.Stderr, "ax: %s: %v, so the batch goes on with the next paper\n", ref, err)
+			state, err = "changed", nil
+		}
 		if err != nil {
 			if ctx.Err() != nil {
 				break
@@ -138,8 +144,20 @@ func censusBatch(args []string) error {
 			fmt.Printf(", %d stopped: %s", n, r)
 		}
 	}
+	if n := counts["changed"]; n > 0 {
+		fmt.Printf(", %d changed at the source", n)
+	}
 	fmt.Println()
 	return ctx.Err()
+}
+
+// changedAtSource tells if the error is a source that changed at arXiv. That
+// is evidence that the manifest keeps, so the batch writes nothing for the
+// paper and goes on with the next one. A file that changed on disk is a fault
+// of this machine, and it stops the batch.
+func changedAtSource(err error) bool {
+	var changed *fetch.Changed
+	return errors.As(err, &changed) && changed.Where == "at the source"
 }
 
 type batch struct {
@@ -151,6 +169,7 @@ type batch struct {
 	pace     time.Duration
 	keep     bool
 	redo     bool
+	accept   bool
 	render   bool
 	resolver *licence.Resolver
 	fetcher  *fetch.Fetcher
@@ -207,7 +226,7 @@ func (b *batch) one(ctx context.Context, ref string) (state string, did bool, er
 		return b.stop(id, rec.ID, v, analysis.StopLicence, fmt.Sprintf("the abs page gives %s for v%d", latest.Licence, v))
 	}
 
-	order := fetch.Order{Record: rec, Version: v}
+	order := fetch.Order{Record: rec, Version: v, Accept: b.accept}
 	if _, cached := b.m.Find(rec.ID, v, fetch.RouteSource); !cached || !exists(corpus.EPrintPath(b.root, id, v)) {
 		if err := b.wait(ctx); err != nil {
 			return "", true, err
