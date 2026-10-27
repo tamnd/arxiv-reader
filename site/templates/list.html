@@ -1,0 +1,6 @@
+{{template "top" .}}
+<nav class="crumbs"><a href="/">Home</a> › {{if .Cat}}<a href="/categories/">Categories</a>{{else}}<a href="/papers/">All papers</a>{{end}} › {{.Title}}</nav>
+<h1>{{if .Cat}}<span class="mono">{{.Cat}}</span>{{else}}{{.Title}}{{end}}</h1>
+<p class="lead">{{len .Papers}} {{plural (len .Papers) "paper" "papers"}}.</p>
+<ol class="plist">{{range .Papers}}{{template "paperrow" .}}{{end}}</ol>
+{{template "bottom" .}}

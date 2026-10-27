@@ -1,0 +1,25 @@
+{{template "top" .}}
+<h1>About</h1>
+<div class="prose">
+<p>The arXiv reader is a corpus of the items of mathematics papers on arXiv: the definitions, the theorems and the other statements, the proofs, the remarks, the examples, the conjectures and the problems. Each item has a permanent tag, the number that the paper prints, its name, its text, and the links to the items that it uses.</p>
+<h2>How it is made</h2>
+<ol>
+<li>A pipeline on a server takes the e-prints of papers in scope, one batch each hour, and keeps them with the licence of each version.</li>
+<li>The TeX front end of <a href="https://github.com/tamnd/arxiv-reader">arxiv-reader</a> reads the source of the paper. It expands the macros of the paper and finds each theorem environment, each proof and each head.</li>
+<li>A census counts the items of the paper in a second, independent way and checks that the two counts agree. A paper with a gap stops with a reason.</li>
+<li>The resolver finds the proof of each statement and the items that each item uses.</li>
+<li>This site is built from the records in <a href="https://github.com/tamnd/arxiv">github.com/tamnd/arxiv</a> and deployed again each time the corpus changes.</li>
+</ol>
+<p>No step uses a language model. All text is the text of the paper.</p>
+<h2>Numbers</h2>
+<table class="tbl"><tbody>
+<tr><td>Papers on this site</td><td>{{num .Site.Stats.Papers}}</td></tr>
+<tr><td>Papers whose text the site shows</td><td>{{num .Site.Stats.WithText}}</td></tr>
+<tr><td>Items</td><td>{{num .Site.Stats.Items}}</td></tr>
+{{with .Site.Census "scope"}}<tr><td>Papers in scope</td><td>{{num .}}</td></tr>{{end}}
+{{with .Site.Census "stopped"}}<tr><td>Papers stopped with a reason</td><td>{{num .}}</td></tr>{{end}}
+</tbody></table>
+<h2>Related</h2>
+<p><a href="https://math2.tamnd.com">math2</a> is the wiki of mathematics that takes its research layer from this corpus.</p>
+</div>
+{{template "bottom" .}}

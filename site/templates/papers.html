@@ -1,0 +1,6 @@
+{{template "top" .}}
+<h1>All papers</h1>
+<p class="lead">{{num .Site.Stats.Papers}} papers, newest first, by the month of their first version.</p>
+<nav class="months">{{range .Site.Months}}<a href="#m{{.Shard}}">{{.Shard}}</a>{{end}}</nav>
+{{range .Site.Months}}<section id="m{{.Shard}}"><h2><a href="/month/{{.Shard}}/">{{month .Shard}}</a> <span class="n">{{len .Papers}}</span></h2><ol class="plist">{{range .Papers}}{{template "paperrow" .}}{{end}}</ol></section>{{end}}
+{{template "bottom" .}}

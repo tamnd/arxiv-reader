@@ -57,6 +57,7 @@ var commands = []command{
 	{"glossary", "seed, extend and check the controlled vocabulary", "M7", nil},
 	{"translate", "vi, zh and ja, and any language with a profile", "M8", nil},
 	{"roundtrip", "back translate a sample and compare", "M8", nil},
+	{"site", "build the reading site of the corpus, as arxiv.tamnd.com", "AX-M9", runSite},
 	{"build", "the intermediate representation, then web, EPUB, TeX and PDF", "M6", nil},
 	{"audit", "the numbered rules, hard and soft", "M1", runAudit},
 	{"report", "coverage, usage, paths, graph and licence", "M5", runReport},

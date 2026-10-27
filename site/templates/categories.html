@@ -1,0 +1,5 @@
+{{template "top" .}}
+<h1>Categories</h1>
+<p class="lead">The arXiv categories of the papers. A paper is in each of its categories.</p>
+<ul class="cats wide">{{range .Site.Categories}}<li><a href="/category/{{.Cat}}/">{{.Cat}}</a> <span class="n">{{.Papers}}</span></li>{{end}}</ul>
+{{template "bottom" .}}
