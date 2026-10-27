@@ -95,6 +95,17 @@ func (c *Census) renderName(env string) string {
 	return env
 }
 
+// textWrapper tells if the environment is a wrapper of the paper that prints
+// its own head and opens no declared environment, as
+// \newenvironment{proof}{\noindent{\bf Proof:}}{}.
+func (c *Census) textWrapper(env string) bool {
+	if c.In.Set == nil {
+		return false
+	}
+	d := c.In.Set.Get(env)
+	return d != nil && d.From == "wrapper" && d.Inner == ""
+}
+
 // renderCounts compares the counts of the source and of the render (AX4.5).
 func (c *Census) renderCounts() *RenderCount {
 	if c.In.Render == nil {
@@ -115,6 +126,9 @@ func (c *Census) renderCounts() *RenderCount {
 	}
 	for _, o := range c.Items() {
 		switch {
+		case c.textWrapper(o.Env):
+			// LaTeXML runs the code of the wrapper, so the render has the
+			// head as text and no theorem or proof.
 		case o.Type == Env:
 			rc.SourceTheorems++
 			count(c.renderName(o.Env)).Source++

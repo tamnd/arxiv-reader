@@ -85,3 +85,31 @@ We use induction. \qed
 		t.Fatalf("the counts are %+v, and the source must have the 2 proofs of the command", rc)
 	}
 }
+
+// TestAWrapperWithATextHeadIsNotInTheRender reads the proof of 2405.09294v1, which a style file defines with \newenvironment and a bold head. LaTeXML renders it as a paragraph that starts with the head, so the render has no proof.
+func TestAWrapperWithATextHeadIsNotInTheRender(t *testing.T) {
+	src := []byte(`\documentclass{article}
+\newtheorem{lemma}{Lemma}
+\newenvironment{proof}{\vskip1ex\noindent{\bf Proof:}\hskip.5em}{\hfill$\Box$}
+\begin{document}
+\begin{lemma} A. \end{lemma}
+\begin{proof} The case is clear. \end{proof}
+\begin{lemma} B. \end{lemma}
+\begin{proof} We use induction. \end{proof}
+\end{document}
+`)
+	d, err := tex.ReadFile("main.tex", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := theorems.NewResolver()
+	in := Input{Paper: "2601.00001", Version: 1, Doc: d, Set: r.Resolve(d), Titles: r.Titles}
+	if p := in.Set.Get("proof"); p == nil || !p.Proof || p.From != "wrapper" {
+		t.Fatalf("proof is %+v, and it must be a wrapper", p)
+	}
+	in.Render = &Render{Theorems: []RenderItem{{Env: "lemma", Number: "1"}, {Env: "lemma", Number: "2"}}}
+	rc := Run(in).renderCounts()
+	if rc.SourceProofs != 0 || rc.SourceTheorems != 2 || !rc.Agree {
+		t.Fatalf("the counts are %+v, and the proofs of the wrapper must not count", rc)
+	}
+}
