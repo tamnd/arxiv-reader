@@ -234,6 +234,10 @@ func (b *batch) one(ctx context.Context, ref string) (state string, did bool, er
 	}
 	res, err := b.fetcher.EPrint(ctx, b.root, b.m, order)
 	var noEPrint *fetch.NoEPrint
+	var tooLarge *fetch.TooLarge
+	if errors.As(err, &tooLarge) {
+		return b.stop(id, rec.ID, v, analysis.StopFailed, err.Error())
+	}
 	if errors.As(err, &noEPrint) {
 		reason := analysis.StopNoSource
 		if strings.Contains(strings.ToLower(rec.Comments), "withdrawn") {
@@ -270,8 +274,13 @@ func (b *batch) one(ctx context.Context, ref string) (state string, did bool, er
 		}
 		r, err := b.fetcher.Render(ctx, b.root, b.m, order)
 		var unrendered *fetch.NotRendered
+		var tooLarge *fetch.TooLarge
 		switch {
 		case errors.As(err, &unrendered):
+		case errors.As(err, &tooLarge):
+			// The census goes on with the source only, as for a paper with no
+			// rendering.
+			fmt.Fprintf(os.Stderr, "ax: %s: %v, so the census has no render\n", ver, err)
 		case err != nil:
 			return "", true, err
 		default:
