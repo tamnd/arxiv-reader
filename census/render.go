@@ -95,15 +95,18 @@ func (c *Census) renderName(env string) string {
 	return env
 }
 
-// textWrapper tells if the environment is a wrapper of the paper that prints
-// its own head and opens no declared environment, as
-// \newenvironment{proof}{\noindent{\bf Proof:}}{}.
+// textWrapper tells if the environment is a wrapper that prints its own head
+// and opens no declared environment, as
+// \newenvironment{proof}{\noindent{\bf Proof:}}{}. LaTeXML runs the code of
+// a wrapper of the paper or of a local .sty file. It does not read a local
+// .cls file, and it uses its own binding of amsthm for such a class.
 func (c *Census) textWrapper(env string) bool {
-	if c.In.Set == nil {
+	if c.In.Set == nil || c.In.Doc == nil || c.In.Doc.Macros == nil {
 		return false
 	}
 	d := c.In.Set.Get(env)
-	return d != nil && d.From == "wrapper" && d.Inner == ""
+	e := c.In.Doc.Macros.Envs[env]
+	return d != nil && d.From == "wrapper" && d.Inner == "" && e != nil && !strings.HasSuffix(strings.ToLower(e.File), ".cls")
 }
 
 // renderCounts compares the counts of the source and of the render (AX4.5).
