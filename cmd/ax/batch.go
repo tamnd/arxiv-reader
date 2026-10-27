@@ -38,13 +38,15 @@ const frontEndLimit = 60 * time.Second
 // of the version from the abs page, fetches the e-print and the render, writes
 // the census record and the object records, and removes the downloads. A
 // paper with a census record or a stop record is not done again, so a batch
-// that stopped can start again with the same command.
+// that stopped can start again with the same command. With -redo, the batch
+// does each paper again, for example after a fix to the census.
 func censusBatch(args []string) error {
 	fs := flag.NewFlagSet("ax census batch", flag.ContinueOnError)
 	list := fs.String("list", "", "a file with one id at the start of each line, as manifests/gold/x-v1.txt")
 	limit := fs.Int("limit", 0, "stop after this many papers that needed work")
 	pace := fs.Duration("pace", fetch.Pace, "the gap to leave between requests to the website")
 	keep := fs.Bool("keep", false, "keep the e-print and the render in work/ after the census")
+	redo := fs.Bool("redo", false, "do each paper again, also when it has a census record or a stop record")
 	norender := fs.Bool("no-render", false, "do not fetch the render, so the census has the source as its only witness")
 	dry := fs.Bool("n", false, "print the count of the papers and the first ten, and do nothing")
 	scopeList := fs.String("scope", "", "take the open and share-alike papers of this scope list, as math, in the order of AX2.6")
@@ -98,6 +100,7 @@ func censusBatch(args []string) error {
 		m:        &manifest,
 		pace:     *pace,
 		keep:     *keep,
+		redo:     *redo,
 		render:   !*norender,
 		resolver: &licence.Resolver{UserAgent: userAgent(), Pace: *pace},
 		fetcher:  &fetch.Fetcher{UserAgent: userAgent(), Pace: *pace},
@@ -147,6 +150,7 @@ type batch struct {
 	m        *fetch.Manifest
 	pace     time.Duration
 	keep     bool
+	redo     bool
 	render   bool
 	resolver *licence.Resolver
 	fetcher  *fetch.Fetcher
@@ -183,7 +187,7 @@ func (b *batch) one(ctx context.Context, ref string) (state string, did bool, er
 		return "", false, fmt.Errorf("the record has no versions")
 	}
 	v := latest.Version
-	if exists(corpus.CensusPath(b.root, id, v)) || exists(corpus.StopPath(b.root, id, v)) {
+	if !b.redo && (exists(corpus.CensusPath(b.root, id, v)) || exists(corpus.StopPath(b.root, id, v))) {
 		return "done", false, nil
 	}
 	ver := fmt.Sprintf("%sv%d", rec.ID, v)
@@ -288,10 +292,22 @@ func (b *batch) one(ctx context.Context, ref string) (state string, did bool, er
 	if err := writeAnalysis(b.root, rec.ID, v, got.res); err != nil {
 		return "", true, err
 	}
+	if b.redo {
+		// The paper stopped before and reads now.
+		if err := os.Remove(corpus.StopPath(b.root, id, v)); err != nil && !errors.Is(err, iofs.ErrNotExist) {
+			return "", true, err
+		}
+	}
 	return "extracted", true, nil
 }
 
 func (b *batch) stop(id axid.ID, paper string, version int, reason, detail string) (string, bool, error) {
+	if b.redo && exists(corpus.CensusPath(b.root, id, version)) {
+		// A paper done again keeps its census record when it stops now, so
+		// that a failed fetch does not remove the work of an earlier run.
+		fmt.Fprintf(os.Stderr, "%sv%d stopped (%s: %s) and keeps its census record\n", paper, version, reason, detail)
+		return analysis.Stopped + ": " + reason, true, nil
+	}
 	s := analysis.Stop{Paper: paper, Version: version, State: analysis.Stopped, Reason: reason, Detail: detail, By: "ax/" + Version, On: time.Now().UTC().Format("2006-01-02")}
 	out, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {

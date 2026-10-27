@@ -57,6 +57,29 @@ func TestAStopRecordNamesTheReason(t *testing.T) {
 	}
 }
 
+func TestARedoKeepsTheCensusRecordWhenItStops(t *testing.T) {
+	root := t.TempDir()
+	id, err := axid.Parse("math/0003117")
+	if err != nil {
+		t.Fatal(err)
+	}
+	census := corpus.CensusPath(root, id, 2)
+	if err := writeFile(census, []byte("{}\n")); err != nil {
+		t.Fatal(err)
+	}
+	b := &batch{root: root, redo: true}
+	state, did, err := b.stop(id, "math/0003117", 2, analysis.StopFailed, "the fetch failed")
+	if err != nil || !did || state != "stopped: failed" {
+		t.Fatalf("got %q %v %v", state, did, err)
+	}
+	if exists(corpus.StopPath(root, id, 2)) {
+		t.Error("the redo wrote a stop record next to the census record")
+	}
+	if !exists(census) {
+		t.Error("the redo removed the census record")
+	}
+}
+
 func TestRemoveKeepsFilesOutsideWork(t *testing.T) {
 	root := t.TempDir()
 	keep := filepath.Join(root, "metadata.jsonl")
