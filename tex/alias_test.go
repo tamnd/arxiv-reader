@@ -83,3 +83,32 @@ func TestAnAliasWithTextAroundTheEnd(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
+
+func TestAnAliasThatGivesItsArgumentsToTheEnvironment(t *testing.T) {
+	src := `\documentclass{amsart}
+\newtheorem{Lem}{Lemma}
+\newenvironment{lemma}[1]{\begin{Lem}\label{l:#1}}{\end{Lem}}
+\newcommand{\lem}[1]{\begin{lemma}{#1}}
+\newcommand{\elem}{\end{lemma}}
+\newcommand{\swap}[2]{\begin{lemma}{#2}{#1}}
+\newcommand{\opt}[1][x]{\begin{lemma}{#1}}
+\begin{document}
+\lem{a} One. \elem
+\swap{b}{c} Two. \end{lemma}
+\end{document}
+`
+	d, err := tex.ReadFile("main.tex", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, n := range d.Tree.Nodes {
+		if n.Kind == "env" {
+			got = append(got, n.Name+" "+strings.Join(strings.Fields(string(d.Text[n.Inner:n.Close])), " "))
+		}
+	}
+	want := []string{"lemma {a} One."}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}

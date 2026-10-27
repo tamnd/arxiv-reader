@@ -17,15 +17,36 @@ var beginEnd = regexp.MustCompile(`\\(begin|end)\b`)
 // envName is the argument of a command that stands for \begin or \end alone.
 var envName = regexp.MustCompile(`^\{\s*[A-Za-z@*]{1,64}\s*\}`)
 
+// argAlias is the body of a command that opens a named environment and gives
+// its own arguments to the environment in order, as
+// \newcommand{\lem}[1]{\begin{lemma}{#1}}.
+var argAlias = regexp.MustCompile(`^(\\begin\s*\{[^{}\\#]{1,64}\})((?:\s*\{#[1-9]\})+)$`)
+
+var argRef = regexp.MustCompile(`#([1-9])`)
+
 // structureAliases returns the commands with no arguments that stand for
 // \begin or \end, with what each one stands for. A paper can write
 // \def\>{\end} and close each environment with \>{lemma}, or write
 // \def\bthm{\begin{theorem}}. The front end does not expand commands, so
 // without this the scanners of the environments do not see them.
+//
+// A command with arguments is an alias when its body is the \begin of an
+// environment followed by the arguments {#1} to {#n} in order. The call
+// \lem{a} then stands for \begin{lemma}{a}, so the alias is the \begin and the
+// arguments of the call stay where they are.
 func (m *Macros) structureAliases() map[string]string {
 	out := map[string]string{}
 	for name, c := range m.Commands {
-		if c.Args != 0 || len(name) < 2 {
+		if len(name) < 2 {
+			continue
+		}
+		if c.Args > 0 && !c.HasDefault {
+			if a := argAlias.FindStringSubmatch(strings.TrimSpace(c.Body)); a != nil && inOrder(a[2], c.Args) {
+				out[name] = a[1]
+			}
+			continue
+		}
+		if c.Args != 0 {
 			continue
 		}
 		body := strings.TrimSpace(c.Body)
@@ -34,6 +55,20 @@ func (m *Macros) structureAliases() map[string]string {
 		}
 	}
 	return out
+}
+
+// inOrder tells if the arguments are #1 to #n, each once and in order.
+func inOrder(args string, n int) bool {
+	refs := argRef.FindAllStringSubmatch(args, -1)
+	if len(refs) != n {
+		return false
+	}
+	for i, r := range refs {
+		if r[1] != string(rune('1'+i)) {
+			return false
+		}
+	}
+	return true
 }
 
 // defining is the commands that define the command after them.
