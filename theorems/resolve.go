@@ -38,6 +38,10 @@ type Declaration struct {
 	// as \begin{thm}{Claim}. Title and Item are then empty, and TitleOf reads
 	// them from the use.
 	TitleArg bool `json:"title_arg,omitempty"`
+	// TitleOpt is true when the title argument is optional, and TitleDefault
+	// is the title of a use that does not give it.
+	TitleOpt     bool   `json:"title_opt,omitempty"`
+	TitleDefault string `json:"title_default,omitempty"`
 	// Off is the offset of the declaration in the expanded text, or -1.
 	Off int `json:"-"`
 }
@@ -453,6 +457,12 @@ func (r *Resolver) wrappers(s *Set, d *tex.Document) {
 		}
 		if code, ok := titledBegin(d.Macros, e); ok {
 			w := &Declaration{Env: name, TitleArg: true, Item: Unknown, From: "wrapper", Form: "titled", Off: e.Off}
+			w.TitleOpt, w.TitleDefault = e.HasDefault, e.Default
+			if r.Classes.IsProofName(name) {
+				// A paper that defines proof again with a title argument
+				// still writes proofs with it.
+				w.Proof, w.Item = true, "proof"
+			}
 			if m := stepCount.FindStringSubmatch(code); m != nil {
 				w.Numbered = true
 				w.Counter = strings.TrimSpace(m[1])
@@ -507,11 +517,25 @@ func (d *Declaration) TitleOf(text []byte, inner int, t *Titles) (title, item st
 	if !d.TitleArg {
 		return d.Title, d.Item, inner
 	}
-	a, end, ok := tex.ReadArgs(text, inner, "m")
+	spec := "m"
+	if d.TitleOpt {
+		spec = "o"
+	}
+	a, end, ok := tex.ReadArgs(text, inner, spec)
 	if !ok {
+		if d.Proof {
+			return "", "proof", inner
+		}
 		return "", Unknown, inner
 	}
-	title = strings.TrimSpace(strings.TrimRight(stripFonts(a.Values[0]), ".: "))
+	title = a.Values[0]
+	if d.TitleOpt && !a.Has[0] {
+		title = d.TitleDefault
+	}
+	title = strings.TrimSpace(strings.TrimRight(stripFonts(title), ".: "))
+	if d.Proof {
+		return title, "proof", end
+	}
 	return title, t.Kind(title), end
 }
 
