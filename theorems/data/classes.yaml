@@ -93,6 +93,17 @@ classes:
     - {env: problem, title: Problem}
     - {env: remark, title: Remark}
     - {env: proof, title: Proof, numbered: false, proof: true}
+  jmlr:
+    - {env: theorem, title: Theorem}
+    - {env: example, title: Example}
+    - {env: lemma, title: Lemma, shared: theorem}
+    - {env: proposition, title: Proposition, shared: theorem}
+    - {env: remark, title: Remark, shared: theorem}
+    - {env: corollary, title: Corollary, shared: theorem}
+    - {env: definition, title: Definition, shared: theorem}
+    - {env: conjecture, title: Conjecture, shared: theorem}
+    - {env: axiom, title: Axiom, shared: theorem}
+    - {env: proof, title: Proof, numbered: false, proof: true}
   amsart:
     - {env: proof, title: Proof, numbered: false, proof: true}
   amsbook:
