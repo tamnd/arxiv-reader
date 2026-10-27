@@ -138,3 +138,68 @@ func TestAWrapperOfALocalClassIsInTheRender(t *testing.T) {
 		t.Fatalf("the counts are %+v, and the proof of the class must count", rc)
 	}
 }
+
+// TestAProofThatThePaperDefinesAgainIsNotInTheRender reads the proofs of 2602.07485v1 and 2606.23841v1. The class or amsthm declares proof, and the paper defines it again with a head of text, so the render has no proof.
+func TestAProofThatThePaperDefinesAgainIsNotInTheRender(t *testing.T) {
+	for _, tc := range []struct {
+		name, preamble string
+		proofs         int
+	}{
+		{"def", `\documentclass{amsart}
+\def\proof{{\it Proof.}\ }
+\def\endproof{\hfill $\Box$\par\vskip3mm}`, 0},
+		{"renewenvironment", `\documentclass{article}
+\usepackage{amsthm}
+\renewenvironment{proof}[1]{\par\noindent{\itshape #1}~}{\par\medskip}`, 0},
+		{"let", `\documentclass{amsart}
+\let\oldproof\proof
+\def\proof{\oldproof\small}
+\def\endproof{\qed}`, 2},
+		{"class", `\documentclass{amsart}`, 2},
+	} {
+		src := []byte(tc.preamble + `
+\newtheorem{lemma}{Lemma}
+\begin{document}
+\begin{lemma} A. \end{lemma}
+\begin{proof} The case is clear. \end{proof}
+\begin{lemma} B. \end{lemma}
+\begin{proof} We use induction. \end{proof}
+\end{document}
+`)
+		d, err := tex.ReadFile("main.tex", src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r := theorems.NewResolver()
+		in := Input{Paper: "2601.00001", Version: 1, Doc: d, Set: r.Resolve(d), Titles: r.Titles}
+		in.Render = &Render{Theorems: []RenderItem{{Env: "lemma", Number: "1"}, {Env: "lemma", Number: "2"}}, Proofs: tc.proofs}
+		rc := Run(in).renderCounts()
+		if rc.SourceProofs != tc.proofs || rc.SourceTheorems != 2 || !rc.Agree {
+			t.Errorf("%s: the counts are %+v, want %d source proofs", tc.name, rc, tc.proofs)
+		}
+	}
+}
+
+// TestAProofOfALocalStyleIsInTheRender reads the proof of 2508.01642v1, which the local file jr.sty defines with the code of amsthm. The render has the proofs.
+func TestAProofOfALocalStyleIsInTheRender(t *testing.T) {
+	sty := []byte(`\newenvironment{proof}[1][Proof]{\par\normalfont\trivlist\item[\hskip\labelsep\itshape #1.]}{\endtrivlist}
+`)
+	main := []byte(`\documentclass{amsart}
+\usepackage{jr}
+\newtheorem{lemma}{Lemma}
+\begin{document}
+\begin{lemma} A. \end{lemma}
+\begin{proof} The case is clear. \end{proof}
+\end{document}
+`)
+	ds, err := tex.Read(&source.Bundle{Tarred: true, Files: []source.File{{Name: "main.tex", Data: main}, {Name: "jr.sty", Data: sty}}})
+	if err != nil || len(ds) == 0 {
+		t.Fatal(err)
+	}
+	r := theorems.NewResolver()
+	in := Input{Paper: "2508.01642", Version: 1, Doc: ds[0], Set: r.Resolve(ds[0]), Titles: r.Titles}
+	in.Render = &Render{Theorems: []RenderItem{{Env: "lemma", Number: "1"}}, Proofs: 1}
+	if rc := Run(in).renderCounts(); rc.SourceProofs != 1 || !rc.Agree {
+		t.Fatalf("the counts are %+v, and the proof of jr.sty must count", rc)
+	}
+}

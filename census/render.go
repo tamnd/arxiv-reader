@@ -2,6 +2,7 @@ package census
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -109,6 +110,46 @@ func (c *Census) textWrapper(env string) bool {
 	return d != nil && d.From == "wrapper" && d.Inner == "" && e != nil && !strings.HasSuffix(strings.ToLower(e.File), ".cls")
 }
 
+// textProof tells if the paper defines a proof environment again with its own
+// head, as \def\proof{{\it Proof.}\ } with \def\endproof, or as
+// \renewenvironment{proof}{\par\noindent{\itshape Proof.}}{}. LaTeXML runs the
+// definition of the paper, so the render has the head as text and no proof. A
+// definition that opens another environment, or that calls a command that \let
+// saved from the old one, still makes a proof. A definition in a local style
+// file does not count: the render of 2508.01642v1 has the proofs of jr.sty.
+func (c *Census) textProof(env string) bool {
+	if c.In.Set == nil || c.In.Doc == nil || c.In.Doc.Macros == nil {
+		return false
+	}
+	d := c.In.Set.Get(env)
+	if d == nil || !d.Proof || d.From == "wrapper" {
+		return false
+	}
+	m := c.In.Doc.Macros
+	var begin, file string
+	if e := m.Envs[env]; e != nil {
+		begin, file = e.Begin, e.File
+	} else if p, q := m.Commands[`\`+env], m.Commands[`\end`+env]; p != nil && q != nil && p.How == "def" {
+		begin, file = p.Body, p.File
+	} else {
+		return false
+	}
+	if file != "" || strings.Contains(begin, `\begin`) {
+		return false
+	}
+	for _, call := range commandCall.FindAllString(begin, -1) {
+		if call == `\`+env {
+			return false
+		}
+		if l := m.Commands[call]; l != nil && l.How == "let" && l.Body == `\`+env {
+			return false
+		}
+	}
+	return true
+}
+
+var commandCall = regexp.MustCompile(`\\[A-Za-z@]+`)
+
 // renderCounts compares the counts of the source and of the render (AX4.5).
 func (c *Census) renderCounts() *RenderCount {
 	if c.In.Render == nil {
@@ -129,7 +170,7 @@ func (c *Census) renderCounts() *RenderCount {
 	}
 	for _, o := range c.Items() {
 		switch {
-		case c.textWrapper(o.Env):
+		case c.textWrapper(o.Env), o.Type == Proof && c.textProof(o.Env):
 			// LaTeXML runs the code of the wrapper, so the render has the
 			// head as text and no theorem or proof.
 		case o.Type == Env:
