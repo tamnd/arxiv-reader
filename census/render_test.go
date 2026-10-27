@@ -231,3 +231,31 @@ func TestAnEnvironmentThatTheRenderDoesNotKnow(t *testing.T) {
 		t.Fatalf("the counts are %+v, and the lemmas must not count", rc)
 	}
 }
+
+// TestATheoremOfTcolorboxIsNotInTheRender reads 2508.01642v1. LaTeXML draws each box of \newtcbtheorem as a picture, so the render has no theorem for it.
+func TestATheoremOfTcolorboxIsNotInTheRender(t *testing.T) {
+	src := []byte(`\documentclass{article}
+\usepackage{tcolorbox}
+\tcbuselibrary{theorems}
+\newtheorem{lemma}{Lemma}
+\newtcbtheorem{Technical}{Technical Discussion}{}{Technical}
+\begin{document}
+\begin{Technical}{Bayes}{bayes} A. \end{Technical}
+\begin{Technical}{Price}{price} B. \end{Technical}
+\begin{lemma} C. \end{lemma}
+\end{document}
+`)
+	d, err := tex.ReadFile("main.tex", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := theorems.NewResolver()
+	in := Input{Paper: "2508.01642", Version: 1, Doc: d, Set: r.Resolve(d), Titles: r.Titles}
+	if t2 := in.Set.Get("Technical"); t2 == nil || t2.Form != "newtcbtheorem" {
+		t.Fatalf("Technical is %+v", t2)
+	}
+	in.Render = &Render{Theorems: []RenderItem{{Env: "lemma", Number: "1"}}}
+	if rc := Run(in).renderCounts(); rc.SourceTheorems != 1 || !rc.Agree {
+		t.Fatalf("the counts are %+v, and the boxes must not count", rc)
+	}
+}
