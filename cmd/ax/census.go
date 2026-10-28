@@ -262,11 +262,33 @@ func replaceVersion(file string, version int, recs []any) error {
 	return writeFile(file, buf.Bytes())
 }
 
+// writeFile writes to a temporary file next to file and renames it over file,
+// so a write that fails part way, as it does when the disk fills, leaves the
+// old file whole rather than cut off in the middle of a record.
 func writeFile(file string, b []byte) error {
-	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+	dir := filepath.Dir(file)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(file, b, 0o644)
+	f, err := os.CreateTemp(dir, "."+filepath.Base(file)+".*")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	_, err = f.Write(b)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Chmod(tmp, 0o644)
+	}
+	if err == nil {
+		err = os.Rename(tmp, file)
+	}
+	if err != nil {
+		os.Remove(tmp)
+	}
+	return err
 }
 
 // splitVersion reads 2312.00752v3 into the id and the version.
