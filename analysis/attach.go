@@ -89,6 +89,13 @@ func (b *Builder) attach(d *tex.Document, items []*item) {
 				continue
 			}
 		}
+		// A proof inside a statement, with no item before it there, proves
+		// the statement, as a paper writes \begin{proof} before
+		// \end{theorem}.
+		if prev == nil && it.parent != nil && isStatement(it.parent) {
+			r.Proves, r.Attach, r.Confidence = it.parent.rec.Local, 3, "high"
+			continue
+		}
 		// Rule 6: an orphan. AX7.6 proposes a target.
 		r.Flags = append(r.Flags, "orphan")
 	}

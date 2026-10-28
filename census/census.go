@@ -67,6 +67,9 @@ type Occurrence struct {
 	Model   string `json:"-"`
 	Aux     string `json:"-"`
 	Printed string `json:"-"`
+	// code is the body of the command of the paper that writes a head, for
+	// the counter model.
+	code string
 	// Labels is each \label of an env or head occurrence. For a label
 	// occurrence, Target is the label key. For a textref, Target is the title
 	// and number that the text names.
@@ -262,10 +265,14 @@ func closeOf(d *tex.Document, name string, from int) (close, end int) {
 // heads counts each manual head of AX3.4 outside the env occurrences.
 func (c *Census) heads() {
 	var skip []tex.Region
+	var stops []int
 	for _, o := range c.Occurrences {
 		skip = append(skip, tex.Region{From: o.Off, To: o.End})
+		if o.Type == Env && theorems.EndsAProof(o.Item) {
+			stops = append(stops, o.Off)
+		}
 	}
-	for _, h := range theorems.FindHeads(c.In.Doc, c.In.Titles, skip) {
+	for _, h := range theorems.FindHeads(c.In.Doc, c.In.Titles, skip, stops...) {
 		typ := Head
 		if h.Proof {
 			typ = Proof
@@ -274,6 +281,7 @@ func (c *Census) heads() {
 		o.Title, o.Item, o.Close, o.End = h.Title, h.Item, h.End, h.End
 		o.Number, o.Confidence = h.Number, h.Confidence()
 		o.Opt = h.Name
+		o.code = h.Code
 		if h.Proof {
 			o.Item = "proof"
 			o.Opt = h.Target

@@ -173,3 +173,52 @@ func TestAWrapperThatCallsTheCommandOfTheEnvironment(t *testing.T) {
 		t.Fatalf("customthm is %+v, and it must be a wrapper of innercustomthm", w)
 	}
 }
+
+func TestTitledWithAFixedWord(t *testing.T) {
+	src := []byte(`\documentclass{article}
+\newcounter{item}
+\newenvironment{theo}[1]{\refstepcounter{item}\par{\bf \theitem.\hspace{1em}Theorem#1.}\sl}{\par}
+\begin{document}
+\begin{theo}{\label{t:a}} Each graph is finite. \end{theo}
+\begin{theo}{ (Euler)} Each tree is a graph. \end{theo}
+\end{document}
+`)
+	d, err := tex.ReadFile("main.tex", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := NewResolver()
+	s := r.Resolve(d)
+	th := s.Get("theo")
+	if th == nil || !th.TitleArg || th.Title != "Theorem" || th.Item != "statement/theorem" || !th.Numbered {
+		t.Fatalf("theo is %+v, and it must be a numbered theorem whose argument follows the title", th)
+	}
+	from := 0
+	for range 2 {
+		i := bytes.Index(d.Text[from:], []byte(`\begin{theo}`))
+		inner := from + i + len(`\begin{theo}`)
+		from = inner
+		title, item, after := th.TitleOf(d.Text, inner, r.Titles)
+		if title != "Theorem" || item != "statement/theorem" || after != inner {
+			t.Errorf("the use at %d gives %q, %q and %d, and it must give Theorem, statement/theorem and %d", inner, title, item, after, inner)
+		}
+	}
+}
+
+func TestAWrapperThatWritesTheNumberBeforeTheTitle(t *testing.T) {
+	src := []byte(`\documentclass{article}
+\newcounter{item}
+\newenvironment{lem}{\refstepcounter{item}\par\indent {\bf \theitem.\hspace{1em}Lemma.} \sl}{\par}
+\begin{document}
+\begin{lem} Each graph is finite. \end{lem}
+\end{document}
+`)
+	d, err := tex.ReadFile("main.tex", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := NewResolver().Resolve(d).Get("lem")
+	if l == nil || l.Title != "Lemma" || l.Item != "statement/lemma" || !l.Numbered {
+		t.Fatalf("lem is %+v, and it must be a numbered lemma", l)
+	}
+}

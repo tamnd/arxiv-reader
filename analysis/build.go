@@ -197,11 +197,15 @@ func wrapperBegin(d *tex.Document, decl *theorems.Declaration, inner int) (strin
 
 func (b *Builder) headItems(d *tex.Document, envs []*item) []*item {
 	var skip []tex.Region
+	var stops []int
 	for _, e := range envs {
 		skip = append(skip, tex.Region{From: e.off, To: e.end})
+		if !e.proof && theorems.EndsAProof(e.rec.Item) {
+			stops = append(stops, e.off)
+		}
 	}
 	var out []*item
-	for _, h := range theorems.FindHeads(d, b.Titles, skip) {
+	for _, h := range theorems.FindHeads(d, b.Titles, skip, stops...) {
 		h := h
 		it := &item{off: h.Off, inner: h.Inner, close: h.End, end: h.End, head: &h, proof: h.Proof}
 		it.rec.Env = "head"

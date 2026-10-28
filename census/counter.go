@@ -28,7 +28,7 @@ type model struct {
 }
 
 var (
-	counterCmd = regexp.MustCompile(`\\(setcounter|addtocounter|stepcounter|refstepcounter)\s*\{([^{}]+)\}(?:\s*\{([^{}]*)\})?`)
+	counterCmd = regexp.MustCompile(`\\(setcounter|addtocounter|stepcounter|refstepcounter)\s*\{([^{}]+)\}(?:\s*\{((?:[^{}]|\{[^{}]*\})*)\})?`)
 	theCmd     = regexp.MustCompile(`\\(?:re)?newcommand\*?\s*\{?\\the([A-Za-z@]+)\}?\s*\{`)
 	theDef     = regexp.MustCompile(`\\def\\the([A-Za-z@]+)\s*\{`)
 	theRef     = regexp.MustCompile(`\\the([A-Za-z@]+)`)
@@ -192,6 +192,14 @@ func (c *Census) number() {
 			}
 		}
 	}
+	// The \maketitle of a class such as svmult starts a chapter, and each
+	// paper of the volume is one.
+	titleChapter := false
+	if d.Macros != nil {
+		if t := d.Macros.Commands[`\maketitle`]; t != nil && chapterStep.MatchString(t.Body) {
+			titleChapter, chapters = true, true
+		}
+	}
 	m := newModel(chapters)
 	for _, decl := range c.In.Set.List() {
 		if decl.Within != "" && decl.Counter == decl.Env {
@@ -224,11 +232,42 @@ func (c *Census) number() {
 		c.formats(m, f, -1)
 	}
 
+	// \setcounter{chapter}{5} in the preamble, out of any definition, sets
+	// the counter before the body starts.
+	pre := d.Preamble()
+	for _, x := range counterCmd.FindAllSubmatchIndex(pre, -1) {
+		if x[6] < 0 || depthAt(pre, x[0]) != 0 {
+			continue
+		}
+		if k := string(pre[x[2]:x[3]]); k == "setcounter" || k == "addtocounter" {
+			m.apply(event{kind: k, name: strings.TrimSpace(string(pre[x[4]:x[5]])), arg: strings.TrimSpace(string(pre[x[6]:x[7]]))})
+		}
+	}
+
 	var evs []event
+	if titleChapter {
+		body := d.Text[d.Body:d.End]
+		for _, x := range maketitle.FindAllIndex(body, -1) {
+			evs = append(evs, event{off: d.Body + x[0], kind: "stepcounter", name: "chapter"})
+		}
+	}
 	if d.Tree != nil {
 		for _, n := range d.Tree.Nodes {
 			if n.Kind == "section" {
 				evs = append(evs, event{off: n.From, kind: "section", name: n.Name, star: n.Star})
+			}
+			// \begin{section}{Title} is \section{Title}, as old papers write
+			// it.
+			if name := strings.TrimSuffix(n.Name, "*"); n.Kind == "env" && sectionEnvs[name] {
+				evs = append(evs, event{off: n.From, kind: "section", name: name, star: name != n.Name})
+			}
+		}
+		// \renewcommand{\sec}[2]{\section{#2}\label{s:#1}} makes each \sec
+		// of the body a section, as in math/9902147v1.
+		for _, w := range sectionCommands(d.Macros) {
+			re := regexp.MustCompile(regexp.QuoteMeta(w.call) + `(?:[^A-Za-z@]|$)`)
+			for _, x := range re.FindAllIndex(d.Text[d.Body:d.End], -1) {
+				evs = append(evs, event{off: d.Body + x[0], kind: "section", name: w.name, star: w.star})
 			}
 		}
 		if d.Tree.Appendix > 0 {
@@ -238,6 +277,9 @@ func (c *Census) number() {
 	for _, o := range c.Occurrences {
 		if o.Type == Env && o.Counter != "" {
 			evs = append(evs, event{off: o.Off, kind: "occ", occ: o})
+		}
+		if o.Type == Head && o.code != "" {
+			evs = append(evs, event{off: o.Off, kind: "code", occ: o})
 		}
 	}
 	body := d.Text[d.Body:d.End]
@@ -274,19 +316,10 @@ func (c *Census) number() {
 			if v, ok := m.the(e.occ.Counter, 0); ok {
 				e.occ.Model = v
 			}
-		case "setcounter":
-			if n, err := strconv.Atoi(e.arg); err == nil {
-				m.value[e.name] = n
-			}
-			m.touched[e.name] = true
-		case "addtocounter":
-			if n, err := strconv.Atoi(e.arg); err == nil {
-				m.value[e.name] += n
-			}
-			m.touched[e.name] = true
-		case "stepcounter", "refstepcounter":
-			m.step(e.name)
-			m.touched[e.name] = true
+		case "setcounter", "addtocounter", "stepcounter", "refstepcounter":
+			m.apply(e)
+		case "code":
+			m.code(e.occ)
 		case "format":
 			c.formats(m, d.Text[e.off:min(e.n+400, d.End)], 0)
 		case "equation":
@@ -297,8 +330,140 @@ func (c *Census) number() {
 	c.witnesses()
 }
 
+// sectionEnvs is the sectioning commands that a paper can use as
+// environments.
+var sectionEnvs = map[string]bool{"chapter": true, "section": true, "subsection": true, "subsubsection": true}
+
+var (
+	chapterStep = regexp.MustCompile(`\\(?:ref)?stepcounter\s*\{chapter\}`)
+	maketitle   = regexp.MustCompile(`\\maketitle\b`)
+)
+
+// depthAt is the depth of the braces of text at i.
+func depthAt(text []byte, i int) int {
+	depth := 0
+	for j := 0; j < i && j < len(text); j++ {
+		switch text[j] {
+		case '\\':
+			j++
+		case '{':
+			depth++
+		case '}':
+			depth--
+		}
+	}
+	return depth
+}
+
+// sectionCommand is a command of the paper that writes a sectioning command.
+type sectionCommand struct {
+	call, name string
+	star       bool
+}
+
+var sectionIn = regexp.MustCompile(`\\(chapter|section|subsection|subsubsection)\b(\*)?`)
+
+// sectionCommands is each command of the paper whose code writes a sectioning
+// command, with the name of that command. A command named as a sectioning
+// command is the sectioning command itself, and the tree has its calls.
+func sectionCommands(m *tex.Macros) []sectionCommand {
+	if m == nil {
+		return nil
+	}
+	var out []sectionCommand
+	for name, c := range m.Commands {
+		if c.File != "" || sectionEnvs[strings.TrimPrefix(name, `\`)] || strings.ContainsAny(name, "@*") {
+			continue
+		}
+		ms := sectionIn.FindAllStringSubmatch(c.Body, -1)
+		if len(ms) != 1 || (c.How == "let" && c.Body != ms[0][0]) {
+			continue
+		}
+		out = append(out, sectionCommand{call: name, name: ms[0][1], star: ms[0][2] != ""})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].call < out[j].call })
+	return out
+}
+
+// defOpen is the text before the brace that opens the code of a definition.
+var defOpen = regexp.MustCompile(`(?:\\(?:re)?newcommand\*?\s*(?:\{\s*\\[A-Za-z@]+\s*\}|\\[A-Za-z@]+)\s*(?:\[\d\])?\s*(?:\[[^\]]*\])?|\\[gex]?def\s*\\[A-Za-z@]+[^{}\\]*)\s*$`)
+
+// inDefinition tells if i of text is in the code of a command that the text
+// defines.
+func inDefinition(text []byte, i int) bool {
+	var open []int
+	for j := 0; j < i && j < len(text); j++ {
+		switch text[j] {
+		case '\\':
+			j++
+		case '%':
+			for j < i && text[j] != '\n' {
+				j++
+			}
+		case '{':
+			open = append(open, j)
+		case '}':
+			if len(open) > 0 {
+				open = open[:len(open)-1]
+			}
+		}
+	}
+	for _, o := range open {
+		if defOpen.Match(text[max(0, o-120):o]) {
+			return true
+		}
+	}
+	return false
+}
+
+var valueOf = regexp.MustCompile(`^\\value\s*\{([^{}]+)\}$`)
+
+// apply runs one counter command. The value can be a number or \value{c}.
+func (m *model) apply(e event) {
+	n, err := strconv.Atoi(e.arg)
+	if v := valueOf.FindStringSubmatch(e.arg); v != nil {
+		n, err = m.value[strings.TrimSpace(v[1])], nil
+	}
+	switch e.kind {
+	case "setcounter":
+		if err == nil {
+			m.value[e.name] = n
+		}
+	case "addtocounter":
+		if err == nil {
+			m.value[e.name] += n
+		}
+	case "stepcounter", "refstepcounter":
+		m.step(e.name)
+	}
+	m.touched[e.name] = true
+}
+
+// code runs the counter commands of the command that writes a head, and gives
+// the head the number of the counter that the command steps last with
+// \refstepcounter, without the title that the format of the counter writes,
+// as Theorem in {Theorem \thesection.\arabic{theorem}}.
+func (m *model) code(o *Occurrence) {
+	last := ""
+	for _, x := range counterCmd.FindAllStringSubmatch(o.code, -1) {
+		e := event{kind: x[1], name: strings.TrimSpace(x[2]), arg: strings.TrimSpace(x[3])}
+		m.apply(e)
+		if e.kind == "refstepcounter" {
+			last = e.name
+		}
+	}
+	if last == "" {
+		return
+	}
+	if v, ok := m.the(last, 0); ok {
+		if v = strings.TrimPrefix(v, o.Title); v != "" {
+			o.Model = v
+		}
+	}
+}
+
 // formats reads each \renewcommand{\thex}{...} of a text into the model.
-func (c *Census) formats(m *model, text []byte, _ int) {
+func (c *Census) formats(m *model, text []byte, pos int) {
 	for _, re := range []*regexp.Regexp{theCmd, theDef} {
 		for _, x := range re.FindAllSubmatchIndex(text, -1) {
 			name := string(text[x[2]:x[3]])
@@ -311,6 +476,17 @@ func (c *Census) formats(m *model, text []byte, _ int) {
 				continue
 			}
 			_ = end
+			if pos < 0 && inDefinition(text, x[0]) {
+				// \newcommand\bppendix{... \renewcommand\thechapter{...}}
+				// sets the format when the paper calls \bppendix, as in
+				// svmult.cls.
+				continue
+			}
+			if strings.Contains(string(text[in:end-1]), "#") {
+				// \def\thethm{#1} in the code of a macro sets the format of
+				// each use of the macro, not of the paper.
+				continue
+			}
 			m.format[name] = string(text[in : end-1])
 			if _, good := m.eval(m.format[name], 0); !good {
 				m.touched[name] = true

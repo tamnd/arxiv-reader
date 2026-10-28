@@ -38,7 +38,9 @@ type Declaration struct {
 	Inner string `json:"inner,omitempty"`
 	// TitleArg is true when each use gives the title as the first argument,
 	// as \begin{thm}{Claim}. Title and Item are then empty, and TitleOf reads
-	// them from the use.
+	// them from the use. When the begin code writes a title word right before
+	// the argument, as {\bf Theorem#1.}, Title and Item are that word's, and
+	// the argument is only text after it.
 	TitleArg bool `json:"title_arg,omitempty"`
 	// TitleOpt is true when the title argument is optional, and TitleDefault
 	// is the title of a use that does not give it.
@@ -546,6 +548,9 @@ func (r *Resolver) wrappers(s *Set, d *tex.Document) {
 				// still writes proofs with it.
 				w.Proof, w.Item = true, "proof"
 			}
+			if t := fixedTitle(code); t != "" && !w.Proof && r.Titles.Known(t) {
+				w.Title, w.Item = t, r.Titles.Kind(t)
+			}
 			if m := stepCount.FindStringSubmatch(code); m != nil {
 				w.Numbered = true
 				w.Counter = strings.TrimSpace(m[1])
@@ -597,6 +602,20 @@ func innerCommand(s *Set, begin, end string) string {
 // titleHead finds #1 inside a bold, italic or small caps group or argument.
 var titleHead = regexp.MustCompile(`\{\s*\\(?:bf|bfseries|sc|scshape|it|itshape|sl)\b[^{}]*(?:\{[^{}]*\}[^{}]*)*#1|\\(?:textbf|textsc|textit|emph)\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*#1`)
 
+// wordBeforeArg is a word that the head writes right before #1.
+var wordBeforeArg = regexp.MustCompile(`([A-Za-z]+)(?:\s|~|\\ )*#1$`)
+
+// fixedTitle gives the word that the head of a titled begin code writes right
+// before the argument, as Theorem in {\bf \theitem.\hspace{1em}Theorem#1.},
+// or "".
+func fixedTitle(code string) string {
+	m := titleHead.FindString(code)
+	if w := wordBeforeArg.FindStringSubmatch(m); w != nil {
+		return w[1]
+	}
+	return ""
+}
+
 // titledBegin tells if an environment prints a head whose title is its first
 // argument. The begin code can do it itself, or it can call one command of
 // the paper that takes the argument, as {\claim} with \def\claim#1{...{\bf
@@ -620,7 +639,9 @@ func titledBegin(m *tex.Macros, e *tex.Env) (string, bool) {
 // the argument. For an environment that is not titled, it returns the title of
 // the declaration and inner.
 func (d *Declaration) TitleOf(text []byte, inner int, t *Titles) (title, item string, after int) {
-	if !d.TitleArg {
+	if !d.TitleArg || d.Title != "" {
+		// A fixed title leaves the argument in the body, where its label is
+		// read.
 		return d.Title, d.Item, inner
 	}
 	spec := "m"

@@ -27,6 +27,9 @@ type Head struct {
 	// EndMark is true when an end-of-proof mark or the end of an italic group
 	// ends the item.
 	EndMark bool
+	// Code is the body of the command of the paper that writes the head, as
+	// \theorem, whose counter commands give the number.
+	Code string
 }
 
 // Confidence is high when the head has a number and an end mark, and medium
@@ -146,9 +149,15 @@ func parseHead(inner string, t *Titles) (Head, bool) {
 	return h, true
 }
 
+// numberFirst is a counter and a space written before the title of a head.
+var numberFirst = regexp.MustCompile(`(\{\s*\\(?:bf|bfseries|sc|scshape|it|itshape|sl)\b\s*)\\the[a-zA-Z]+\s*[.:]?\s*(?:\\hspace\*?\s*\{[^{}]*\}|\\quad|\\qquad|\\enspace|~|\\ )?\s*`)
+
 // FirstHead finds a head in the begin code of an environment, and returns its
 // title.
 func FirstHead(code string, t *Titles) (string, bool) {
+	// The number that the code writes before the title, as in {\bf
+	// \theitem.\hspace{1em}Lemma.}, is not part of the title.
+	code = numberFirst.ReplaceAllString(code, "$1")
 	for i := 0; i < len(code); i++ {
 		if code[i] != '{' && code[i] != '\\' {
 			continue
@@ -350,6 +359,75 @@ func macroHeadAt(text []byte, i int, macros map[string]string, t *Titles) (Head,
 	return h, afterName(text, end, &h), true
 }
 
+var (
+	stepsCounter = regexp.MustCompile(`\\(?:refstepcounter|stepcounter)\s*\{`)
+	theCounter   = regexp.MustCompile(`\\the[a-zA-Z]+`)
+	counterRep   = regexp.MustCompile(`\\(?:the[a-zA-Z]+|arabic|roman|Roman|alph|Alph|fnsymbol)\b(?:\s*\{[^{}]*\})?`)
+	commandName  = regexp.MustCompile(`^\\([a-zA-Z@]+)(?:[^a-zA-Z@]|$)`)
+)
+
+// headCommands is each command of the paper with no argument that steps a
+// counter and writes a head, as
+//
+//	\renewcommand{\thetheorem}{{Theorem \thesection.\arabic{theorem}}}
+//	\newcommand{\theorem}{\refstepcounter{theorem}{\bf \thetheorem:\ }}
+//
+// used as "\theorem Each graph is finite." The head of the value has no
+// number: the counter model gives it from the code of the command.
+func headCommands(m *tex.Macros, t *Titles) map[string]Head {
+	out := map[string]Head{}
+	if m == nil {
+		return out
+	}
+	for name, c := range m.Commands {
+		if c.Args != 0 || !stepsCounter.MatchString(c.Body) {
+			continue
+		}
+		body := c.Body
+		// \the<counter> of the paper can write the title, so it is put in
+		// before the counters are.
+		for range 2 {
+			body = theCounter.ReplaceAllStringFunc(body, func(the string) string {
+				if d, ok := m.Commands[the]; ok && d.Args == 0 && !strings.Contains(d.Body, the) {
+					return d.Body
+				}
+				return the
+			})
+		}
+		body = counterRep.ReplaceAllString(body, "1")
+		body = strings.ReplaceAll(body, `\ `, " ")
+		b := []byte(body)
+		for i := 0; i < len(b); i++ {
+			if b[i] != '{' && b[i] != '\\' {
+				continue
+			}
+			if h, _, ok := headAt(b, i, t); ok {
+				h.Number, h.Name, h.Target, h.Code = "", "", "", c.Body
+				out[name] = h
+				break
+			}
+		}
+	}
+	return out
+}
+
+// commandHeadAt reads a head written with one of the head commands of the
+// paper.
+func commandHeadAt(text []byte, i int, heads map[string]Head) (Head, int, bool) {
+	if len(heads) == 0 {
+		return Head{}, 0, false
+	}
+	m := commandName.FindSubmatchIndex(text[i:min(len(text), i+80)])
+	if m == nil {
+		return Head{}, 0, false
+	}
+	h, ok := heads[`\`+string(text[i+m[2]:i+m[3]])]
+	if !ok {
+		return Head{}, 0, false
+	}
+	return h, i + m[3], true
+}
+
 // stripFonts removes font commands inside a head, as in {\bf Theorem \it 2}.
 func stripFonts(s string) string {
 	s = regexp.MustCompile(`\\(bf|bfseries|sc|scshape|it|itshape|sl|em|rm|upshape|normalfont|textbf|textsc|textit|emph|textrm|textup)\b\s*`).ReplaceAllString(s, "")
@@ -440,13 +518,18 @@ func ProofSections(d *tex.Document, t *Titles) []Head {
 // section whose title is a head. A head inside a region in skip is ignored:
 // the census passes the declared environments that it has already counted,
 // so that the head of a theorem environment is not counted twice.
-func FindHeads(d *tex.Document, t *Titles, skip []tex.Region) []Head {
+//
+// stops is the offset of each statement or definition environment. A manual
+// proof with no end mark ends before the next one that no other environment
+// holds, as a paper writes \proof Clear. and then the next lemma.
+func FindHeads(d *tex.Document, t *Titles, skip []tex.Region, stops ...int) []Head {
 	if d.Body == 0 {
 		return nil
 	}
 	var out []Head
 	seen := map[int]bool{}
 	macros := fontMacros(d.Macros)
+	heads := headCommands(d.Macros, t)
 	marks := EndMarks(d.Macros)
 	for _, p := range starts(d.Text, d.Body, d.End) {
 		i := skipLayout(d.Text, p, d.End)
@@ -456,6 +539,9 @@ func FindHeads(d *tex.Document, t *Titles, skip []tex.Region) []Head {
 		h, inner, ok := headAt(d.Text, i, t)
 		if !ok {
 			h, inner, ok = macroHeadAt(d.Text, i, macros, t)
+		}
+		if !ok {
+			h, inner, ok = commandHeadAt(d.Text, i, heads)
 		}
 		if !ok {
 			continue
@@ -480,10 +566,24 @@ func FindHeads(d *tex.Document, t *Titles, skip []tex.Region) []Head {
 		out = append(out, h)
 	}
 	sortHeads(out)
+	var top []int
+	for _, s := range stops {
+		if !inSkip(skip, s) {
+			top = append(top, s)
+		}
+	}
+	sort.Ints(top)
 	for k := range out {
-		out[k].End, out[k].EndMark = itemEnd(d, out, k, marks)
+		out[k].End, out[k].EndMark = itemEnd(d, out, k, marks, top)
 	}
 	return out
+}
+
+// EndsAProof tells if an environment of the item ends a manual proof before
+// it: a statement other than a claim, or a definition. A claim is often a
+// step of the proof.
+func EndsAProof(item string) bool {
+	return strings.HasPrefix(item, "statement/") && item != "statement/claim" || item == "definition" || strings.HasPrefix(item, "definition/")
 }
 
 func inSkip(rs []tex.Region, off int) bool {
@@ -506,7 +606,7 @@ func sortHeads(hs []Head) {
 // itemEnd is where the item of head k ends (AX3.4): the next head, the next
 // section, an end-of-proof mark for a proof, or the end of the paragraph or
 // of the italic group for a statement.
-func itemEnd(d *tex.Document, hs []Head, k int, marks *regexp.Regexp) (int, bool) {
+func itemEnd(d *tex.Document, hs []Head, k int, marks *regexp.Regexp, stops []int) (int, bool) {
 	h := hs[k]
 	end := d.End
 	if k+1 < len(hs) && hs[k+1].Off < end {
@@ -522,6 +622,12 @@ func itemEnd(d *tex.Document, hs []Head, k int, marks *regexp.Regexp) (int, bool
 		return end, false
 	}
 	if h.Proof {
+		for _, s := range stops {
+			if s > h.Inner && s < end {
+				end = s
+				break
+			}
+		}
 		if m := marks.FindIndex(d.Text[h.Inner:end]); m != nil {
 			return h.Inner + m[1], true
 		}
