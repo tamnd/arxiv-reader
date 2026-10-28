@@ -110,6 +110,8 @@ func localOf(id string) string {
 type EdgeScore struct {
 	SetVersion, Extractor    string
 	Papers, Marked, Proposed int
+	// MarkedBy counts the marked records by who marked them.
+	MarkedBy map[string]int
 	// Precision is, for each method, the edges from a marked proof that a
 	// use accounts for. Recall is the uses that an edge of the methods 1 to
 	// 7 accounts for.
@@ -181,8 +183,8 @@ func (s EdgeScore) Met() bool {
 func (s EdgeScore) Markdown() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# The score of the edge resolver on gold set E %s\n\n", s.SetVersion)
-	fmt.Fprintf(&b, "The set has %s. %s have a record that a person marked, and %s have a proposed record only. Only the marked records are scored. The extractor is %s.\n\n",
-		prose.Count(s.Papers, "paper"), prose.Thousands(s.Marked), prose.Thousands(s.Proposed), s.Extractor)
+	fmt.Fprintf(&b, "The set has %s. %s have a marked record%s, and %s have a proposed record only. Only the marked records are scored. The extractor is %s.\n\n",
+		prose.Count(s.Papers, "paper"), prose.Thousands(s.Marked), markers(s.MarkedBy), prose.Thousands(s.Proposed), s.Extractor)
 	if s.Marked == 0 {
 		b.WriteString("No record is marked yet, so there is no score. A person must read each proof and decide what it uses (AX11.1).\n\n")
 	}
