@@ -403,4 +403,69 @@ func (r *resolver) refs() {
 			r.link(src, off, d.Body+m[1], t, Ref, Certain, nil)
 		}
 	}
+	r.macroRefs()
+}
+
+// userCmd is the name of a command in the text, as \refl.
+var userCmd = regexp.MustCompile(`\\[A-Za-z@]+`)
+
+// macroRefs resolves the references that a command of the paper makes, as
+// \refl{bfe1} for \newcommand{\refl}[1]{Lemma~\ref{l:#1}}. The call is the
+// place of the reference.
+func (r *resolver) macroRefs() {
+	d := r.in.Doc
+	if d.Macros == nil || len(d.Macros.Commands) == 0 {
+		return
+	}
+	refMacros := map[string]*tex.Macro{}
+	for name, mac := range d.Macros.Commands {
+		if refCmd.MatchString(d.Macros.Expand(mac.Body)) {
+			refMacros[name] = mac
+		}
+	}
+	if len(refMacros) == 0 {
+		return
+	}
+	body := d.Text[d.Body:d.End]
+	for _, loc := range userCmd.FindAllIndex(body, -1) {
+		if loc[0] > 0 && body[loc[0]-1] == '\\' {
+			continue
+		}
+		mac, ok := refMacros[string(body[loc[0]:loc[1]])]
+		if !ok {
+			continue
+		}
+		off := d.Body + loc[0]
+		src := r.from(off)
+		if src == nil {
+			continue
+		}
+		spec := strings.Repeat("m", mac.Args)
+		if mac.HasDefault && mac.Args > 0 {
+			spec = "o" + strings.Repeat("m", mac.Args-1)
+		}
+		_, end, ok := tex.ReadArgs(d.Text, d.Body+loc[1], spec)
+		if !ok {
+			continue
+		}
+		expanded := d.Macros.Expand(string(d.Text[off:end]))
+		for _, m := range refCmd.FindAllStringSubmatch(expanded, -1) {
+			keys := m[3]
+			if m[1] == "hyperref" {
+				keys = m[2]
+			}
+			for _, k := range strings.Split(keys, ",") {
+				k = strings.TrimSpace(k)
+				if k == "" {
+					continue
+				}
+				t, ok := r.labels[k]
+				if !ok {
+					r.res.Dangling++
+					continue
+				}
+				r.link(src, off, end, t, Ref, Certain, nil)
+			}
+		}
+	}
 }
