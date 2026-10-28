@@ -303,6 +303,7 @@ func goldScore(args []string) error {
 			continue
 		}
 		s.Marked++
+		s.MarkedBy = countBy(s.MarkedBy, g.By)
 		s.Add(gold.ScorePaper(g, recs))
 	}
 	md := s.Markdown()
@@ -388,6 +389,7 @@ func goldScoreE(root, version string, picks []gold.Pick, report string) error {
 			continue
 		}
 		s.Marked++
+		s.MarkedBy = countBy(s.MarkedBy, g.By)
 		es, err := readEdgesOf(root, id)
 		if err != nil {
 			return err
@@ -438,4 +440,13 @@ func atoiOr(s string) int {
 		n = n*10 + int(c-'0')
 	}
 	return n
+}
+
+// countBy adds one record marked by by to the counts.
+func countBy(m map[string]int, by string) map[string]int {
+	if m == nil {
+		m = map[string]int{}
+	}
+	m[by]++
+	return m
 }

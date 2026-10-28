@@ -171,6 +171,8 @@ type Score struct {
 	// Papers is the papers of the set, Marked the papers with a marked
 	// record, and Proposed the papers with a proposed record only.
 	Papers, Marked, Proposed int
+	// MarkedBy counts the marked records by who marked them.
+	MarkedBy                 map[string]int
 	Recall, Precision, Prose Ratio
 	Number, Attach, Status   Ratio
 	ByDecade                 map[string]Ratio
@@ -215,8 +217,8 @@ func (s Score) Met() bool {
 func (s Score) Markdown() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# The score of the extractor on gold set %s %s\n\n", s.Set, s.SetVersion)
-	fmt.Fprintf(&b, "The set has %s. %s have a record that a person marked, and %s have a proposed record only. Only the marked records are scored. The extractor is %s.\n\n",
-		prose.Count(s.Papers, "paper"), prose.Thousands(s.Marked), prose.Thousands(s.Proposed), s.Extractor)
+	fmt.Fprintf(&b, "The set has %s. %s have a marked record%s, and %s have a proposed record only. Only the marked records are scored. The extractor is %s.\n\n",
+		prose.Count(s.Papers, "paper"), prose.Thousands(s.Marked), markers(s.MarkedBy), prose.Thousands(s.Proposed), s.Extractor)
 	if s.Marked == 0 {
 		b.WriteString("No record is marked yet, so there is no score. A person must read each paper and decide each mark (AX11.1).\n\n")
 	}
@@ -259,4 +261,28 @@ func (s Score) Markdown() string {
 		}
 	}
 	return b.String()
+}
+
+// markers says who marked the records, as " (12 by Ann, 3 by Bo)", in the
+// order of the most records first. A reader of the score has to know whether
+// a person or a program decided the marks it is measured against.
+func markers(by map[string]int) string {
+	if len(by) == 0 {
+		return ""
+	}
+	names := make([]string, 0, len(by))
+	for n := range by {
+		names = append(names, n)
+	}
+	sort.Slice(names, func(i, j int) bool {
+		if by[names[i]] != by[names[j]] {
+			return by[names[i]] > by[names[j]]
+		}
+		return names[i] < names[j]
+	})
+	parts := make([]string, len(names))
+	for i, n := range names {
+		parts[i] = prose.Thousands(by[n]) + " by " + n
+	}
+	return " (" + strings.Join(parts, ", ") + ")"
 }

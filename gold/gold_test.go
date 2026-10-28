@@ -3,6 +3,7 @@ package gold
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/tamnd/arxiv-reader/metadata"
@@ -132,5 +133,18 @@ func TestListRoundTrip(t *testing.T) {
 	back, err := ReadList(path)
 	if err != nil || len(back) != 2 || back[0] != picks[0] {
 		t.Fatalf("read back %v, %v", back, err)
+	}
+}
+
+// TestTheReportSaysWhoMarked checks that the report names who marked the
+// records, so a score against marks made by a program is not read as a score
+// against marks made by a person.
+func TestTheReportSaysWhoMarked(t *testing.T) {
+	s := Score{Set: "X", SetVersion: "v1", Extractor: "ax/test", Papers: 5, Marked: 4, Proposed: 1,
+		MarkedBy: map[string]int{"Ann": 1, "claude-opus-5-5": 3}}
+	md := s.Markdown()
+	want := "4 have a marked record (3 by claude-opus-5-5, 1 by Ann), and 1 have a proposed record only."
+	if !strings.Contains(md, want) {
+		t.Fatalf("the report does not say %q:\n%s", want, md)
 	}
 }
