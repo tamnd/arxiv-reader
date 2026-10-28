@@ -34,6 +34,9 @@ type item struct {
 	restate string
 	parent  *item
 	proof   bool
+	// wrapLabels is the labels that the begin code of a wrapper sets, as
+	// \label{l:#1} in \newenvironment{lemma}[1]{\begin{Lem}\label{l:#1}}.
+	wrapLabels []string
 	// normLen is the length of the normalized body, so that two short or
 	// empty bodies do not count as one item restated.
 	normLen int
@@ -134,10 +137,17 @@ func (b *Builder) envItems(d *tex.Document, set *theorems.Set) []*item {
 		if decl == nil {
 			continue
 		}
-		if o, after, ok := wrapperHead(d, decl, inner); ok {
-			opt, hasOpt, inner = o, true, after
+		var wrapLabels []string
+		if begin, after, ok := wrapperBegin(d, decl, inner); ok {
+			if m := innerOpt.FindStringSubmatch(begin); m != nil {
+				opt, hasOpt = m[1], true
+			}
+			for _, m := range labelIn.FindAllStringSubmatch(begin, -1) {
+				wrapLabels = append(wrapLabels, strings.TrimSpace(m[1]))
+			}
+			inner = after
 		}
-		it := &item{off: n.From, inner: inner, close: n.Close, end: n.To, opt: opt, hasOpt: hasOpt, decl: decl, restate: restate, proof: decl.Proof}
+		it := &item{off: n.From, inner: inner, close: n.Close, end: n.To, opt: opt, hasOpt: hasOpt, decl: decl, restate: restate, proof: decl.Proof, wrapLabels: wrapLabels}
 		it.rec.Env = name
 		it.rec.Title, it.rec.Item, it.inner = decl.TitleOf(d.Text, inner, b.Titles)
 		it.rec.Head = "environment"
@@ -156,11 +166,14 @@ func (b *Builder) envItems(d *tex.Document, set *theorems.Set) []*item {
 
 var innerOpt = regexp.MustCompile(`\\begin\s*\{[^{}]+\}\s*\[([^\]]*)\]`)
 
-// wrapperHead gives the head of a wrapper that takes arguments, as
-// \begin{proofof}{Theorem 1} for \newenvironment{proofof}[1]{\begin{proof}[Proof
-// of #1]}{\end{proof}}. It reads the arguments at inner and puts them into
-// the optional argument of the inner environment.
-func wrapperHead(d *tex.Document, decl *theorems.Declaration, inner int) (string, int, bool) {
+// wrapperBegin gives the begin code of a wrapper that takes arguments, with
+// the arguments of the use put in, and the offset after them. For
+// \newenvironment{proofof}[1]{\begin{proof}[Proof of #1]}{\end{proof}}, the use
+// \begin{proofof}{Theorem 1} gives \begin{proof}[Proof of Theorem 1], whose
+// optional argument is the head, and for
+// \newenvironment{lemma}[1]{\begin{Lem}\label{l:#1}}{\end{Lem}} the use
+// \begin{lemma}{bfe1} gives the label l:bfe1.
+func wrapperBegin(d *tex.Document, decl *theorems.Declaration, inner int) (string, int, bool) {
 	if decl.Inner == "" || d.Macros == nil {
 		return "", 0, false
 	}
@@ -168,19 +181,18 @@ func wrapperHead(d *tex.Document, decl *theorems.Declaration, inner int) (string
 	if e == nil || e.Args < 1 || e.Args > 9 {
 		return "", 0, false
 	}
-	m := innerOpt.FindStringSubmatch(e.Begin)
-	if m == nil {
+	if !innerOpt.MatchString(e.Begin) && !labelIn.MatchString(e.Begin) {
 		return "", 0, false
 	}
 	a, end, ok := tex.ReadArgs(d.Text, inner, strings.Repeat("m", e.Args))
 	if !ok {
 		return "", 0, false
 	}
-	head := m[1]
+	begin := e.Begin
 	for k := e.Args; k >= 1; k-- {
-		head = strings.ReplaceAll(head, "#"+strconv.Itoa(k), a.Values[k-1])
+		begin = strings.ReplaceAll(begin, "#"+strconv.Itoa(k), a.Values[k-1])
 	}
-	return head, end, true
+	return begin, end, true
 }
 
 func (b *Builder) headItems(d *tex.Document, envs []*item) []*item {
@@ -358,6 +370,7 @@ func (b *Builder) fill(d *tex.Document, items []*item) {
 			body = string(d.Text[it.inner:it.close])
 		}
 		r.Labels, r.Parts = labels(body, it.inner)
+		r.Labels = append(append([]string(nil), it.wrapLabels...), r.Labels...)
 		if it.hasOpt {
 			for _, m := range labelIn.FindAllStringSubmatch(it.opt, -1) {
 				r.Labels = append(r.Labels, strings.TrimSpace(m[1]))

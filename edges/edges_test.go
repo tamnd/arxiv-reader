@@ -24,7 +24,14 @@ const preamble = `\documentclass{article}
 
 func run(t *testing.T, body string) *analysis.Result {
 	t.Helper()
-	b := &source.Bundle{Files: []source.File{{Name: "main.tex", Data: []byte(preamble + body + "\n\\end{document}\n")}}}
+	return runWith(t, "", body)
+}
+
+// runWith runs a paper whose preamble also has the definitions defs.
+func runWith(t *testing.T, defs, body string) *analysis.Result {
+	t.Helper()
+	pre := strings.Replace(preamble, "\\begin{document}", defs+"\n\\begin{document}", 1)
+	b := &source.Bundle{Files: []source.File{{Name: "main.tex", Data: []byte(pre + body + "\n\\end{document}\n")}}}
 	res, err := analysis.Analyze(b, analysis.Paper{ID: "test", Version: 1, Extractor: "test"}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -187,4 +194,32 @@ func TestAnEquationLabelIsAPart(t *testing.T) {
 \begin{proof} By \eqref{eq:k}, B holds. \end{proof}
 `)
 	want(t, res, "proof-1 uses lemma-1 ref certain part=eq:k")
+}
+
+// A paper of 1999 (math/9902147) opens its lemmas through a wrapper whose
+// begin code sets the label, and refers to them through a command that adds
+// the prefix of the label.
+func TestAWrapperLabelAndAReferenceCommand(t *testing.T) {
+	res := runWith(t, `
+\newenvironment{lem}[1]{\begin{lemma}\label{l:#1}}{\end{lemma}}
+\newcommand{\lm}[1]{\begin{lem}{#1}}
+\newcommand{\elm}{\end{lem}}
+\newcommand{\refl}[1]{Lemma~\ref{l:#1}}
+\newcommand{\refls}[2]{Lemmas~\ref{l:#1} and~\ref{l:#2}}
+`, `
+\lm{first} A. \elm
+\lm{second} B. \elm
+\begin{theorem} C. \end{theorem}
+\begin{proof} By \refls{first}{second}, and again by \refl{first}, C holds. \end{proof}
+`)
+	var labels []string
+	for _, o := range res.Objects {
+		if o.Path == "source" && o.Kind == "statement" && o.Subkind == "lemma" {
+			labels = append(labels, o.Label)
+		}
+	}
+	if !slices.Equal(labels, []string{"l:first", "l:second"}) {
+		t.Fatalf("lemma labels %v", labels)
+	}
+	want(t, res, "proof-1 uses lem-1 ref certain", "proof-1 uses lem-2 ref certain")
 }
