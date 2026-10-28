@@ -431,8 +431,33 @@ func commandHeadAt(text []byte, i int, heads map[string]Head) (Head, int, bool) 
 // stripFonts removes font commands inside a head, as in {\bf Theorem \it 2}.
 func stripFonts(s string) string {
 	s = regexp.MustCompile(`\\(bf|bfseries|sc|scshape|it|itshape|sl|em|rm|upshape|normalfont|textbf|textsc|textit|emph|textrm|textup)\b\s*`).ReplaceAllString(s, "")
-	return strings.NewReplacer("{", "", "}", "", "~", " ").Replace(s)
+	// The braces of a reference stay, so that "Proof of Theorem \ref{T2}"
+	// keeps the label.
+	refs := refArg.FindAllStringIndex(s, -1)
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		in := false
+		for _, r := range refs {
+			if i >= r[0] && i < r[1] {
+				in = true
+			}
+		}
+		switch {
+		case in:
+			b.WriteByte(s[i])
+		case s[i] == '{' || s[i] == '}':
+		case s[i] == '~':
+			b.WriteByte(' ')
+		default:
+			b.WriteByte(s[i])
+		}
+	}
+	return b.String()
 }
+
+// refArg is a reference command and its argument, as \ref{T2}, \cref{a,b},
+// or a command of the paper such as \refmt{main}.
+var refArg = regexp.MustCompile(`\\[A-Za-z]*ref[A-Za-z]*\*?\s*\{[^{}]*\}`)
 
 // afterName reads a name or a period after the head group, as in
 // \textbf{Theorem 2.1} (Hahn-Banach).

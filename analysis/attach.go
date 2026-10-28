@@ -38,7 +38,7 @@ func (b *Builder) attach(d *tex.Document, items []*item) {
 			continue
 		}
 		r := &it.rec
-		target := it.opt
+		target := expandRefs(d.Macros, it.opt)
 		// Rule 1: a reference to a label in the head.
 		if m := refIn.FindStringSubmatch(target); m != nil {
 			key := strings.TrimSpace(strings.Split(m[1], ",")[0])
@@ -89,6 +89,13 @@ func (b *Builder) attach(d *tex.Document, items []*item) {
 				continue
 			}
 		}
+		// A proof after a statement with a short text between them, as "In
+		// particular, C(G) is not trivial.", proves the statement.
+		if prev != nil && isStatement(prev) && shortGap(d, prev, it) {
+			r.Proves, r.Attach, r.Confidence = prev.rec.Local, 3, "medium"
+			r.Flags = append(r.Flags, "text-between")
+			continue
+		}
 		// A proof inside a statement, with no item before it there, proves
 		// the statement, as a paper writes \begin{proof} before
 		// \end{theorem}.
@@ -99,6 +106,26 @@ func (b *Builder) attach(d *tex.Document, items []*item) {
 		// Rule 6: an orphan. AX7.6 proposes a target.
 		r.Flags = append(r.Flags, "orphan")
 	}
+}
+
+// refCall is a call of a command with one argument.
+var refCall = regexp.MustCompile(`(\\[A-Za-z]+)\s*\{([^{}]*)\}`)
+
+// expandRefs writes out each command of the paper that makes a reference, as
+// \newcommand{\refmt}[1]{Theorem~\ref{mt:#1}} in math/9902147v1, so that the
+// head names the label.
+func expandRefs(m *tex.Macros, s string) string {
+	if m == nil || !strings.Contains(s, `\`) {
+		return s
+	}
+	return refCall.ReplaceAllStringFunc(s, func(call string) string {
+		x := refCall.FindStringSubmatch(call)
+		c := m.Commands[x[1]]
+		if c == nil || c.Args != 1 || !refIn.MatchString(c.Body) {
+			return call
+		}
+		return strings.ReplaceAll(c.Body, "#1", x[2])
+	})
 }
 
 func stripProofOf(s string) string {
@@ -193,6 +220,23 @@ func adjacent(d *tex.Document, a, b *item) (ok, floats bool) {
 		return false, false
 	}
 	return gapOK.Match(floatEnv.ReplaceAll(gap, nil)), true
+}
+
+// gapBreak is what ends the run of a statement into its proof: an
+// environment, a section or a display of the text.
+var gapBreak = regexp.MustCompile(`\\(?:begin|section|subsection|subsubsection|chapter|paragraph)\b|\n[ \t]*\n[ \t]*\n`)
+
+// shortGap tells if the text between two items is at most two short
+// paragraphs with no environment and no section.
+func shortGap(d *tex.Document, a, b *item) bool {
+	if a.end > b.off || b.off-a.end > 600 {
+		return false
+	}
+	gap := d.Text[a.end:b.off]
+	if gapBreak.Match(gap) {
+		return false
+	}
+	return strings.Count(strings.TrimSpace(string(gap)), "\n\n") <= 1
 }
 
 func isStatement(it *item) bool {

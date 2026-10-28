@@ -67,7 +67,7 @@ var (
 	refIn      = regexp.MustCompile(`\\(?:ref|cref|Cref|autoref|eqref)\*?\s*\{([^{}]+)\}`)
 	labelIn    = regexp.MustCompile(`\\label\s*\{([^{}]*)\}`)
 	paraBreak  = regexp.MustCompile(`\n[ \t]*\n|\\par\b`)
-	gapOK      = regexp.MustCompile(`^(?:\s|\\label\s*\{[^{}]*\}|\\(?:qed|qedhere|medskip|smallskip|bigskip|noindent|par|vspace\*?\s*\{[^{}]*\}|vskip\s*[\d.]+\w*|newline|hfill|bigbreak|medbreak|smallbreak|goodbreak|nopagebreak|pagebreak|clearpage|newpage)\b|\\\\)*$`)
+	gapOK      = regexp.MustCompile(`^(?:\s|\\label\s*\{[^{}]*\}|\\(?:qed|qedhere|medskip|smallskip|bigskip|noindent|par|vspace\*?\s*\{[^{}]*\}|vskip\s*[\d.]+\w*|newline|hfill|bigbreak|medbreak|smallbreak|goodbreak|nopagebreak|pagebreak|clearpage|newpage)\b|\\(?:begin|end)\s*\{sloppypar\}|\\\\)*$`)
 	restateCmd = regexp.MustCompile(`\\([A-Za-z@]+)\*`)
 	partStart  = regexp.MustCompile(`\\begin\s*\{(enumerate|enumerate\*|itemize|description|parts|romanenumerate|alphenumerate|enumeratei|enumi|thmenum|conditions)\}(\s*\[[^\]]*\])?`)
 	itemCmd    = regexp.MustCompile(`\\item\b(\s*\[([^\]]*)\])?`)
