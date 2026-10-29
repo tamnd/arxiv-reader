@@ -162,10 +162,11 @@ func TestTheRenderSampleIsOneInEveryAndStable(t *testing.T) {
 	n := 0
 	for i := 0; i < 10000; i++ {
 		id := fmt.Sprintf("2610.%05d", i)
-		if sampled(id, 10) {
+		first := sampled(id, 10)
+		if first {
 			n++
 		}
-		if sampled(id, 10) != sampled(id, 10) || !sampled(id, 1) {
+		if sampled(id, 10) != first || !sampled(id, 1) {
 			t.Fatalf("the sample of %s changes", id)
 		}
 	}
