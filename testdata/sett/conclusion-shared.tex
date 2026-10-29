@@ -1,0 +1,16 @@
+% Pattern: kind/conclusion/article. A Conclusion environment that steps the
+% counter of the theorems states a result and is a corollary. A Conclusion of
+% its own counter is a closing section.
+% from math/9201244, math/9802134
+% want theorem-1 statement/theorem 1
+% want conclusion-1 statement/corollary 2
+% want summary-1 other/section 1
+\documentclass{article}
+\newtheorem{theorem}{Theorem}
+\newtheorem{conclusion}[theorem]{Conclusion}
+\newtheorem{summary}{Conclusion}
+\begin{document}
+\begin{theorem} Each tree is a graph. \end{theorem}
+\begin{conclusion} Each path is a graph. \end{conclusion}
+\begin{summary} We have shown two facts. \end{summary}
+\end{document}

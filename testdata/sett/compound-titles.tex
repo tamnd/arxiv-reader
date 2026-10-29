@@ -1,0 +1,19 @@
+% Pattern: title/amsthm. A title of two kinds, as "Proposition-definition" or
+% "Observation / Convention", is of the first; a title as "Rado's criterion for
+% one equation" is of the word before "for"; and a wish is a conjecture.
+% seen in the gold pilot (set X)
+% want pd-1 statement/proposition 1
+% want oc-1 statement/fact 2
+% want rado-1 statement/criterion -
+% want wish-1 conjecture 3
+\documentclass{amsart}
+\newtheorem{pd}{Proposition-definition}
+\newtheorem{oc}[pd]{Observation / Convention}
+\newtheorem*{rado}{Rado's criterion for one equation}
+\newtheorem{wish}[pd]{Wish}
+\begin{document}
+\begin{pd} Let a tree be a connected graph with no cycle. Then it has a leaf. \end{pd}
+\begin{oc} Each graph here is finite. \end{oc}
+\begin{rado} The equation has a monochromatic solution when some coefficients sum to zero. \end{rado}
+\begin{wish} Each tree has a short proof. \end{wish}
+\end{document}

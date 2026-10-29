@@ -1,0 +1,22 @@
+% Pattern: proof/manual/article. A manual proof head with no end mark, and
+% the next lemma right after the text of the proof.
+% from math/0406514
+% want lem-1 statement/lemma 1 status=here
+% want head-1 proof - proves=lem-1
+% want lem-2 statement/lemma 2 status=here
+% want head-2 proof - proves=lem-2
+\documentclass{article}
+\newtheorem{lem}{Lemma}
+\begin{document}
+\begin{lem} Each tree is a graph. \end{lem}
+
+\proof:  Clear.
+
+We write $T$ for a tree.
+
+\begin{lem} Each path is a tree.
+\end{lem}
+
+\proof A path has no cycle.
+
+\end{document}

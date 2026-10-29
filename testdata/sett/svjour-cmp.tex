@@ -1,0 +1,14 @@
+% Pattern: class/svjour. The journal option cmp of svjour numbers the
+% environments of the class in one counter within the section.
+% seen in the gold pilot (set X)
+% want theorem-1 statement/theorem 1.1
+% want lemma-1 statement/lemma 1.2
+% want theorem-2 statement/theorem 2.1
+\documentclass[cmp]{svjour}
+\begin{document}
+\section{Trees}
+\begin{theorem} Each tree with $n$ vertices has $n-1$ edges. \end{theorem}
+\begin{lemma} Each tree with two vertices or more has a leaf. \end{lemma}
+\section{Forests}
+\begin{theorem} Each forest with $k$ trees and $n$ vertices has $n-k$ edges. \end{theorem}
+\end{document}

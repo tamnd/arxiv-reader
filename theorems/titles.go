@@ -14,6 +14,7 @@ import (
 	_ "embed"
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -108,10 +109,27 @@ func (t *Titles) Kind(title string) string {
 	if k, ok := t.kinds[n]; ok {
 		return k
 	}
+	// "Bergelson--Leibman" names a theorem by its authors.
+	if authorsTitle.MatchString(title) {
+		return "statement/theorem"
+	}
 	// "Proposition-definition" is the words "proposition" and "definition".
 	words := strings.FieldsFunc(n, func(r rune) bool { return r == ' ' || r == '-' || r == '/' })
 	if len(words) == 0 {
 		return Unknown
+	}
+	// A title of two kinds, as "Proposition-definition" or "Observation /
+	// Convention", is of the first.
+	if parts := strings.FieldsFunc(n, func(r rune) bool { return r == '-' || r == '/' }); len(parts) > 1 {
+		if k, ok := t.kinds[strings.TrimSpace(parts[0])]; ok {
+			return k
+		}
+	}
+	// "Rado's criterion for one equation" is a criterion.
+	if i := slices.IndexFunc(words, func(w string) bool { return w == "for" || w == "of" }); i > 0 {
+		if k, ok := t.kinds[words[i-1]]; ok {
+			return k
+		}
 	}
 	for _, try := range []string{strings.Join(words[1:], " "), words[0], words[len(words)-1]} {
 		if k, ok := t.kinds[try]; ok && try != "" {
@@ -145,7 +163,10 @@ func (t *Titles) Words() []string {
 }
 
 var (
-	accentCmd = regexp.MustCompile(`\\([\x60'^"~=.Hcuvk])\s*\{?\s*([a-zA-Z])\}?`)
+	authorsTitle = regexp.MustCompile(`^\s*\p{Lu}[\p{L}\\'"{}]+(?:\s*-{2,3}\s*\p{Lu}[\p{L}\\'"{}]+)+\s*$`)
+	// A letter accent takes its letter after a space or in braces: \Hex is
+	// a command of its own, not \H on "ex".
+	accentCmd = regexp.MustCompile(`\\([\x60'^"~=.])\s*\{?\s*([a-zA-Z])\}?|\\([Hcuvk])(?:\s+|\s*\{\s*)([a-zA-Z])\}?`)
 	texCmd    = regexp.MustCompile(`\\[a-zA-Z@]+\*?`)
 )
 
@@ -168,6 +189,9 @@ var accents = map[string]map[byte]string{
 func Normalize(title string) string {
 	s := accentCmd.ReplaceAllStringFunc(title, func(m string) string {
 		sub := accentCmd.FindStringSubmatch(m)
+		if sub[1] == "" {
+			sub = sub[2:]
+		}
 		if r, ok := accents[sub[1]][sub[2][0]]; ok {
 			return r
 		}

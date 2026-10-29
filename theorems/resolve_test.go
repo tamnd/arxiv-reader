@@ -173,3 +173,108 @@ func TestAWrapperThatCallsTheCommandOfTheEnvironment(t *testing.T) {
 		t.Fatalf("customthm is %+v, and it must be a wrapper of innercustomthm", w)
 	}
 }
+
+func TestTitledWithAFixedWord(t *testing.T) {
+	src := []byte(`\documentclass{article}
+\newcounter{item}
+\newenvironment{theo}[1]{\refstepcounter{item}\par{\bf \theitem.\hspace{1em}Theorem#1.}\sl}{\par}
+\begin{document}
+\begin{theo}{\label{t:a}} Each graph is finite. \end{theo}
+\begin{theo}{ (Euler)} Each tree is a graph. \end{theo}
+\end{document}
+`)
+	d, err := tex.ReadFile("main.tex", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := NewResolver()
+	s := r.Resolve(d)
+	th := s.Get("theo")
+	if th == nil || !th.TitleArg || th.Title != "Theorem" || th.Item != "statement/theorem" || !th.Numbered {
+		t.Fatalf("theo is %+v, and it must be a numbered theorem whose argument follows the title", th)
+	}
+	from := 0
+	for range 2 {
+		i := bytes.Index(d.Text[from:], []byte(`\begin{theo}`))
+		inner := from + i + len(`\begin{theo}`)
+		from = inner
+		title, item, after := th.TitleOf(d.Text, inner, r.Titles)
+		if title != "Theorem" || item != "statement/theorem" || after != inner {
+			t.Errorf("the use at %d gives %q, %q and %d, and it must give Theorem, statement/theorem and %d", inner, title, item, after, inner)
+		}
+	}
+}
+
+func TestAWrapperThatWritesTheNumberBeforeTheTitle(t *testing.T) {
+	src := []byte(`\documentclass{article}
+\newcounter{item}
+\newenvironment{lem}{\refstepcounter{item}\par\indent {\bf \theitem.\hspace{1em}Lemma.} \sl}{\par}
+\begin{document}
+\begin{lem} Each graph is finite. \end{lem}
+\end{document}
+`)
+	d, err := tex.ReadFile("main.tex", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := NewResolver().Resolve(d).Get("lem")
+	if l == nil || l.Title != "Lemma" || l.Item != "statement/lemma" || !l.Numbered {
+		t.Fatalf("lem is %+v, and it must be a numbered lemma", l)
+	}
+}
+
+// TestATitleThatACommandWrites reads the declarations that LyX writes, whose
+// titles are commands defined after them. Seen in the gold pilot (set X).
+func TestATitleThatACommandWrites(t *testing.T) {
+	src := []byte(`\documentclass{article}
+\usepackage{amsthm}
+\theoremstyle{plain}
+\newtheorem{thm}{\protect\theoremname}
+\newtheorem{prop}[thm]{\protect\propositionname}
+\usepackage{babel}
+\providecommand{\propositionname}{Proposition}
+\providecommand{\theoremname}{Theorem}
+\begin{document}
+\begin{thm}A.\end{thm}
+\begin{prop}C.\end{prop}
+\end{document}
+`)
+	d, err := tex.ReadFile("main.tex", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := NewResolver().Resolve(d)
+	for env, want := range map[string]string{"thm": "statement/theorem", "prop": "statement/proposition"} {
+		if e := s.Get(env); e == nil || e.Item != want {
+			t.Errorf("%s is %+v, and it must be %s", env, e, want)
+		}
+	}
+}
+
+// Seen in the gold pilot (set X): the class siamltex defines its theorems,
+// and they share one counter within the section.
+func TestTheSiamltexClassDefinesItsEnvironments(t *testing.T) {
+	d, err := tex.ReadFile("main.tex", []byte(`\documentclass[final]{siamltex}
+\begin{document}
+\section{One}
+\begin{definition} A graph is a set with a relation. \end{definition}
+\begin{proposition} Every graph is a set. \end{proposition}
+\begin{proof} Clear. \end{proof}
+\end{document}
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := NewResolver().Resolve(d)
+	if th := s.Get("theorem"); th == nil || th.Within != "section" || th.From != "class:siamltex" {
+		t.Errorf("theorem is %+v, and it must be numbered within the section", th)
+	}
+	for _, env := range []string{"lemma", "corollary", "proposition", "definition"} {
+		if e := s.Get(env); e == nil || e.Proof || e.Shared != "theorem" || e.From != "class:siamltex" {
+			t.Errorf("%s is %+v, and it must share the theorem counter of siamltex", env, e)
+		}
+	}
+	if p := s.Get("proof"); p == nil || !p.Proof {
+		t.Errorf("proof is %+v, and it must be a proof", p)
+	}
+}

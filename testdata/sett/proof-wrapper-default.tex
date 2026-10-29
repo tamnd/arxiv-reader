@@ -1,0 +1,36 @@
+% Pattern: proof/wrapper. A proof wrapper whose first argument is optional, as
+% \newenvironment{Proof}[1][\proofname]{\begin{proof}[#1]}, takes the option of
+% the use and no letter of the body; a wrapper whose second argument names the
+% statement in the end mark, as \begin{PROOF}{\ref{key}}, proves it; and a
+% label that a command of the paper sets, as \prlabel{key}, is a label of the
+% statement.
+% seen in the gold pilot (set X)
+% want thm-1 statement/theorem 1 labels=th:a
+% want prop-1 statement/proposition 2 labels=pr:b
+% want lem-1 statement/lemma 3 labels=c
+% want proof-1 proof - proves=thm-1
+% want proof-2 proof - proves=lem-1
+% want proof-3 proof - proves=prop-1
+\documentclass{amsart}
+\newtheorem{thm}{Theorem}
+\newtheorem{prop}[thm]{Proposition}
+\newtheorem{lem}[thm]{Lemma}
+\newcommand{\prlabel}[1]{\label{pr:#1}}
+\newcommand{\prref}[1]{Proposition~\ref{pr:#1}}
+\newenvironment{Proof}[1][\proofname]{\begin{proof}[#1]}{\end{proof}}
+\newenvironment{PROOF}[2][\proofname.]
+   {\begin{proof}[#1]\renewcommand{\qedsymbol}{$\square_{#2}$}}
+   {\end{proof}}
+\begin{document}
+\begin{thm}\label{th:a} Each tree with $n$ vertices has $n-1$ edges. \end{thm}
+\begin{prop}\prlabel{b} Each forest is a union of trees. \end{prop}
+\begin{lem}\label{c} Each tree with two vertices or more has a leaf. \end{lem}
+
+\begin{Proof}[Proof of Theorem~\ref{th:a}]
+Let a tree be given. \end{Proof}
+
+\begin{PROOF}{\ref{c}} Take a longest path. \end{PROOF}
+
+\renewcommand{\proofname}{Proof of \prref{b}}
+\begin{proof} Take the components. \end{proof}
+\end{document}

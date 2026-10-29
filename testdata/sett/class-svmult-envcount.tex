@@ -1,0 +1,17 @@
+% Pattern: env/class/svmult. With the options envcountsame and envcountsect,
+% each numbered environment of the class steps the counter of theorem, which
+% the section resets and numbers.
+% from 2311.01874
+% want theorem-1 statement/theorem 1.1
+% want lemma-1 statement/lemma 1.2
+% want remark-1 remark 2.1
+% want claim-1 statement/claim -
+\documentclass[envcountsame,envcountsect]{svmult}
+\begin{document}
+\section{One}
+\begin{theorem} Each tree is a graph. \end{theorem}
+\begin{lemma} Each path is a tree. \end{lemma}
+\section{Two}
+\begin{remark} Each cycle is a graph. \end{remark}
+\begin{claim} A claim of the class. \end{claim}
+\end{document}

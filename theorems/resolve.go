@@ -38,12 +38,27 @@ type Declaration struct {
 	Inner string `json:"inner,omitempty"`
 	// TitleArg is true when each use gives the title as the first argument,
 	// as \begin{thm}{Claim}. Title and Item are then empty, and TitleOf reads
-	// them from the use.
+	// them from the use. When the begin code writes a title word right before
+	// the argument, as {\bf Theorem#1.}, Title and Item are that word's, and
+	// the argument is only text after it.
 	TitleArg bool `json:"title_arg,omitempty"`
 	// TitleOpt is true when the title argument is optional, and TitleDefault
 	// is the title of a use that does not give it.
 	TitleOpt     bool   `json:"title_opt,omitempty"`
 	TitleDefault string `json:"title_default,omitempty"`
+	// NumberArg is the argument of each use that is its number, from 1, for
+	// a wrapper whose begin code sets the number, as \def\thethm{#1}\begin{thm}
+	// of a restatement. Such a use does not step the counter.
+	NumberArg int `json:"number_arg,omitempty"`
+	// LeadOnly is true for an environment with no title that numbers
+	// itself and sets its body bold, as \newenvironment{nonsec}{\bf
+	// \refstepcounter{item}\theitem.}. A use is an item only when its body
+	// leads with a group of a known title, as \begin{nonsec}{Example}. Other
+	// uses are numbered headings.
+	LeadOnly bool `json:"lead_only,omitempty"`
+	// Code is the begin code of a wrapper that steps a counter by itself,
+	// for the counter model, which runs its counter commands at each use.
+	Code string `json:"-"`
 	// Off is the offset of the declaration in the expanded text, or -1.
 	Off int `json:"-"`
 }
@@ -98,6 +113,7 @@ type classEnv struct {
 	Numbered *bool  `yaml:"numbered"`
 	Proof    bool   `yaml:"proof"`
 	Shared   string `yaml:"shared"`
+	Within   string `yaml:"within"`
 }
 
 // ParseClasses reads manifests/classes.yaml.
@@ -143,6 +159,9 @@ var (
 	declCmd   = regexp.MustCompile(`\\(newtheorem|renewtheorem|spnewtheorem|declaretheorem|newproof|newdefinition|newremark|newaliascnt|theoremstyle|numberwithin|counterwithin|newenvironment|renewenvironment|newmdtheoremenv|newtcbtheorem|NewTheorem)\b`)
 	stepCount = regexp.MustCompile(`\\refstepcounter\s*\{([^}]+)\}`)
 	innerEnv  = regexp.MustCompile(`\\begin\s*\{([^}]+)\}`)
+	// numberArg is a begin code that sets the format of a counter to an
+	// argument, as \def\thethm{#1} or \renewcommand\theinnercustomthm{#1}.
+	numberArg = regexp.MustCompile(`\\(?:g?def|(?:re)?newcommand\*?)\s*\{?\s*\\the[A-Za-z@]+\s*\}?\s*\{\s*#([1-9])\s*\}`)
 )
 
 // Resolve gives the theorem-like environments of a document.
@@ -175,14 +194,101 @@ func (r *Resolver) Resolve(d *tex.Document) *Set {
 			}
 		}
 	}
+	springerOptions(s, d)
 	for i := 0; i < 3; i++ {
 		r.wrappers(s, d)
 	}
 	r.usedProofs(s, d)
+	r.titleCommands(s, d)
 	for _, d := range s.Envs {
 		d.Counter = s.counterOf(d)
 	}
+	s.conclusions()
 	return s
+}
+
+// titleCommands reads a title that a command of the paper writes, as
+// \newtheorem{thm}{\protect\theoremname} and \providecommand{\theoremname}{Theorem},
+// which LyX writes.
+func (r *Resolver) titleCommands(s *Set, d *tex.Document) {
+	if d.Macros == nil {
+		return
+	}
+	for _, e := range s.Envs {
+		if e.Item != Unknown || !strings.Contains(e.Title, `\`) {
+			continue
+		}
+		t := strings.TrimSpace(d.Macros.Expand(protectCmd.ReplaceAllString(e.Title, "")))
+		if t == e.Title || strings.Contains(t, `\`) {
+			continue
+		}
+		if k := r.item(&Declaration{Title: t, Within: e.Within}); k != Unknown {
+			e.Title, e.Item = t, k
+		}
+	}
+}
+
+var protectCmd = regexp.MustCompile(`\\protect\b\s*`)
+
+// conclusions gives the kind of a corollary to a Conclusion environment that
+// steps the counter of a statement, as \newtheorem{conclusion}[theorem]
+// {Conclusion}: the paper numbers it with its theorems and states a result in
+// it, and a Conclusion of its own counter is a closing section.
+func (s *Set) conclusions() {
+	stated := map[string]bool{}
+	for _, d := range s.Envs {
+		if strings.HasPrefix(d.Item, "statement/") && d.Counter != "" {
+			stated[d.Counter] = true
+		}
+	}
+	for _, d := range s.Envs {
+		if d.Item == "other/section" && strings.EqualFold(strings.TrimSpace(d.Title), "conclusion") && d.Counter != "" && d.Counter != d.Env && stated[d.Counter] {
+			d.Item = "statement/corollary"
+		}
+	}
+}
+
+// springer is each Springer class whose options set the counters of its
+// theorem environments.
+var springer = map[string]bool{"svmult": true, "svjour": true, "svjour3": true, "svjour2": true, "llncs": true, "svproc": true, "svmono": true}
+
+// springerOptions reads the options of a Springer class: envcountsame makes
+// each numbered environment of the class step the counter of theorem, and
+// envcountsect and envcountchap number theorem within the section or the
+// chapter, as \documentclass[envcountsame,envcountsect]{svmult}.
+func springerOptions(s *Set, d *tex.Document) {
+	if !springer[d.Class] {
+		return
+	}
+	opts := map[string]bool{}
+	for _, o := range d.Options {
+		opts[o] = true
+	}
+	// The journal option cmp of svjour, for Communications in Mathematical
+	// Physics, numbers the environments in one counter within the section,
+	// as Theorem 2.1, Lemma 2.2.
+	if d.Class == "svjour" && opts["cmp"] {
+		opts["envcountsame"], opts["envcountsect"] = true, true
+	}
+	th := s.Envs["theorem"]
+	if th == nil {
+		return
+	}
+	switch {
+	case opts["envcountsect"] && th.Within == "" && th.Shared == "":
+		th.Within = "section"
+	case opts["envcountchap"] && th.Within == "" && th.Shared == "":
+		th.Within = "chapter"
+	}
+	if !opts["envcountsame"] {
+		return
+	}
+	for _, e := range s.Envs {
+		fromClass := strings.HasPrefix(e.From, "class:") || e.From == "local:"+d.Class+".cls"
+		if fromClass && e != th && e.Numbered && !e.Proof && e.Shared == "" {
+			e.Shared, e.Within = "theorem", ""
+		}
+	}
 }
 
 var loadClassCmd = regexp.MustCompile(`\\LoadClass(?:WithOptions)?\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}`)
@@ -230,7 +336,7 @@ func (r *Resolver) fromClass(e classEnv, from string) *Declaration {
 	if e.Proof {
 		numbered = false
 	}
-	d := &Declaration{Env: e.Env, Title: e.Title, Numbered: numbered, Proof: e.Proof, Shared: e.Shared, From: from, Off: -1}
+	d := &Declaration{Env: e.Env, Title: e.Title, Numbered: numbered, Proof: e.Proof, Shared: e.Shared, Within: e.Within, From: from, Off: -1}
 	d.Item = r.item(d)
 	return d
 }
@@ -239,8 +345,16 @@ func (r *Resolver) item(d *Declaration) string {
 	if d.Proof {
 		return "proof"
 	}
+	if Normalize(d.Title) == "" && d.Within != "" && !sectionCounter[d.Within] {
+		// \newtheorem{stat}{}[thm] prints only a number, as 4.4.1, within a
+		// theorem: the claims of its proof.
+		return "statement/claim"
+	}
 	return r.Titles.Kind(d.Title)
 }
+
+// sectionCounter is the counters of the sectioning commands.
+var sectionCounter = map[string]bool{"part": true, "chapter": true, "section": true, "subsection": true, "subsubsection": true, "paragraph": true, "subparagraph": true}
 
 // counterOf follows shared environments and aliases to the counter that an
 // environment steps.
@@ -534,6 +648,9 @@ func (r *Resolver) wrappers(s *Set, d *tex.Document) {
 				if w.Shared == "" && w.Numbered {
 					w.Shared = inner
 				}
+				if m := numberArg.FindStringSubmatch(e.Begin); m != nil && !e.HasDefault && int(m[1][0]-'0') <= e.Args {
+					w.NumberArg = int(m[1][0] - '0')
+				}
 				s.add(&w, false)
 			}
 			continue
@@ -546,9 +663,13 @@ func (r *Resolver) wrappers(s *Set, d *tex.Document) {
 				// still writes proofs with it.
 				w.Proof, w.Item = true, "proof"
 			}
+			if t := fixedTitle(code); t != "" && !w.Proof && r.Titles.Known(t) {
+				w.Title, w.Item = t, r.Titles.Kind(t)
+			}
 			if m := stepCount.FindStringSubmatch(code); m != nil {
 				w.Numbered = true
 				w.Counter = strings.TrimSpace(m[1])
+				w.Code = code
 				s.Aliases[name] = w.Counter
 			}
 			s.add(w, false)
@@ -564,12 +685,26 @@ func (r *Resolver) wrappers(s *Set, d *tex.Document) {
 				w.Numbered = true
 				w.Shared = ""
 				w.Counter = strings.TrimSpace(m[1])
+				w.Code = e.Begin
 				s.Aliases[name] = w.Counter
 			}
 			s.add(w, false)
+			continue
+		}
+		if m := stepCount.FindStringSubmatch(e.Begin); m != nil && e.Args == 0 && boldBody.MatchString(e.Begin) {
+			c := strings.TrimSpace(m[1])
+			if strings.Contains(e.Begin, `\the`+c) {
+				w := &Declaration{Env: name, Item: Unknown, From: "wrapper", Form: "newenvironment", Off: e.Off, LeadOnly: true}
+				w.Numbered, w.Counter, w.Code = true, c, e.Begin
+				s.Aliases[name] = c
+				s.add(w, false)
+			}
 		}
 	}
 }
+
+// boldBody is begin code that sets the whole body bold.
+var boldBody = regexp.MustCompile(`^\s*\\(?:bf|bfseries)\b`)
 
 var cmdCall = regexp.MustCompile(`\\([A-Za-z@]+)`)
 
@@ -597,6 +732,20 @@ func innerCommand(s *Set, begin, end string) string {
 // titleHead finds #1 inside a bold, italic or small caps group or argument.
 var titleHead = regexp.MustCompile(`\{\s*\\(?:bf|bfseries|sc|scshape|it|itshape|sl)\b[^{}]*(?:\{[^{}]*\}[^{}]*)*#1|\\(?:textbf|textsc|textit|emph)\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*#1`)
 
+// wordBeforeArg is a word that the head writes right before #1.
+var wordBeforeArg = regexp.MustCompile(`([A-Za-z]+)(?:\s|~|\\ )*#1$`)
+
+// fixedTitle gives the word that the head of a titled begin code writes right
+// before the argument, as Theorem in {\bf \theitem.\hspace{1em}Theorem#1.},
+// or "".
+func fixedTitle(code string) string {
+	m := titleHead.FindString(code)
+	if w := wordBeforeArg.FindStringSubmatch(m); w != nil {
+		return w[1]
+	}
+	return ""
+}
+
 // titledBegin tells if an environment prints a head whose title is its first
 // argument. The begin code can do it itself, or it can call one command of
 // the paper that takes the argument, as {\claim} with \def\claim#1{...{\bf
@@ -615,12 +764,48 @@ func titledBegin(m *tex.Macros, e *tex.Env) (string, bool) {
 	return "", false
 }
 
+var (
+	// boldLead is a bold title at the start of a body, after labels.
+	boldLead = regexp.MustCompile(`^\s*(?:\\label\s*\{[^{}]*\}\s*)*(?:\{\\bf\s+|\\textbf\s*\{)((?:[^{}$]|\{[^{}]*\}){1,80}?)\}`)
+	// groupLead is a plain group at the start of a body, as the title of
+	// \begin{nonsec}{Example}, whose begin code sets the body bold.
+	groupLead = regexp.MustCompile(`^\s*\{([^{}$\\]{1,40})\}`)
+	// proofLead is the title of a proof, as "Proof of Theorem \ref{a}".
+	proofLead = regexp.MustCompile(`(?i)^proof\b`)
+)
+
 // TitleOf reads the title of one use of a titled environment, from the
 // argument at inner. It returns the title, its item kind and the offset after
 // the argument. For an environment that is not titled, it returns the title of
 // the declaration and inner.
 func (d *Declaration) TitleOf(text []byte, inner int, t *Titles) (title, item string, after int) {
-	if !d.TitleArg {
+	if d.LeadOnly {
+		if m := groupLead.FindSubmatch(text[inner:min(len(text), inner+300)]); m != nil {
+			lead := strings.TrimSpace(strings.TrimRight(string(m[1]), ".: "))
+			if k := t.Kind(lead); k != Unknown && k != "proof" {
+				return lead, k, inner
+			}
+		}
+		return "", Unknown, inner
+	}
+	if !d.TitleArg && Normalize(d.Title) == "" && !d.Proof {
+		// An environment with no title whose body leads with a bold title
+		// of a known kind, as \newtheorem{subsec}[equation]{} and
+		// \begin{subsec}{\bf Notation.}, is of that kind. The lead stays in
+		// the body.
+		if m := boldLead.FindSubmatch(text[inner:min(len(text), inner+300)]); m != nil {
+			lead := strings.TrimSpace(strings.TrimRight(string(m[1]), ".: "))
+			if proofLead.MatchString(lead) {
+				return lead, "proof", inner
+			}
+			if k := t.Kind(lead); k != Unknown {
+				return lead, k, inner
+			}
+		}
+	}
+	if !d.TitleArg || d.Title != "" {
+		// A fixed title leaves the argument in the body, where its label is
+		// read.
 		return d.Title, d.Item, inner
 	}
 	spec := "m"

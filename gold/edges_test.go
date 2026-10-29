@@ -53,7 +53,7 @@ func TestSetEScoresEachMethod(t *testing.T) {
 	g.Uses = []Use{{Proof: "proof-1", To: "lemma-1"}, {Proof: "proof-1", To: "definition-1"}}
 	var s EdgeScore
 	s.Marked = 1
-	s.AddPaper(g, edgeList())
+	s.AddPaper(g, edgeObjects(), edgeList())
 	if r := s.Precision[edges.Ref]; r.Hit != 1 || r.Of != 1 {
 		t.Errorf("ref %v", r)
 	}
@@ -88,5 +88,33 @@ func TestSetEIsDrawnFromSetX(t *testing.T) {
 		if picks[i] != again[i] {
 			t.Fatal("the same seed gives another draw")
 		}
+	}
+}
+
+// Seen in the gold pilot (set E): the marks of a record are matched to the
+// items by their place, so an item that the extractor names otherwise, or
+// that a mark of set X alone found with another kind, is still the mark.
+func TestSetEMatchesTheMarksByTheirPlace(t *testing.T) {
+	recs := []objects.Record{
+		{Kind: "statement", Item: "statement/lemma", Paper: "p", Version: "1", Local: "head-2", Path: "source", Span: &objects.Span{File: "a.tex", From: 10, To: 12}},
+		{Kind: "statement", Item: "statement/lemma", Paper: "p", Version: "1", Local: "head-1", Path: "source", Span: &objects.Span{File: "a.tex", From: 20, To: 22}},
+		{Kind: "proof", Item: "proof", Paper: "p", Version: "1", Local: "proof-1", Path: "source", Span: &objects.Span{File: "a.tex", From: 30, To: 40}},
+	}
+	g := Record{Set: "E", Paper: "p", Version: 1, State: Marked, By: "A. Person", Marks: []Mark{
+		{ID: "head-1", Kind: "statement", File: "a.tex", From: 10, To: 12},
+		{ID: "gold-lemma-2", Kind: "remark", File: "a.tex", From: 20, To: 22},
+		{ID: "proof-1", Kind: "proof", File: "a.tex", From: 30, To: 40},
+	}, Uses: []Use{{Proof: "proof-1", To: "gold-lemma-2"}}}
+	ev := edges.Evidence{Version: 1, Cue: "by"}
+	es := []edges.Edge{
+		{From: "p#proof-1", To: "p#head-1", Predicate: edges.Uses, Method: edges.Ref, Confidence: edges.Certain, Evidence: ev},
+	}
+	var s EdgeScore
+	s.AddPaper(g, recs, es)
+	if r := s.Precision[edges.Ref]; r.Hit != 1 || r.Of != 1 {
+		t.Errorf("ref %v, and the edge to head-1 is the use of the mark gold-lemma-2", r)
+	}
+	if s.Recall.Hit != 1 {
+		t.Errorf("recall %v", s.Recall)
 	}
 }

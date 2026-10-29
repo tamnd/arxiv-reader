@@ -1,0 +1,30 @@
+% Pattern: theorem/newenvironment/article. An environment of sub-theorems
+% that the paper defines and never uses. Its counter commands and its
+% \def\thetheorem are code of the environment, not of the paper.
+% seen in the gold pilot (set X)
+% want theorem-1 statement/theorem 2.1
+% want lemma-1 statement/lemma 2.2
+\documentclass[10pt]{article}
+\numberwithin{equation}{section}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\makeatletter
+\newcounter{parenttheorem}%
+\newenvironment{subassumptions}{%
+  \refstepcounter{theorem}%
+  \protected@edef\theparenttheorem{\thetheorem}%
+  \setcounter{parenttheorem}{\value{theorem}}%
+  \setcounter{theorem}{0}%
+  \def\thetheorem{\theparenttheorem\normalfont\alph{theorem}}%
+  \ignorespaces
+}{%
+  \setcounter{theorem}{\value{parenttheorem}}%
+  \ignorespacesafterend
+}
+\makeatother
+\begin{document}
+\section{One}
+\section{Two}
+\begin{theorem} Each tree is a graph. \end{theorem}
+\begin{lemma} Each path is a tree. \end{lemma}
+\end{document}

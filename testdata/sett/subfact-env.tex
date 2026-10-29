@@ -1,0 +1,12 @@
+% Pattern: env/title/article. An environment titled Subfact is a fact, and a
+% proof environment titled Another proof is a proof.
+% seen in the gold pilot (set X)
+% want subfact-1 statement/fact 1 status=here
+% want proof-1 proof - proves=subfact-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{subfact}{Subfact}
+\begin{document}
+\begin{subfact}\label{sf} Each tree is a graph. \end{subfact}
+\begin{proof}[Another proof of Subfact~\ref{sf}] A tree is a connected graph. \end{proof}
+\end{document}

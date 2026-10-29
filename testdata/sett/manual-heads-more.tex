@@ -1,0 +1,42 @@
+% Pattern: head/layout/article. Manual heads after a layout command of the
+% paper, after a line break and \noindent, in an underlined group, after a
+% lone brace, with a misspelled title, and a theorem environment declared in
+% the body.
+% seen in the gold pilot (set X)
+% want head-1 statement/fact (α) status=here
+% want head-2 proof - proves=head-1
+% want head-3 remark -
+% want head-4 statement/proposition 9.2.7 status=none
+% want head-5 statement/claim 1 status=none
+% want head-6 definition/notation -
+% want head-7 problem -
+% want corollary-1 statement/corollary 1 status=none
+\documentclass{article}
+\newcommand{\sn}{\smallskip\noindent}
+\newcommand{\mn}{\sn\medskip}
+\begin{document}
+\mn
+\textbf{Fact $(\alpha)$}: Each tree is a graph.
+
+\sn
+Proof: By renaming. \qed
+
+{
+{\noindent \bf Remark}  A path is a tree.
+}
+
+{\bf Proposision 9.2.7}\quad Each cycle is a graph.
+
+Call such a tree good.\\[5pt] \noindent
+\textbf{Claim 1.}  Each good tree is a path.
+
+{\underline {\bf Convention:}} A graph is finite.
+
+\!\!\!\! \textbf{Question:}
+Is each graph a tree?
+
+\newtheorem{corollary}{Corollary}
+\begin{corollary}
+Each path is a graph.
+\end{corollary}
+\end{document}

@@ -1,0 +1,30 @@
+% Pattern: head/label/article. A bold label in an \item or at the start of a
+% paragraph that a later "Proof of A1" names is a claim, numbered with the
+% label, and the proof proves it. A proof head of a part inside a proof
+% environment is an item too.
+% from 1407.0548
+% want lemma-1 statement/lemma 1
+% want proof-1 proof - proves=lemma-1
+% want head-1 statement/claim A1
+% want head-2 statement/claim A2
+% want head-3 proof - proves=head-1
+% want head-4 proof - proves=head-2
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{lemma}{Lemma}
+\begin{document}
+\begin{lemma} Each tree is a graph. \end{lemma}
+\begin{proof}
+We show two assertions.
+\begin{enumerate}
+\item[{\bf A1.}\,] Each node has a degree.
+\item[{\bf A2.}\,] Each edge has two ends.
+\end{enumerate}
+
+{\it Proof of \,{\bf A1}}.\, Count the edges at the node.
+
+{\it Proof of \,{\bf A2}}.\, An edge joins two nodes.
+
+Then the lemma follows from {\bf A1} and {\bf A2}.
+\end{proof}
+\end{document}

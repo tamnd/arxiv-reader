@@ -1,0 +1,26 @@
+% Pattern: proof/manual/article. A manual proof head in bold that names its
+% statement with \ref, far from the statement, and a proof whose head uses a
+% reference command of the paper.
+% from 1303.4328, math/9902147
+% want theorem-1 statement/theorem 1 status=here labels=T2
+% want theorem-2 statement/theorem 2 status=here labels=mt:small
+% want lemma-1 statement/lemma 3 status=here
+% want proof-1 proof - proves=lemma-1
+% want head-1 proof - proves=theorem-1
+% want proof-2 proof - proves=theorem-2
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newcommand{\refmt}[1]{Theorem~\ref{mt:#1}}
+\begin{document}
+\begin{theorem}\label{T2} Each tree is a graph. \end{theorem}
+\begin{theorem}\label{mt:small} Each path is a tree. \end{theorem}
+\begin{lemma} Each path is a graph. \end{lemma}
+\begin{proof} A path is a walk. \end{proof}
+
+\noindent {\bf Proof of Theorem \ref{T2}:}
+A tree has no cycle.
+
+\begin{proof}[Proof of \refmt{small}] A path has no cycle. \end{proof}
+\end{document}

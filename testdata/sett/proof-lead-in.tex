@@ -1,0 +1,25 @@
+% Pattern: proof/amsthm/amsart. A proof far from the theorem it proves, after
+% a sentence that names the theorem, and a proof whose name the paper sets
+% with \renewcommand{\proofname}. Both prove the theorem that they name.
+% seen in the gold pilot (set X)
+% want thm-1 statement/theorem 1 labels=main status=here
+% want lem-1 statement/lemma 2 labels=aux status=here
+% want proof-1 proof - proves=lem-1
+% want proof-2 proof - proves=thm-1
+% want proof-3 proof - proves=thm-1
+\documentclass{amsart}
+\newtheorem{thm}{Theorem}
+\newtheorem{lem}[thm]{Lemma}
+\newcommand{\thref}[1]{Theorem~\ref{#1}}
+\begin{document}
+\begin{thm}\label{main} Each tree with $n$ vertices has $n-1$ edges. \end{thm}
+\begin{lem}\label{aux} Each tree with two vertices or more has a leaf. \end{lem}
+\begin{proof} Take a longest path. \end{proof}
+
+We are now able to prove Theorem~\ref{main}.
+
+\begin{proof} Remove a leaf and use Lemma~\ref{aux}. \end{proof}
+
+\renewcommand{\proofname}{Proof of \thref{main}}
+\begin{proof} Count the components. \end{proof}
+\end{document}

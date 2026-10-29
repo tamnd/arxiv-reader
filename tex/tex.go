@@ -70,6 +70,13 @@ type Document struct {
 type Region struct {
 	From int `json:"from"`
 	To   int `json:"to"`
+	// Part is a region of an item that is a part of a proof, as a claim,
+	// which a proof head can follow inside the proof.
+	Part bool `json:"-"`
+	// Statement is a region of a statement or a definition, which a proof
+	// head can follow inside it, as a paper that writes {\bf Proof.} before
+	// \end{lemma}.
+	Statement bool `json:"-"`
 }
 
 // In tells if the offset is in one of the regions.
@@ -88,9 +95,9 @@ func (d *Document) Pos(off int) Pos { return pos(d.segs, d.Text, off) }
 // ErrNoDocument is the error for a main file with no \begin{document}.
 var ErrNoDocument = errors.New("tex: the main file has no \\begin{document}")
 
-// ErrPlainTeX is the error for a main file in Plain TeX. The front end reads
-// only LaTeX, so it does not find the structure of such a paper.
-var ErrPlainTeX = errors.New("tex: the main file is Plain TeX, and the front end reads only LaTeX")
+// ErrPlainTeX is the error for a main file in Plain TeX with no text after
+// its definitions.
+var ErrPlainTeX = errors.New("tex: the main file is Plain TeX, and it has no text after its definitions")
 
 // plainMarks are the commands that a file in Plain TeX has and a LaTeX file
 // does not need.
@@ -193,6 +200,9 @@ func build(main string, files, local map[string][]byte, excluded map[string]bool
 	t := d.toggles()
 	d.findBody()
 	n := d.conditionals()
+	for name, sty := range d.Local {
+		d.Local[name] = decideLocal(d.Text, name, sty)
+	}
 	d.step("conditionals: %d decided, %d flag tests decided, %d kept", n, t, len(d.Conditional))
 	d.Macros = ReadMacros(d.Text[:d.preambleEnd()], local)
 	d.Macros.Add(ReadMacros(d.bodyText(), nil))
@@ -231,8 +241,60 @@ func (d *Document) findBody() {
 		if e := endDocument.FindIndex(d.Text[d.Body:]); e != nil {
 			d.End = d.Body + e[0]
 		}
+		return
+	}
+	if isPlainTeX(d.Text) {
+		d.Body, d.End = plainBody(d.Text)
+		if d.Body > 0 {
+			d.step("plain: the main file is Plain TeX, and its text starts at line %d", bytes.Count(d.Text[:d.Body], []byte("\n"))+1)
+		}
 	}
 }
+
+// plainDecl is the start of a line of the definitions of a file in Plain TeX.
+var plainDecl = regexp.MustCompile(`^\\(def|gdef|edef|xdef|let|long|outer|global|font|magnification|input|catcode|chardef|mathchardef|countdef|dimendef|skipdef|toksdef|new[a-z]+|textfont|scriptfont|scriptscriptfont|hsize|vsize|hoffset|voffset|parindent|parskip|baselineskip|normalbaselineskip|tolerance|overfullrule|nopagenumbers|headline|footline|output|everypar|advance|setbox|raggedbottom|frenchspacing|pageno|count[0-9]*|tenpoint|twelvepoint|rm|interlinepenalty|binoppenalty|relpenalty|abovedisplayskip|belowdisplayskip|mathsurround|lineskip|lineskiplimit|footnoteskip|topskip|maxdepth|emergencystretch|hbadness|vbadness|hfuzz|vfuzz)(?:[^A-Za-z]|$)`)
+
+// plainBody is where the text of a file in Plain TeX starts, after the lines
+// of its definitions, and where it ends, at \bye. Plain TeX has no
+// \begin{document}; its definitions come first, with the numbers of a paper
+// that sets them by hand, as \def\ROOTlem{1.6}. Body is 0 when the file has
+// no text.
+func plainBody(text []byte) (body, end int) {
+	end = len(text)
+	if m := byeCmd.FindIndex(text); m != nil {
+		end = m[0]
+	}
+	depth := 0
+	for at := 0; at < end; {
+		nl := bytes.IndexByte(text[at:end], '\n')
+		next := end
+		if nl >= 0 {
+			next = at + nl + 1
+		}
+		line := bytes.TrimSpace(text[at:next])
+		if depth == 0 && len(line) > 0 && line[0] != '%' && !plainDecl.Match(line) {
+			return max(at, 1), end
+		}
+		for i := 0; i < len(line); i++ {
+			switch line[i] {
+			case '\\':
+				i++
+			case '%':
+				i = len(line)
+			case '{':
+				depth++
+			case '}':
+				if depth > 0 {
+					depth--
+				}
+			}
+		}
+		at = next
+	}
+	return 0, len(text)
+}
+
+var byeCmd = regexp.MustCompile(`\\bye\b`)
 
 func (d *Document) preambleEnd() int {
 	if d.Body == 0 {

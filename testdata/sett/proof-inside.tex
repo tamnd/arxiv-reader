@@ -1,0 +1,16 @@
+% Pattern: proof/amsthm/article. A proof written inside its statement, before
+% \end{theorem}.
+% from 1809.06512
+% want theorem-1 statement/theorem 1 status=here
+% want proof-1 proof - proves=theorem-1 parent=theorem-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\begin{document}
+\begin{theorem}
+Each tree is a graph.
+\begin{proof}
+A tree is a graph with no cycle.
+\end{proof}
+\end{theorem}
+\end{document}

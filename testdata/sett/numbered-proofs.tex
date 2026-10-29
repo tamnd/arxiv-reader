@@ -1,0 +1,13 @@
+% Pattern: proof/amsthm/amsart. A statement with two proofs, whose heads
+% are "Proof 1" and "Proof 2". Both prove the statement.
+% seen in the gold pilot (set X)
+% want prop-1 statement/proposition 1 status=here
+% want proof-1 proof - proves=prop-1
+% want proof-2 proof - proves=prop-1
+\documentclass{amsart}
+\newtheorem{prop}{Proposition}
+\begin{document}
+\begin{prop} Each tree with $n$ vertices has $n-1$ edges. \end{prop}
+\begin{proof}[Proof 1] Remove a leaf and use induction. \end{proof}
+\begin{proof}[Proof 2] Count the vertices and the components. \end{proof}
+\end{document}

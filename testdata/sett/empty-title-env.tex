@@ -1,0 +1,20 @@
+% Pattern: theorem/newtheorem/article. An environment with an empty title,
+% numbered within the theorems, that the paper uses for the claims of a proof.
+% The paper prints only the number, as 1.1 within Theorem 1: the claims
+% of its proof.
+% seen in the gold pilot (set X)
+% want thm-1 statement/theorem 1
+% want proof-1 proof - proves=thm-1
+% want stat-1 statement/claim 1.1
+% want stat-2 statement/claim 1.2
+\documentclass{article}
+\newtheorem{thm}{Theorem}
+\newtheorem{stat}{}[thm]
+\begin{document}
+\begin{thm} Each tree with two vertices is a path. \end{thm}
+\begin{proof}
+\begin{stat} The tree has one edge. \end{stat}
+\begin{stat} The edge joins the two vertices. \end{stat}
+Both give the path.
+\end{proof}
+\end{document}

@@ -111,7 +111,9 @@ func Analyze(b *source.Bundle, p Paper, m *Manifests) (*Result, error) {
 			r := &recs[k]
 			if o, ok := at[ext[k].Off]; ok {
 				r.Census = o.ID
-				if r.Number == "" || o.NumberFrom != "head" {
+				// The census puts the number of the label in a head number
+				// written with \ref.
+				if r.Number == "" || o.NumberFrom != "head" || strings.Contains(r.Number, `\ref`) {
 					r.Number, r.NumberFrom = o.Number, o.NumberFrom
 				}
 			}

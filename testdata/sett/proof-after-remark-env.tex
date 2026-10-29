@@ -1,0 +1,48 @@
+% Pattern: proof/amsthm/amsart. A remark between a statement and its proof,
+% as \end{lemma} \begin{remark} We will later apply ... \end{remark}
+% \begin{proof}, does not take the proof, unless the statement cites another
+% paper; a proof inside a remark proves the remark, and so does each proof
+% after it there; and a display in the text between a statement and its proof
+% does not break them.
+% seen in the gold pilot (set X)
+% want lem-1 statement/lemma 1
+% want rem-1 remark 2
+% want proof-1 proof - proves=lem-1 flag=remark-between
+% want lem-2 statement/lemma 3
+% want rem-2 remark 4
+% want proof-2 proof - proves=rem-2
+% want rem-3 remark 5
+% want proof-3 proof - proves=rem-3
+% want proof-4 proof - proves=rem-3
+% want lem-3 statement/lemma 6
+% want proof-5 proof - proves=lem-3 flag=text-between
+\documentclass{amsart}
+\newtheorem{lem}{Lemma}
+\theoremstyle{remark}
+\newtheorem{rem}[lem]{Remark}
+\begin{document}
+\begin{lem} Each tree with two vertices or more has a leaf. \end{lem}
+
+\begin{rem} We will later apply this to the trees of a forest. \end{rem}
+
+\begin{proof} Take a longest path. \end{proof}
+
+\begin{lem}\cite{X} Each finite graph has a spanning forest. \end{lem}
+\begin{rem} Each forest with $k$ trees and $n$ vertices has $n-k$ edges. \end{rem}
+\begin{proof} Count the edges of each tree. \end{proof}
+
+\begin{rem} We list two facts.
+\begin{proof} The first is clear. \end{proof}
+\begin{proof} The second is clear too. \end{proof}
+\end{rem}
+
+\begin{lem} Each tree has a proper two-colouring. \end{lem}
+
+We note a formula before the proof.
+\begin{equation}
+ \chi(T) \le 2.
+\end{equation}
+It is the bound.
+
+\begin{proof} Colour by the parity of the distance to a root. \end{proof}
+\end{document}

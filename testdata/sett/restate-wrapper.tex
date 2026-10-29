@@ -1,0 +1,24 @@
+% Pattern: theorem/newenvironment/article. A restatement environment sets
+% the format of the theorem counter to its argument, a \ref to the theorem it
+% restates, and puts the counter back at its end. The restated theorem has the
+% number of the first one, and the next theorem goes on from the counter.
+% seen in the gold pilot (set X)
+% want thm-1 statement/theorem 1.1 labels=main
+% want thm-2 statement/theorem 2.1
+% want restate-1 statement/theorem 1.1
+% want thm-3 statement/theorem 2.2
+\documentclass{article}
+\newtheorem{thm}{Theorem}[section]
+\newenvironment{restate}[1]
+    {\def\thethm{#1}\begin{thm}}
+    {\end{thm}\addtocounter{thm}{-1}}
+\begin{document}
+\section{One}
+\begin{thm}\label{main} Each tree is a graph. \end{thm}
+\section{Two}
+\begin{thm} Each path is a tree. \end{thm}
+\begin{restate}{\ref{main}}
+Each tree is a graph.
+\end{restate}
+\begin{thm} Each star is a tree. \end{thm}
+\end{document}

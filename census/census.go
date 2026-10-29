@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/tamnd/arxiv-reader/tex"
@@ -67,6 +68,12 @@ type Occurrence struct {
 	Model   string `json:"-"`
 	Aux     string `json:"-"`
 	Printed string `json:"-"`
+	// code is the body of the command of the paper that writes a head, for
+	// the counter model.
+	code string
+	// argNumber is the number that a use gives as an argument, for a wrapper
+	// with a NumberArg.
+	argNumber string
 	// Labels is each \label of an env or head occurrence. For a label
 	// occurrence, Target is the label key. For a textref, Target is the title
 	// and number that the text names.
@@ -161,6 +168,7 @@ func Run(in Input) *Census {
 		}
 	}
 	c.envs()
+	c.envCommands()
 	c.heads()
 	c.restates()
 	sort.SliceStable(c.Occurrences, func(i, j int) bool { return c.Occurrences[i].Off < c.Occurrences[j].Off })
@@ -205,11 +213,21 @@ func (c *Census) envs() {
 		if decl == nil {
 			continue
 		}
+		if decl.LeadOnly {
+			if _, item, _ := decl.TitleOf(d.Text, inner, c.In.Titles); item == theorems.Unknown {
+				// A numbered heading, as \begin{nonsec}{Trees}.
+				continue
+			}
+		}
 		typ := Env
 		if decl.Proof {
 			typ = Proof
 		}
 		o := c.occ(typ, name, decl, off, inner)
+		o.code = decl.Code
+		if decl.NumberArg > 0 {
+			o.argNumber = argAt(d.Text, inner, decl.NumberArg)
+		}
 		if decl.TitleArg {
 			o.Title, o.Item, o.Inner = decl.TitleOf(d.Text, inner, c.In.Titles)
 		}
@@ -222,6 +240,253 @@ func (c *Census) envs() {
 		if o.Close == d.End {
 			o.Flags = append(o.Flags, "unclosed")
 		}
+	}
+}
+
+// envCommands counts each \definition ... \enddefinition of CommandEnvs and
+// each use of a command of MacroEnvs.
+func (c *Census) envCommands() {
+	for _, e := range append(CommandEnvs(c.In.Doc, c.In.Set), MacroEnvs(c.In.Doc, c.In.Set)...) {
+		typ := Env
+		if e.Decl.Proof {
+			typ = Proof
+		}
+		o := c.occ(typ, e.Decl.Env, e.Decl, e.Off, e.Inner)
+		o.code = e.Decl.Code
+		o.Opt, o.HasOpt = e.Opt, e.HasOpt
+		o.Close, o.End = e.Close, e.End
+		if !e.Closed {
+			o.Flags = append(o.Flags, "unclosed")
+		}
+		for _, l := range e.Labels {
+			o.Labels = append(o.Labels, l)
+			if _, ok := c.Labels[l]; !ok {
+				c.Labels[l] = fmt.Sprint(indexOf(c.Occurrences, o))
+			}
+		}
+	}
+}
+
+// CommandEnv is a use of an environment as two commands, as \definition ...
+// \enddefinition: the offsets of the opening command, after it and its
+// option, of the closing command and after it.
+type CommandEnv struct {
+	Decl                   *theorems.Declaration
+	Off, Inner, Close, End int
+	Opt                    string
+	HasOpt, Closed         bool
+	// Labels is the labels that the body of a command wrapper sets, as
+	// \label{#2}, with the arguments of the use put in.
+	Labels []string
+}
+
+// CommandEnvs finds each \definition ... \enddefinition, the form of an
+// environment as two commands that Plain TeX writes and LaTeX reads too, and
+// each \nota at the start of a line that nothing closes, which starts the
+// environment all the same, to the end of its paragraph.
+func CommandEnvs(d *tex.Document, set *theorems.Set) []CommandEnv {
+	if d == nil || set == nil || d.Body == 0 {
+		return nil
+	}
+	var out []CommandEnv
+	body := d.Text[d.Body:d.End]
+	for _, decl := range set.List() {
+		if decl.LeadOnly || decl.TitleArg || decl.NumberArg > 0 || !plainName.MatchString(decl.Env) {
+			continue
+		}
+		re := regexp.MustCompile(`\\(end)?` + regexp.QuoteMeta(decl.Env) + `(?:[^A-Za-z@]|$)`)
+		open := -1
+		for _, m := range re.FindAllSubmatchIndex(body, -1) {
+			off := d.Body + m[0]
+			if (off > 0 && d.Text[off-1] == '\\') || inDefinition(d.Text, off) {
+				continue
+			}
+			if m[2] < 0 {
+				if open >= 0 {
+					out = appendUnclosed(out, d, decl, open)
+				}
+				open = off
+				continue
+			}
+			if open < 0 {
+				continue
+			}
+			e := commandEnv(d, decl, open)
+			e.Close, e.End, e.Closed = off, off+len(`\end`)+len(decl.Env), true
+			out = append(out, e)
+			open = -1
+		}
+		if open >= 0 {
+			out = appendUnclosed(out, d, decl, open)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Off < out[j].Off })
+	return out
+}
+
+func commandEnv(d *tex.Document, decl *theorems.Declaration, open int) CommandEnv {
+	e := CommandEnv{Decl: decl, Off: open, Inner: open + 1 + len(decl.Env)}
+	if j := skipSpace(d.Text, e.Inner); j < d.End && d.Text[j] == '[' {
+		if in, end, ok := tex.Group(d.Text, j); ok && end-j < 2000 {
+			e.Opt, e.HasOpt, e.Inner = string(d.Text[in:end-1]), true, end
+		}
+	}
+	return e
+}
+
+func appendUnclosed(out []CommandEnv, d *tex.Document, decl *theorems.Declaration, open int) []CommandEnv {
+	if decl.Proof {
+		return out
+	}
+	i := open - 1
+	for i >= 0 && (d.Text[i] == ' ' || d.Text[i] == '\t') {
+		i--
+	}
+	if i >= 0 && d.Text[i] != '\n' {
+		return out
+	}
+	e := commandEnv(d, decl, open)
+	e.Close = d.End
+	if p := blankLine.FindIndex(d.Text[e.Inner:d.End]); p != nil {
+		e.Close = e.Inner + p[0]
+	}
+	e.End = e.Close
+	return append(out, e)
+}
+
+// MacroEnvs finds each use of a command of the paper that writes a whole
+// environment around one of its arguments, as
+// \newcommandtwoopt{\theo}[3][][]{\begin{theorem}[#1]\label{#2} #3\end{theorem}}
+// and \theo[Main]{main}{...}, and each use of a command that writes a proof
+// head before its argument, as \renewcommand{\proof}[1]{\textsc{Proof.} #1\qed}.
+// The body of the item is the argument in the text of the paper.
+func MacroEnvs(d *tex.Document, set *theorems.Set) []CommandEnv {
+	if d == nil || set == nil || d.Body == 0 || d.Macros == nil {
+		return nil
+	}
+	var out []CommandEnv
+	for _, name := range sortedCommands(d.Macros) {
+		mac := d.Macros.Commands[name]
+		w, ok := wrapOf(mac, set)
+		if !ok {
+			continue
+		}
+		call := regexp.MustCompile(regexp.QuoteMeta(name) + `(?:[^A-Za-z@]|$)`)
+		body := d.Text[d.Body:d.End]
+		for _, m := range call.FindAllIndex(body, -1) {
+			off := d.Body + m[0]
+			if (off > 0 && d.Text[off-1] == '\\') || inDefinition(d.Text, off) {
+				continue
+			}
+			a, end, ok := tex.ReadArgs(d.Text, off+len(name), mac.Spec())
+			if !ok || len(a.Values) < mac.Args || a.Offs[w.body-1] < 0 {
+				continue
+			}
+			val := func(k int) string {
+				if a.Has[k-1] {
+					return a.Values[k-1]
+				}
+				if k == 2 {
+					return mac.Default2
+				}
+				return mac.Default
+			}
+			sub := func(t string) string {
+				for k := mac.Args; k >= 1; k-- {
+					t = strings.ReplaceAll(t, "#"+strconv.Itoa(k), val(k))
+				}
+				return strings.TrimSpace(t)
+			}
+			inner := a.Offs[w.body-1]
+			e := CommandEnv{Decl: w.decl, Off: off, Inner: inner, Close: inner + len(a.Values[w.body-1]), End: end, Closed: true}
+			if e.Opt = sub(w.opt); e.Opt != "" {
+				e.HasOpt = true
+			}
+			if l := sub(w.label); l != "" {
+				e.Labels = []string{l}
+			}
+			out = append(out, e)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Off < out[j].Off })
+	return out
+}
+
+// macroWrap is what a command of the paper writes around its argument body,
+// from 1: the environment, its option and its label, with the #k of the
+// command in them.
+type macroWrap struct {
+	decl       *theorems.Declaration
+	opt, label string
+	body       int
+}
+
+var (
+	wrapBody  = regexp.MustCompile(`(?s)^\s*\\begin\s*\{([^{}]+)\}\s*(\[[^\[\]]*\])?\s*(\\label\s*\{[^{}]*\})?\s*#([1-9])(.*)\\end\s*\{([^{}]+)\}\s*$`)
+	proofBody = regexp.MustCompile(`(?s)^\s*(?:\\begin\s*\{adjustwidth\}\s*\{[^{}]*\}\s*\{[^{}]*\})?\s*\\(?:textsc|textbf|textit|emph)\s*\{\s*(Proof[^{}]*?)\s*\}\s*#1`)
+)
+
+func wrapOf(mac *tex.Macro, set *theorems.Set) (macroWrap, bool) {
+	if mac.Args < 1 || mac.How != "newcommand" {
+		return macroWrap{}, false
+	}
+	if m := wrapBody.FindStringSubmatch(mac.Body); m != nil && m[1] == m[6] && !strings.Contains(m[5], `\begin{`+m[1]) {
+		decl := set.Get(strings.TrimSpace(m[1]))
+		if decl == nil || decl.LeadOnly || decl.TitleArg || decl.NumberArg > 0 {
+			return macroWrap{}, false
+		}
+		k, _ := strconv.Atoi(m[4])
+		w := macroWrap{decl: decl, body: k}
+		if m[2] != "" {
+			w.opt = m[2][1 : len(m[2])-1]
+		}
+		if m[3] != "" {
+			w.label = m[3][strings.Index(m[3], "{")+1 : len(m[3])-1]
+		}
+		return w, k <= mac.Args
+	}
+	if m := proofBody.FindStringSubmatch(mac.Body); m != nil && mac.Args == 1 {
+		decl := set.Get("proof")
+		if decl == nil || !decl.Proof {
+			decl = &theorems.Declaration{Env: "proof", Item: "proof", Proof: true, From: "wrapper", Off: -1}
+		}
+		w := macroWrap{decl: decl, body: 1}
+		if h := strings.TrimSuffix(strings.TrimSpace(m[1]), "."); h != "Proof" {
+			w.opt = h
+		}
+		return w, true
+	}
+	return macroWrap{}, false
+}
+
+func sortedCommands(m *tex.Macros) []string {
+	out := make([]string, 0, len(m.Commands))
+	for k := range m.Commands {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+var plainName = regexp.MustCompile(`^[A-Za-z]+$`)
+
+var blankLine = regexp.MustCompile(`\n[ \t]*\n`)
+
+// argAt gives the k-th argument in braces after at, from 1, or "".
+func argAt(text []byte, at, k int) string {
+	for i := 1; ; i++ {
+		j := skipSpace(text, at)
+		if j >= len(text) || text[j] != '{' {
+			return ""
+		}
+		in, e, ok := tex.Group(text, j)
+		if !ok {
+			return ""
+		}
+		if i == k {
+			return strings.TrimSpace(string(text[in : e-1]))
+		}
+		at = e
 	}
 }
 
@@ -262,10 +527,14 @@ func closeOf(d *tex.Document, name string, from int) (close, end int) {
 // heads counts each manual head of AX3.4 outside the env occurrences.
 func (c *Census) heads() {
 	var skip []tex.Region
+	var stops []int
 	for _, o := range c.Occurrences {
-		skip = append(skip, tex.Region{From: o.Off, To: o.End})
+		skip = append(skip, tex.Region{From: o.Off, To: o.End, Part: o.Type == Env && theorems.PartOfProof(o.Item), Statement: o.Type == Env && theorems.EndsAProof(o.Item)})
+		if o.Type == Env && theorems.EndsAProof(o.Item) {
+			stops = append(stops, o.Off)
+		}
 	}
-	for _, h := range theorems.FindHeads(c.In.Doc, c.In.Titles, skip) {
+	for _, h := range theorems.FindHeads(c.In.Doc, c.In.Titles, skip, stops...) {
 		typ := Head
 		if h.Proof {
 			typ = Proof
@@ -274,6 +543,7 @@ func (c *Census) heads() {
 		o.Title, o.Item, o.Close, o.End = h.Title, h.Item, h.End, h.End
 		o.Number, o.Confidence = h.Number, h.Confidence()
 		o.Opt = h.Name
+		o.code = h.Code
 		if h.Proof {
 			o.Item = "proof"
 			o.Opt = h.Target

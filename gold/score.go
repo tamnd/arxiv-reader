@@ -59,46 +59,26 @@ type PaperScore struct {
 func ScorePaper(g Record, recs []objects.Record) PaperScore {
 	s := PaperScore{Paper: g.Paper, Version: g.Version, Group: g.Group, Decade: DecadeOf(yearOf(g.Paper))}
 	items := Items(recs, strconv.Itoa(g.Version))
+	match := Align(g, items)
 	used := make([]bool, len(items))
-	match := map[string]int{}
-	byLocal := map[string]int{}
-	for i, o := range items {
-		byLocal[o.Local] = i
+	for _, i := range match {
+		used[i] = true
 	}
 	for _, m := range g.Marks {
-		best, bestScore := -1, 0
-		for i, o := range items {
-			if used[i] || o.Kind != m.Kind {
-				continue
-			}
-			sc := 0
-			switch {
-			case m.File != "" && o.Span != nil && o.Span.File == m.File && o.Span.From <= m.To && m.From <= o.Span.To:
-				sc = 3
-			case m.Label != "" && (o.Label == m.Label || contains(o.Labels, m.Label)):
-				sc = 2
-			case m.Number != "" && o.Number == m.Number:
-				sc = 1
-			}
-			if sc > bestScore {
-				best, bestScore = i, sc
-			}
-		}
+		_, ok := match[m.ID]
 		if m.Prose {
 			s.Prose.Of++
+			if ok {
+				s.Prose.Hit++
+			}
 		} else {
 			s.Recall.Of++
+			if ok {
+				s.Recall.Hit++
+			}
 		}
-		if best < 0 {
+		if !ok {
 			s.Missed = append(s.Missed, m.ID)
-			continue
-		}
-		used[best] = true
-		match[m.ID] = best
-		if m.Prose {
-			s.Prose.Hit++
-		} else {
-			s.Recall.Hit++
 		}
 	}
 	for i, o := range items {
@@ -135,6 +115,63 @@ func ScorePaper(g Record, recs []objects.Record) PaperScore {
 		}
 	}
 	return s
+}
+
+// Align matches the marks of a gold record to the items of the extractor. It
+// gives, for each matched mark, the index of its item.
+func Align(g Record, items []objects.Record) map[string]int {
+	used := make([]bool, len(items))
+	match := map[string]int{}
+	// The matches are made strongest first: each overlapping span, then each
+	// label, then each number. A mark that agrees with an item only in its
+	// number then does not take the item whose span another mark overlaps.
+	score := func(m Mark, o objects.Record) int {
+		switch {
+		case m.File != "" && o.Span != nil && o.Span.File == m.File && o.Span.From <= m.To && m.From <= o.Span.To:
+			return 3
+		case m.Label != "" && (o.Label == m.Label || contains(o.Labels, m.Label)):
+			return 2
+		case m.Number != "" && o.Number == m.Number:
+			return 1
+		}
+		return 0
+	}
+	// Among the overlapping spans, the closest pairs match first, so a mark
+	// whose span holds a whole section does not take the item of a proof
+	// inside it from the mark of that proof.
+	type pair struct{ m, i, d int }
+	var pairs []pair
+	for k, m := range g.Marks {
+		for i, o := range items {
+			if o.Kind == m.Kind && score(m, o) == 3 {
+				pairs = append(pairs, pair{k, i, abs(o.Span.From-m.From) + abs(o.Span.To-m.To)})
+			}
+		}
+	}
+	sort.SliceStable(pairs, func(a, b int) bool { return pairs[a].d < pairs[b].d })
+	for _, p := range pairs {
+		id := g.Marks[p.m].ID
+		if _, ok := match[id]; ok || used[p.i] {
+			continue
+		}
+		used[p.i] = true
+		match[id] = p.i
+	}
+	for level := 2; level >= 1; level-- {
+		for _, m := range g.Marks {
+			if _, ok := match[m.ID]; ok {
+				continue
+			}
+			for i, o := range items {
+				if !used[i] && o.Kind == m.Kind && score(m, o) == level {
+					used[i] = true
+					match[m.ID] = i
+					break
+				}
+			}
+		}
+	}
+	return match
 }
 
 func contains(xs []string, x string) bool {
@@ -285,4 +322,11 @@ func markers(by map[string]int) string {
 		parts[i] = prose.Thousands(by[n]) + " by " + n
 	}
 	return " (" + strings.Join(parts, ", ") + ")"
+}
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
 }

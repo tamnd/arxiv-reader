@@ -2,6 +2,7 @@ package analysis
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/tamnd/arxiv-reader/tex"
@@ -10,8 +11,9 @@ import (
 
 var (
 	headNumber = regexp.MustCompile(`(?i)^(?:the\s+)?([A-Za-z][A-Za-z -]{0,30}?)\s*~?\s*(\d+(?:\.\d+)*[a-z]?|(?-i:[A-Z])(?:\.\d+)*)\b`)
+	mathRef    = regexp.MustCompile(`\$[^$]{1,30}\$`)
 	mainName   = regexp.MustCompile(`(?i)^(?:the\s+)?main\s+(theorem|result|lemma|proposition)s?$`)
-	otherProof = regexp.MustCompile(`(?i)\b(second|alternative|another|third|new)\s+proof\b`)
+	otherProof = regexp.MustCompile(`(?i)\b(second|alternative|another|third|new)\s+proof\b|^\s*proof\s+(?:\d+|[ivx]+|[a-z])\s*[.:]?\s*$`)
 	citeNear   = regexp.MustCompile(`\\cite[a-zA-Z]*\*?\s*(?:\[[^\]]*\]\s*){0,2}\{[^{}]*\}`)
 	sentence   = regexp.MustCompile(`[.!?](?:\s|$)`)
 )
@@ -38,9 +40,17 @@ func (b *Builder) attach(d *tex.Document, items []*item) {
 			continue
 		}
 		r := &it.rec
-		target := it.opt
+		target := expandRefs(d.Macros, it.opt)
+		// "Proof that Lemma 1 implies Theorem 2" proves Theorem 2.
+		if m := impliesIn.FindStringIndex(target); m != nil && refIn.MatchString(target[m[1]:]) {
+			target = target[m[1]:]
+		}
 		// Rule 1: a reference to a label in the head.
-		if m := refIn.FindStringSubmatch(target); m != nil {
+		m := refIn.FindStringSubmatch(target)
+		if m == nil && it.wrapRef != "" {
+			m = refIn.FindStringSubmatch(expandRefs(d.Macros, it.wrapRef))
+		}
+		if m != nil {
 			key := strings.TrimSpace(strings.Split(m[1], ",")[0])
 			if t, ok := byLabel[key]; ok && t != it {
 				r.Proves, r.Attach, r.Confidence = t.rec.Local, 1, "certain"
@@ -54,9 +64,26 @@ func (b *Builder) attach(d *tex.Document, items []*item) {
 				continue
 			}
 		}
-		// Rule 2: a number or a name in the head.
-		if t := b.byNumber(items, target); t != nil && t != it {
+		// Rule 2: a number or a name in the head. A label such as A1 names the
+		// last claim with that label before the proof.
+		if t := lastClaim(items, i, theorems.LabelKey(stripProofOf(target))); t != nil {
 			r.Proves, r.Attach, r.Confidence = t.rec.Local, 2, "high"
+			continue
+		}
+		if t := b.byNumber(items, it, target); t != nil && t != it {
+			r.Proves, r.Attach, r.Confidence = t.rec.Local, 2, "high"
+			continue
+		}
+		if t := b.theLast(items, i, target); t != nil {
+			r.Proves, r.Attach, r.Confidence = t.rec.Local, 2, "medium"
+			continue
+		}
+		// The sentence before the proof names what it proves, as "We are now
+		// able to prove Theorem \ref{main}." or \renewcommand{\proofname}{Proof
+		// of \prref{cat}}.
+		if t := leadIn(d, items, i, byLabel); t != nil {
+			r.Proves, r.Attach, r.Confidence = t.rec.Local, 2, "high"
+			r.Flags = append(r.Flags, "lead-in")
 			continue
 		}
 		prev := previous(items, i)
@@ -78,6 +105,14 @@ func (b *Builder) attach(d *tex.Document, items []*item) {
 					r.Confidence = "high"
 				}
 				continue
+			case !prev.proof && remarkBetween(d, items, prev) != nil:
+				// A remark between a statement and its proof, as "\\end{lemma}
+				// \\begin{remark} We will later apply this ... \\end{remark}
+				// \\begin{proof}". The proof proves the statement.
+				t := remarkBetween(d, items, prev)
+				r.Proves, r.Attach, r.Confidence = t.rec.Local, 3, "medium"
+				r.Flags = append(r.Flags, "remark-between")
+				continue
 			case !prev.proof:
 				// Rule 4: right after a definition, a remark or an example.
 				r.Proves, r.Attach, r.Confidence = prev.rec.Local, 4, "high"
@@ -89,9 +124,96 @@ func (b *Builder) attach(d *tex.Document, items []*item) {
 				continue
 			}
 		}
+		// A proof after a statement with a short text between them, as "In
+		// particular, C(G) is not trivial.", proves the statement.
+		if prev != nil && isStatement(prev) && shortGap(d, prev, it) {
+			r.Proves, r.Attach, r.Confidence = prev.rec.Local, 3, "medium"
+			r.Flags = append(r.Flags, "text-between")
+			continue
+		}
+		// A proof after a statement, with paragraphs of remarks and no
+		// environment or section between, proves it. A statement written by
+		// hand ends where the paper does not say, and its end is a guess at
+		// the first blank line, as "{\bf Proposition 9.2.3} ... (4) ... {\bf
+		// Proof}: (1) ...".
+		if prev != nil && isStatement(prev) && (prev.head == nil || !prev.head.EndMark) && longGap(d, prev, it) {
+			r.Proves, r.Attach, r.Confidence = prev.rec.Local, 3, "medium"
+			r.Flags = append(r.Flags, "text-between")
+			continue
+		}
+		// A proof inside a statement, with no item before it there, proves
+		// the statement, as a paper writes \begin{proof} before
+		// \end{theorem}.
+		if prev == nil && it.parent != nil && isStatement(it.parent) {
+			r.Proves, r.Attach, r.Confidence = it.parent.rec.Local, 3, "high"
+			continue
+		}
+		// A proof inside a remark or an example proves it, as a remark that
+		// lists facts, each with its proof, and so does each proof after it
+		// there.
+		if it.parent != nil && !it.parent.proof && (prev == nil || prev.proof && prev.rec.Proves == it.parent.rec.Local) {
+			r.Proves, r.Attach, r.Confidence = it.parent.rec.Local, 4, "medium"
+			r.Flags = append(r.Flags, "proves-non-statement")
+			continue
+		}
 		// Rule 6: an orphan. AX7.6 proposes a target.
 		r.Flags = append(r.Flags, "orphan")
 	}
+}
+
+// leadWords is a sentence that leads into a proof and names what it proves.
+var leadWords = regexp.MustCompile(`(?i)\b(?:prove|proof|derive|establish)[a-z]*\b[^.;]{0,80}?\\ref\s*\{([^{}]+)\}`)
+
+// leadIn gives the statement that the last paragraph before a proof names
+// with a verb of proving and a reference, or nil. The paragraph is after the
+// item before the proof, and at most 400 bytes long.
+func leadIn(d *tex.Document, items []*item, i int, byLabel map[string]*item) *item {
+	it := items[i]
+	from := max(d.Body, it.off-400)
+	for j := i - 1; j >= 0; j-- {
+		if items[j].end <= it.off {
+			from = max(from, items[j].end)
+			break
+		}
+	}
+	if from >= it.off {
+		return nil
+	}
+	text := string(d.Text[from:it.off])
+	if k := strings.LastIndex(strings.TrimRight(text, " \t\r\n"), "\n\n"); k >= 0 {
+		text = text[k:]
+	}
+	ms := leadWords.FindAllStringSubmatch(expandRefs(d.Macros, text), -1)
+	if ms == nil {
+		return nil
+	}
+	key := strings.TrimSpace(strings.Split(ms[len(ms)-1][1], ",")[0])
+	if t, ok := byLabel[key]; ok && t != it && isStatement(t) {
+		return t
+	}
+	return nil
+}
+
+// refCall is a call of a command with one argument.
+var refCall = regexp.MustCompile(`(\\[A-Za-z]+)\s*\{([^{}]*)\}`)
+
+// expandRefs writes out each command of the paper that makes a reference, as
+// \newcommand{\refmt}[1]{Theorem~\ref{mt:#1}} in math/9902147v1, so that the
+// head names the label.
+var impliesIn = regexp.MustCompile(`\bimpl(?:y|ies)\b`)
+
+func expandRefs(m *tex.Macros, s string) string {
+	if m == nil || !strings.Contains(s, `\`) {
+		return s
+	}
+	return refCall.ReplaceAllStringFunc(s, func(call string) string {
+		x := refCall.FindStringSubmatch(call)
+		c := m.Commands[x[1]]
+		if c == nil || c.Args != 1 || !refIn.MatchString(c.Body) {
+			return call
+		}
+		return strings.ReplaceAll(c.Body, "#1", x[2])
+	})
 }
 
 func stripProofOf(s string) string {
@@ -105,30 +227,121 @@ func stripProofOf(s string) string {
 	return s
 }
 
+// nameKey is the name of a statement or the name in the head of a proof, in
+// lower case and with no command, as "computational adequacy" for "Proof of
+// computational adequacy \textnormal{(...)}".
+func nameKey(s string) string {
+	if i := strings.IndexAny(s, `\($`); i >= 0 {
+		s = s[:i]
+	}
+	return strings.Join(strings.Fields(strings.Trim(strings.ToLower(s), " .:;,")), " ")
+}
+
+// byName gives the one statement whose name is the head of a proof, as
+// \begin{proof}[Proof of computational adequacy] after
+// \begin{therm}[Computational adequacy], or nil.
+func byName(items []*item, h string) *item {
+	k := nameKey(h)
+	if len(k) < 6 {
+		return nil
+	}
+	var found *item
+	for _, it := range items {
+		if it.proof || !it.hasOpt || !isStatement(it) || nameKey(it.opt) != k {
+			continue
+		}
+		if found != nil {
+			return nil
+		}
+		found = it
+	}
+	return found
+}
+
+// theHead is the head of a proof that names a kind and no number, as "Proof
+// of the theorem".
+var theHead = regexp.MustCompile(`(?i)^\s*(?:proof\s+)?of\s+the\s+([a-z]+)\s*[.:]?\s*$`)
+
+// theLast gives the last statement of the kind that the head of items[i]
+// names with no number, as "Proof of the theorem", when no proof before
+// items[i] proves it, or nil.
+func (b *Builder) theLast(items []*item, i int, head string) *item {
+	m := theHead.FindStringSubmatch(head)
+	if m == nil {
+		return nil
+	}
+	kind := b.Titles.Kind(m[1])
+	if kind == "" || !strings.HasPrefix(kind, "statement") {
+		return nil
+	}
+	for j := i - 1; j >= 0; j-- {
+		t := items[j]
+		if t.proof || t.rec.Item != kind {
+			continue
+		}
+		for _, p := range items[j+1 : i] {
+			if p.proof && p.rec.Proves == t.rec.Local {
+				return nil
+			}
+		}
+		return t
+	}
+	return nil
+}
+
+// lastClaim is the last claim before items[i] whose number is label.
+func lastClaim(items []*item, i int, label string) *item {
+	if label == "" {
+		return nil
+	}
+	for k := i - 1; k >= 0; k-- {
+		if it := items[k]; !it.proof && it.rec.Item == "statement/claim" && it.rec.Number == label && it.head != nil && it.head.Form == "label" {
+			return it
+		}
+	}
+	return nil
+}
+
 // byNumber resolves "Lemma 3.2", "Theorem A" or "the Main Theorem" in a head
-// to an item with that title and number.
-func (b *Builder) byNumber(items []*item, head string) *item {
+// to an item with that title and number. Of two items with the title and the
+// number, the one in the item that holds the proof comes first, as the proof
+// of Claim 1 in a proof proves the claim 1 of that proof.
+func (b *Builder) byNumber(items []*item, proof *item, head string) *item {
 	h := strings.TrimSpace(stripProofOf(head))
 	h = strings.TrimPrefix(strings.TrimPrefix(h, "of "), "for ")
 	if h == "" {
 		return nil
 	}
+	// "Theorem $A$" names the head that prints Theorem A.
+	h = mathRef.ReplaceAllStringFunc(h, theorems.MathNumber)
 	if m := headNumber.FindStringSubmatch(h); m != nil {
 		title, number := strings.TrimSpace(m[1]), m[2]
 		kind := b.Titles.Kind(title)
-		var any *item
+		var same, any *item
 		for _, it := range items {
 			if it.proof || it.rec.Number != number {
 				continue
 			}
 			if theorems.Normalize(it.rec.Title) == theorems.Normalize(title) || it.rec.Item == kind {
-				return it
+				if proof != nil && it.parent != nil && it.parent == proof.parent {
+					return it
+				}
+				if same == nil {
+					same = it
+				}
+				continue
 			}
 			if any == nil {
 				any = it
 			}
 		}
+		if same != nil {
+			return same
+		}
 		return any
+	}
+	if t := byName(items, h); t != nil {
+		return t
 	}
 	if mainName.MatchString(h) {
 		var found *item
@@ -147,6 +360,38 @@ func (b *Builder) byNumber(items []*item, head string) *item {
 		return found
 	}
 	return nil
+}
+
+// remarkBetween gives the statement right before the remark prev, or nil.
+func remarkBetween(d *tex.Document, items []*item, prev *item) *item {
+	if !strings.HasPrefix(prev.rec.Item, "remark") {
+		return nil
+	}
+	j := slices.Index(items, prev)
+	if j < 0 {
+		return nil
+	}
+	pp := previous(items, j)
+	if pp == nil || !isStatement(pp) || citedStatement(d, pp) {
+		return nil
+	}
+	if ok, _ := adjacent(d, pp, prev); !ok {
+		return nil
+	}
+	return pp
+}
+
+// citedStatement tells if a statement is a result of another paper, which
+// names its source in the head or in its first words, as "\begin{lem}
+// \cite{dani} If ...".
+func citedStatement(d *tex.Document, it *item) bool {
+	if len(it.rec.CitesInHead) > 0 {
+		return true
+	}
+	if it.close <= it.inner {
+		return false
+	}
+	return strings.HasPrefix(strings.TrimSpace(string(d.Text[it.inner:it.close])), `\cite`)
 }
 
 // previous is the item before items[i] at the same depth, or nil.
@@ -170,7 +415,7 @@ func previous(items []*item, i int) *item {
 
 // floatEnv is a float environment. TeX moves a float, so a float between a
 // statement and a proof does not separate them.
-var floatEnv = regexp.MustCompile(`(?s)\\begin\s*\{(figure|table|wrapfigure|wraptable|algorithm|marginfigure|SCfigure)(\*?)\}.*?\\end\s*\{(?:figure|table|wrapfigure|wraptable|algorithm|marginfigure|SCfigure)\*?\}`)
+var floatEnv = regexp.MustCompile(`(?s)\\begin\s*\{(figure|table|wrapfigure|wraptable|algorithm|marginfigure|SCfigure|longtable)(\*?)\}.*?\\end\s*\{(?:figure|table|wrapfigure|wraptable|algorithm|marginfigure|SCfigure|longtable)\*?\}`)
 
 // adjacent tells if only spacing, labels and end marks are between two items.
 // floats is true when a float is between them too.
@@ -186,6 +431,41 @@ func adjacent(d *tex.Document, a, b *item) (ok, floats bool) {
 		return false, false
 	}
 	return gapOK.Match(floatEnv.ReplaceAll(gap, nil)), true
+}
+
+// gapBreak is what ends the run of a statement into its proof: an
+// environment, a section or a display of the text.
+var gapBreak = regexp.MustCompile(`\\(?:begin|section|subsection|subsubsection|chapter|paragraph)\b|\n[ \t\r]*\n[ \t\r]*\n`)
+
+// shortGap tells if the text between two items is at most two short
+// paragraphs with no environment and no section.
+func shortGap(d *tex.Document, a, b *item) bool {
+	if a.end > b.off || b.off-a.end > 600 {
+		return false
+	}
+	gap := d.Text[a.end:b.off]
+	if gapBreak.Match(gap) {
+		return false
+	}
+	return strings.Count(strings.ReplaceAll(strings.TrimSpace(string(gap)), "\r", ""), "\n\n") <= 1
+}
+
+// partBreak is a break in the text that a statement written by hand does
+// not run over: an environment or a section.
+var partBreak = regexp.MustCompile(`\\(?:begin|section|subsection|subsubsection|chapter|paragraph)\b`)
+
+// displayEnv is a display of mathematics, which is a part of a paragraph.
+var displayEnv = regexp.MustCompile(`(?s)\\begin\s*\{(equation|align|gather|multline|eqnarray|displaymath|flalign|alignat)(\*?)\}.*?\\end\s*\{(?:equation|align|gather|multline|eqnarray|displaymath|flalign|alignat)\*?\}`)
+
+// longGap tells if b follows a with up to a few paragraphs and no
+// environment or section between them. A display of mathematics in the
+// paragraphs does not break them, nor does a float.
+func longGap(d *tex.Document, a, b *item) bool {
+	if a.end > b.off || b.off-a.end > 4000 {
+		return false
+	}
+	gap := displayEnv.ReplaceAll(d.Text[a.end:b.off], nil)
+	return !partBreak.Match(floatEnv.ReplaceAll(gap, nil))
 }
 
 func isStatement(it *item) bool {
@@ -232,7 +512,7 @@ func (b *Builder) status(d *tex.Document, items []*item) {
 			}
 			continue
 		}
-		if t := b.byNumber(items, h.Target); t != nil {
+		if t := b.byNumber(items, nil, h.Target); t != nil {
 			elsewhere[t.rec.Local] = true
 		}
 	}

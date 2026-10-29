@@ -1,0 +1,22 @@
+% Pattern: proof/amsthm/article. A sentence between a statement and its
+% proof, and a proof inside a sloppypar.
+% from 0910.5574, math/0003117
+% want proposition-1 statement/proposition 1 status=here
+% want proof-1 proof - proves=proposition-1 flag=text-between
+% want proposition-2 statement/proposition 2 status=here
+% want proof-2 proof - proves=proposition-2
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{proposition}{Proposition}
+\begin{document}
+\begin{proposition} Each tree is a graph. \end{proposition}
+
+In particular, each forest is a graph.
+
+\begin{proof} A tree has no cycle. \end{proof}
+\begin{proposition} Each path is a tree. \end{proposition}
+
+\begin{sloppypar}
+\begin{proof} A path has no cycle. \end{proof}
+\end{sloppypar}
+\end{document}
