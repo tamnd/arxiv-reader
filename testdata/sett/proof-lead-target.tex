@@ -1,0 +1,19 @@
+% Pattern: proof/lead-target. A proof with no title whose body opens by
+% naming what it proves in parentheses, as "(of Theorem \ref{b})" or
+% "\textit{(Lemma \ref{a})}", proves that item; a title of \thref names it too.
+% seen in the gold pilot (set E)
+% want lemma-1 statement/lemma 1 labels=a
+% want theorem-1 statement/theorem 2 labels=b
+% want proof-1 proof - proves=theorem-1
+% want proof-2 proof - proves=lemma-1
+% want proof-3 proof - proves=theorem-1
+\documentclass{amsart}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\begin{document}
+\begin{lemma}\label{a} Each tree is a graph. \end{lemma}
+\begin{theorem}\label{b} Each path is a tree. \end{theorem}
+\begin{proof} (of Theorem \ref{b}) A path has no cycle. \end{proof}
+\begin{proof} \textit{( Lemma~\ref{a})} A tree is connected. \end{proof}
+\begin{proof}[Proof of \thref{b}] Again a path has no cycle. \end{proof}
+\end{document}

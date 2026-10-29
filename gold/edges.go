@@ -3,6 +3,7 @@ package gold
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/tamnd/arxiv-reader/edges"
@@ -121,10 +122,48 @@ type EdgeScore struct {
 	Missed map[string][]string
 }
 
-// AddPaper scores the edges of one version against its marked record.
-func (s *EdgeScore) AddPaper(g Record, es []edges.Edge) {
+// AddPaper scores the edges of one version against its marked record. The
+// items of the edges are the marks they match, as set X matches them, so an
+// item that a later extractor names otherwise is still the same mark.
+func (s *EdgeScore) AddPaper(g Record, recs []objects.Record, es []edges.Edge) {
 	if s.Precision == nil {
 		s.Precision, s.Missed = map[string]Ratio{}, map[string][]string{}
+	}
+	items := Items(recs, strconv.Itoa(g.Version))
+	name := map[string]string{}
+	for _, o := range items {
+		// An item that no mark matches is no mark, even when its name is
+		// the id of one.
+		name[o.Local] = "ax:" + o.Local
+	}
+	match := Align(g, items)
+	taken := map[int]bool{}
+	for id, i := range match {
+		name[items[i].Local] = id
+		taken[i] = true
+	}
+	// A mark that starts where an item starts is that item, whatever kind
+	// each reading gives it: the target of a use is the same text. A mark
+	// with no place, as one that the proposal wrote, is the item of its id.
+	for _, m := range g.Marks {
+		if _, ok := match[m.ID]; ok {
+			continue
+		}
+		for i, o := range items {
+			same := m.File != "" && o.Span != nil && o.Span.File == m.File && abs(o.Span.From-m.From) <= 2 && (o.Kind == "proof") == (m.Kind == "proof")
+			if !taken[i] && (same || m.File == "" && o.Local == m.ID && o.Kind == m.Kind) {
+				name[o.Local] = m.ID
+				taken[i] = true
+				break
+			}
+		}
+	}
+	markOf := func(id string) string {
+		l := localOf(id)
+		if n, ok := name[l]; ok {
+			return n
+		}
+		return l
 	}
 	proofs := map[string]bool{}
 	for _, m := range g.Marks {
@@ -141,11 +180,11 @@ func (s *EdgeScore) AddPaper(g Record, es []edges.Edge) {
 		if e.Evidence.Version != g.Version || e.Method == edges.Attach || (e.Predicate != edges.Uses && e.Predicate != edges.CitesResult) {
 			continue
 		}
-		from := localOf(e.From)
+		from := markOf(e.From)
 		if !proofs[from] {
 			continue
 		}
-		k := from + " " + localOf(e.To)
+		k := from + " " + markOf(e.To)
 		r := s.Precision[e.Method]
 		r.Of++
 		if marked[k] {

@@ -1,6 +1,6 @@
 # Theorem-like environments that a document class or a package defines before the paper declares anything (AX3.2).
 # Each entry is an environment with its title, its counter, and whether it is numbered.
-# shared names the environment whose counter it uses. A proof entry is a proof environment.
+# shared names the environment whose counter it uses, and within the counter that resets it. A proof entry is a proof environment.
 classes:
   llncs:
     - {env: theorem, title: Theorem}
@@ -103,6 +103,13 @@ classes:
     - {env: definition, title: Definition, shared: theorem}
     - {env: conjecture, title: Conjecture, shared: theorem}
     - {env: axiom, title: Axiom, shared: theorem}
+    - {env: proof, title: Proof, numbered: false, proof: true}
+  siamltex:
+    - {env: theorem, title: Theorem, within: section}
+    - {env: lemma, title: Lemma, shared: theorem}
+    - {env: corollary, title: Corollary, shared: theorem}
+    - {env: proposition, title: Proposition, shared: theorem}
+    - {env: definition, title: Definition, shared: theorem}
     - {env: proof, title: Proof, numbered: false, proof: true}
   amsart:
     - {env: proof, title: Proof, numbered: false, proof: true}

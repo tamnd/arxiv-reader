@@ -1,0 +1,20 @@
+% Pattern: env/numbered/article. An environment whose name ends in a star but
+% that \newtheorem declares without one is numbered, and a title in a font
+% command is read.
+% seen in the gold pilot (set X)
+% want theorem-1 statement/theorem 1 status=none
+% want rem--1 remark 1
+% want rem--2 remark 2
+% want definition--1 definition 1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{\noindent\textbf{Theorem}}
+\theoremstyle{remark}
+\newtheorem{rem*}{\noindent\textbf{Remark}}
+\newtheorem{definition*}{\noindent\textbf{Definition}}
+\begin{document}
+\begin{theorem} Each tree is a graph. \end{theorem}
+\begin{rem*} A path is a tree. \end{rem*}
+\begin{rem*} A cycle is a graph. \end{rem*}
+\begin{definition*} A graph is finite when it has finitely many nodes. \end{definition*}
+\end{document}

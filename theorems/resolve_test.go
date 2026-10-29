@@ -222,3 +222,59 @@ func TestAWrapperThatWritesTheNumberBeforeTheTitle(t *testing.T) {
 		t.Fatalf("lem is %+v, and it must be a numbered lemma", l)
 	}
 }
+
+// TestATitleThatACommandWrites reads the declarations that LyX writes, whose
+// titles are commands defined after them. Seen in the gold pilot (set X).
+func TestATitleThatACommandWrites(t *testing.T) {
+	src := []byte(`\documentclass{article}
+\usepackage{amsthm}
+\theoremstyle{plain}
+\newtheorem{thm}{\protect\theoremname}
+\newtheorem{prop}[thm]{\protect\propositionname}
+\usepackage{babel}
+\providecommand{\propositionname}{Proposition}
+\providecommand{\theoremname}{Theorem}
+\begin{document}
+\begin{thm}A.\end{thm}
+\begin{prop}C.\end{prop}
+\end{document}
+`)
+	d, err := tex.ReadFile("main.tex", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := NewResolver().Resolve(d)
+	for env, want := range map[string]string{"thm": "statement/theorem", "prop": "statement/proposition"} {
+		if e := s.Get(env); e == nil || e.Item != want {
+			t.Errorf("%s is %+v, and it must be %s", env, e, want)
+		}
+	}
+}
+
+// Seen in the gold pilot (set X): the class siamltex defines its theorems,
+// and they share one counter within the section.
+func TestTheSiamltexClassDefinesItsEnvironments(t *testing.T) {
+	d, err := tex.ReadFile("main.tex", []byte(`\documentclass[final]{siamltex}
+\begin{document}
+\section{One}
+\begin{definition} A graph is a set with a relation. \end{definition}
+\begin{proposition} Every graph is a set. \end{proposition}
+\begin{proof} Clear. \end{proof}
+\end{document}
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := NewResolver().Resolve(d)
+	if th := s.Get("theorem"); th == nil || th.Within != "section" || th.From != "class:siamltex" {
+		t.Errorf("theorem is %+v, and it must be numbered within the section", th)
+	}
+	for _, env := range []string{"lemma", "corollary", "proposition", "definition"} {
+		if e := s.Get(env); e == nil || e.Proof || e.Shared != "theorem" || e.From != "class:siamltex" {
+			t.Errorf("%s is %+v, and it must share the theorem counter of siamltex", env, e)
+		}
+	}
+	if p := s.Get("proof"); p == nil || !p.Proof {
+		t.Errorf("proof is %+v, and it must be a proof", p)
+	}
+}

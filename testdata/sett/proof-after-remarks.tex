@@ -1,0 +1,18 @@
+% Pattern: proof/amsthm/amsart. A theorem, then two paragraphs of remarks
+% about it, then its proof, with no environment between.
+% seen in the gold pilot (set X)
+% want thm-1 statement/theorem 1 status=here
+% want proof-1 proof - proves=thm-1
+\documentclass{amsart}
+\newtheorem{thm}{Theorem}
+\begin{document}
+\begin{thm} Each tree with $n$ vertices has $n-1$ edges. \end{thm}
+
+Let us make a few remarks about this result before turning to the proof. The
+bound is sharp for paths, and the converse holds for connected graphs.
+
+A forest with $c$ components has $n-c$ edges, by the same count, and so the
+theorem is the case $c=1$.
+
+\begin{proof} Remove a leaf and use induction. \end{proof}
+\end{document}

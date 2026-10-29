@@ -9,7 +9,7 @@ import (
 )
 
 // number is a printed number: 3.2, 3.2a or A.
-const number = `(?:\d+(?:\.\d+)*[a-z]?|[A-Z](?:\.\d+)*)\b`
+const number = `(?:\d+(?:\.\d+)*[a-z]?|[A-Z](?:\.\d+)*)(?:'+|\b)`
 
 // part is a part marker after a number, as the (ii) of Theorem 2.1(ii).
 const part = `(?:\s*\((?:[ivx]{1,5}|[a-h]|\d{1,2})\))?`
@@ -24,8 +24,12 @@ var (
 	// in [12, Theorem 4.1].
 	beforeOpen = regexp.MustCompile(`\[[^\]]{0,30}$`)
 	// ofCite is a reference to the result of another paper: Theorem 4.1 of
-	// \cite{key}, or Theorem 4.1 in [12].
-	ofCite = regexp.MustCompile(`^\s*(?:of|in|from)\s*(?:~|\s)*(?:\\cite|\[|the\s+paper|\\citet|\\citep|ref\.)`)
+	// \cite{key}, Theorem 4.1 in [12], Corollary 1.1 of Bucher-Connel
+	// \cite{key}, or Lemma 1 in the supplementary material.
+	ofCite = regexp.MustCompile(`^(?:\s*(?:,|and|or)\s*(?:~|\s)*[A-Z][a-z]+\.?(?:~|\s)*` + number + part + `)*(?:\s*(?:of|in)\s+(?:Chapter|Section|Part|\\S)(?:~|\s)*[0-9A-Z.]+)?\s*(?:of|in|from)\s*(?:~|\s)*(?:(?:(?:[A-Z][A-Za-z'-]+|de|van|von|der|den|la|le|du)(?:,|\s+and\s+|\s+)?){1,4}(?:~|\s|\()*\\cite|\\cite|\[|the\s+paper|the\s+supplement|\\citet|\\citep|ref\.)`)
+	// citeBefore is a citation just before a reference to its result:
+	// \cite{key}, Lemma 4, or [22] Theorem C.
+	citeBefore = regexp.MustCompile(`(?:\\cite[a-z]*\*?(?:\s*\[[^\]]*\])*\s*\{[^{}]*\}|\[\d{1,3}(?:\s*,\s*\d{1,3})*\])\s*,?(?:~|\s)*$`)
 	// commaAfter is the locator after a citation: \cite{key}, Theorem 6.
 	commaAfter = regexp.MustCompile(`^\s*,\s*(?:~|\s)*([A-Z][a-z]+\.?(?:~|\s)*` + number + part + `)`)
 	// locatorTitle is a locator that names a result: Theorem 4.1, Lemma 2.
@@ -98,7 +102,7 @@ func (r *resolver) texts() {
 			continue
 		}
 		// A reference to the result of another paper is a citation.
-		if inCite(m[0]) || beforeOpen.Match(body[max(0, m[0]-40):m[0]]) || ofCite.Match(body[m[1]:min(len(body), m[1]+40)]) {
+		if inCite(m[0]) || beforeOpen.Match(body[max(0, m[0]-40):m[0]]) || citeBefore.Match(body[max(0, m[0]-80):m[0]]) || ofCite.Match(body[m[1]:min(len(body), m[1]+80)]) {
 			continue
 		}
 		title := string(body[m[2]:m[3]])
@@ -108,7 +112,7 @@ func (r *resolver) texts() {
 			if off < src.Inner && ref.n == src.Number {
 				continue
 			}
-			t, flags, conf, ok := r.byNumber(title, ref.n, off)
+			t, flags, conf, ok := r.byNumber(src, title, ref.n, off)
 			if !ok {
 				r.res.Dangling++
 				continue
@@ -158,8 +162,11 @@ func between(a, b string) []numbered {
 
 // byNumber finds the item that has the number. The title must agree with the
 // kind of the item. When it does not, and an item with another title has the
-// number, the edge is medium with the flag title-mismatch (AX6.2).
-func (r *resolver) byNumber(title, n string, off int) (target, []string, string, bool) {
+// number, the edge is medium with the flag title-mismatch (AX6.2). Of two
+// items with the number, one in an item that holds the reference comes first,
+// as "By Claim 1" in a proof names the claim of that proof and not the claim
+// 1 of another proof, and then the nearer one.
+func (r *resolver) byNumber(src *Item, title, n string, off int) (target, []string, string, bool) {
 	kind := theorems.Unknown
 	if r.in.Titles != nil {
 		kind = r.in.Titles.Kind(title)
@@ -171,10 +178,10 @@ func (r *resolver) byNumber(title, n string, off int) (target, []string, string,
 			continue
 		}
 		if theorems.Normalize(it.Title) == theorems.Normalize(title) || (kind != theorems.Unknown && it.Kind == kind) {
-			if same == nil || nearer(it, same, off) {
+			if same == nil || r.before(src, it, same, off) {
 				same = it
 			}
-		} else if other == nil || nearer(it, other, off) {
+		} else if other == nil || r.before(src, it, other, off) {
 			other = it
 		}
 	}
@@ -185,6 +192,22 @@ func (r *resolver) byNumber(title, n string, off int) (target, []string, string,
 		return target{local: other.Local}, []string{FlagTitleMismatch}, Medium, true
 	}
 	return target{}, nil, "", false
+}
+
+// before tells if a reference from src at the offset names a before b: a is
+// in an item that holds src and b is not, or the two are alike in that and a
+// is nearer.
+func (r *resolver) before(src, a, b *Item, off int) bool {
+	if sa, sb := r.scoped(src, a), r.scoped(src, b); sa != sb {
+		return sa
+	}
+	return nearer(a, b, off)
+}
+
+// scoped tells if the item is in an item that holds src.
+func (r *resolver) scoped(src, it *Item) bool {
+	p := r.byID[it.Parent]
+	return it.Parent != "" && p != nil && r.inside(src, p)
 }
 
 // nearer tells if a is nearer to the offset than b.

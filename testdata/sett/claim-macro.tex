@@ -1,0 +1,29 @@
+% Pattern: head/command/article. A command of the paper with no argument that
+% starts a paragraph and writes a head in a font, as \claim, writes an
+% unnumbered item at each call. A head number written with a reference takes
+% the number of the label, and a proof head can follow \end{lemma} on its
+% line.
+% from math/0406514
+% want lem-1 statement/lemma 1.1 labels=one
+% want head-1 statement/theorem 1.1A
+% want head-2 statement/claim -
+% want lem-2 statement/lemma 1.2
+% want head-3 proof -
+% want head-4 statement/theorem 1B'
+\documentclass{article}
+\newtheorem{lem}{Lemma}[section]
+\newcommand{\claim}{{\noindent \bf Claim }}
+\newcommand{\Thm}{\textbf{Theorem}}
+\begin{document}
+\section{One}
+\begin{lem}\label{one} Each finite tree has a leaf. \end{lem}
+
+\smallskip \noindent {\bf Theorem {\ref{one}A}} {\em Each finite graph has a vertex.}
+
+\claim The set of leaves is not empty.
+\begin{lem} Each path is a tree. \end{lem} \proof Clear.
+
+\noindent {\bf Theorem 1B'} {\em Each cycle has an edge.}
+
+\Thm{} is a word in this sentence.
+\end{document}

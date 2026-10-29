@@ -1,0 +1,16 @@
+% Pattern: theorem/newtheorem/revtex4-1. The class revtex prints the sections
+% in capital Roman numerals, so a theorem numbered within the sections is II.1.
+% seen in the gold pilot (set X)
+% want theorem-1 statement/theorem I.1
+% want lemma-1 statement/lemma II.1
+% want lemma-2 statement/lemma II.2
+\documentclass[aip,preprint]{revtex4-1}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\begin{document}
+\section{One}
+\begin{theorem} Each tree is a graph. \end{theorem}
+\section{Two}
+\begin{lemma} Each path is a tree. \end{lemma}
+\begin{lemma} Each star is a tree. \end{lemma}
+\end{document}

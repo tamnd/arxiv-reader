@@ -1,0 +1,25 @@
+% Pattern: manual/bold/article and environment/newtheorem*. A bold head whose
+% number is followed by a citation in brackets, as "Lemma 1[6,9]", a numbered
+% claim head on a line after a sentence inside a proof, and a starred
+% environment titled with the names of the authors of a theorem.
+% seen in the gold pilot (set X)
+% want head-1 statement/lemma 1
+% want proof-1 proof -
+% want head-2 statement/claim 2
+% want bl-1 statement/theorem -
+\documentclass{article}
+\newtheorem*{bl}{Smith--Jones}
+\begin{document}
+
+\noindent{\bf Lemma 1[6,9]} {\it Let $G$ be a graph. Then $G$ has a vertex.}
+
+\begin{proof}
+The graph is finite, and the vertex set is not empty.\\
+{\bf Claim 2.}~The set has a least element.
+It is finite.
+\end{proof}
+
+\begin{bl}
+Let $k\geq 1$. Then the set is not empty.
+\end{bl}
+\end{document}

@@ -1,0 +1,23 @@
+% Pattern: proof/in-proof/article. Inside a proof, a claim environment and
+% then a proof written as \proof: the proof is the proof of the claim.
+% seen in the gold pilot (set X)
+% want theorem-1 statement/theorem 1 status=here
+% want proof-1 proof - proves=theorem-1
+% want claim-1 statement/claim 2 status=here
+% want head-1 proof - proves=claim-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\newtheorem{claim}[theorem]{Claim}
+\begin{document}
+\begin{theorem} Each tree is a graph. \end{theorem}
+\begin{proof}
+We argue by contradiction.
+
+\begin{claim}\label{c1} Each path is a tree. \end{claim}
+
+\proof    If a path has a cycle, it is not a path. \qed
+
+So the tree is a graph.
+\end{proof}
+\end{document}

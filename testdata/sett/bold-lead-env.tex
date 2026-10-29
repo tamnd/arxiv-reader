@@ -1,0 +1,16 @@
+% Pattern: env/empty-title. An environment with no title, as
+% \newtheorem{subsec}[equation]{}, whose body leads with a bold title of a
+% known kind, as {\bf Notation.} or {\bf Proof of Theorem \ref{a}.}, is of that
+% kind; a lead of no known kind leaves it as it was.
+% seen in the gold pilot (set X)
+% want thm-1 statement/theorem 1 labels=a
+% want subsec-1 definition/notation 2
+% want subsec-2 proof 3 proves=thm-1
+\documentclass{amsart}
+\newtheorem{thm}{Theorem}
+\newtheorem{subsec}[thm]{}
+\begin{document}
+\begin{thm}\label{a} Each tree with $n$ vertices has $n-1$ edges. \end{thm}
+\begin{subsec}{\bf Notation.} We write $T$ for a tree. \end{subsec}
+\begin{subsec}{\bf Proof of Theorem \ref{a}.} Remove a leaf. \end{subsec}
+\end{document}

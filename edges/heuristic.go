@@ -25,7 +25,9 @@ func (r *resolver) positions() {
 	body := d.Text[d.Body:d.End]
 	read := func(off, end int, word, title string) {
 		src := r.from(off)
-		if src == nil {
+		// "The following theorem of de Jong (\cite{key})" is a result of
+		// another work.
+		if src == nil || ofCite.Match(d.Text[end:min(len(d.Text), end+80)]) {
 			return
 		}
 		back := true
@@ -38,7 +40,7 @@ func (r *resolver) positions() {
 			r.res.Dangling++
 			return
 		}
-		r.link(src, off, end, target{local: dst.Local}, Position, Medium, nil)
+		r.link(src, off, end, target{local: dst.Local, forward: !back}, Position, Medium, nil)
 	}
 	for _, m := range before.FindAllSubmatchIndex(body, -1) {
 		read(d.Body+m[0], d.Body+m[1], string(body[m[2]:m[3]]), string(body[m[4]:m[5]]))
@@ -170,6 +172,10 @@ var (
 	mathSpan = regexp.MustCompile(`(?s)\$\$.*?\$\$|\$[^$]*\$|\\\(.*?\\\)|\\\[.*?\\\]`)
 )
 
+// byDefinition is an appeal to a definition just before its term, as "by the
+// definition of bad gaps" or "by definition, a tame".
+var byDefinition = regexp.MustCompile(`(?i)(?:\bdefinitions?\s+of|\bby\s+definition,?|\bdefined\s+as)\s+(?:an?\s+|the\s+|our\s+)?$`)
+
 // commonTerms are the words that a definition often emphasizes and that are
 // used in each paper, so a use of one is no evidence of an edge.
 var commonTerms = map[string]bool{
@@ -252,6 +258,14 @@ func (r *resolver) terms() {
 			continue
 		}
 		file, line := r.where(off)
-		r.add(Edge{From: r.id(src.Local), To: r.id(def.Local), Predicate: Uses, Method: Term, Confidence: Medium, Evidence: Evidence{File: file, Line: line, Cue: "term"}})
+		// A statement that has a term means what the definition says, so it
+		// uses the definition. In a proof the term is a mention, and it is a
+		// use only when the sentence appeals to the definition, as "by
+		// definition".
+		pred := Uses
+		if (src.Proof || src.InProof) && !byDefinition.Match(text[max(0, m[0]-40):m[0]]) {
+			pred = RefersTo
+		}
+		r.add(Edge{From: r.id(src.Local), To: r.id(def.Local), Predicate: pred, Method: Term, Confidence: Medium, Evidence: Evidence{File: file, Line: line, Cue: "term"}})
 	}
 }

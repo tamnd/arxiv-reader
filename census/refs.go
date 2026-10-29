@@ -47,7 +47,9 @@ func (c *Census) textrefs() {
 		titles[t] = true
 	}
 	for _, o := range c.Occurrences {
-		if o.Type == Head && o.Title != "" {
+		// "Case 2" in the text names a case of the proof it is in, not an
+		// item that the census must have.
+		if o.Type == Head && o.Title != "" && o.Item != "other/case" {
 			titles[o.Title] = true
 		}
 	}
@@ -203,7 +205,9 @@ func (c *Census) checks() {
 	last := map[scope]int{}
 	lastID := map[scope]string{}
 	for _, o := range c.Items() {
-		if o.Type != Env || o.Counter == "" || c.touched[o.Counter] || o.HasFlag("conditional") {
+		// The displays step the counter equation, so an environment that
+		// shares it has gaps.
+		if o.Type != Env || o.Counter == "" || o.Counter == "equation" || c.touched[o.Counter] || o.HasFlag("conditional") {
 			continue
 		}
 		n := o.Number

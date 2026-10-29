@@ -1,0 +1,23 @@
+% Pattern: case/manual/article. Bold case heads in a proof are items, of the
+% kind other/case, and they do not end the proof they are in. A plain
+% "Case 3:" in a sentence is not an item.
+% from 0807.1620, 1006.4470
+% want theorem-1 statement/theorem 1 status=here
+% want proof-1 proof - proves=theorem-1
+% want head-1 other/case 1
+% want head-2 other/case 2
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\begin{document}
+\begin{theorem}
+Each tree with two nodes is a path.
+\end{theorem}
+\begin{proof}
+There are two cases.
+
+\textbf{Case 1.} The tree has one edge. Then it is a path.
+
+\textbf{Case 2.} The tree has no edge. Case 3: there is none.
+\end{proof}
+\end{document}

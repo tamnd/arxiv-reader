@@ -1,0 +1,39 @@
+% Pattern: theorem/newenvironment/article. Environments that number
+% themselves: each sets its counter to the equations, steps the equations
+% and steps its counter, so the items and the equations share one sequence.
+% A heading environment that is not theorem-like steps them too, and a
+% command of the paper sets the equations back to 0.
+% seen in the gold pilot (set X)
+% want lem-1 statement/lemma 1.1
+% want rem-1 remark 1.4
+% want lem-2 statement/lemma 2.1
+\documentclass{article}
+\newcounter{item}
+\renewcommand{\theitem}{\arabic{section}.\arabic{item}}
+\renewcommand{\theequation}{\thesection.\arabic{equation}}
+\newcommand{\cc}{\setcounter{equation}{0}}
+\newenvironment{lem}{
+\setcounter{item}{\value{equation}} \addtocounter{equation}{1}
+\refstepcounter{item}
+\par {\bf \theitem.\hspace{1em}Lemma.} \sl }
+{\par}
+\newenvironment{rem}{
+\setcounter{item}{\value{equation}}\addtocounter{equation}{1}
+\refstepcounter{item}
+\par {\bf \theitem.\hspace{1em}Remark.} }
+{\par}
+\newenvironment{nonsec}{\bf
+\setcounter{item}{\value{equation}}\addtocounter{equation}{1}
+\refstepcounter{item}
+\par \theitem.\hspace{1em}\ignorespaces }
+{\unskip .\ \ \ }
+\begin{document}
+\section{One}
+\begin{lem} Each tree is a graph. \end{lem}
+\begin{nonsec}{Trees}\end{nonsec}
+\begin{equation} a = a \end{equation}
+\begin{rem} The converse fails. \end{rem}
+\section{Two}
+\cc
+\begin{lem} Each path is a tree. \end{lem}
+\end{document}

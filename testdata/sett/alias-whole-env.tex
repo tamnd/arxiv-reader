@@ -1,0 +1,19 @@
+% Pattern: theorem/macro/article. A command that is a whole numbered
+% environment with no title, and a command that opens a lemma and labels it.
+% Both are items, and they share the counter of the lemmas.
+% from math/0406514
+% want lem-1 statement/lemma 1.1 labels=a
+% want sta-1 unknown 1.2
+% want lem-2 statement/lemma 1.3
+\documentclass{article}
+\newtheorem{lem}{Lemma}[section]
+\newtheorem{sta}[lem]{}
+\def\lbl#1{\label{#1}}
+\def\lemm#1{ \begin{lem} \lbl{#1} }
+\def\st { \begin{sta} \ \end{sta}}
+\begin{document}
+\section{One}
+\lemm{a} Each tree is a graph. \end{lem}
+\st Let $T$ be a tree.
+\begin{lem} Each path is a tree. \end{lem}
+\end{document}

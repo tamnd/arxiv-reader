@@ -15,6 +15,7 @@ package edges
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -175,6 +176,8 @@ type target struct {
 	local   string
 	part    string
 	section bool
+	// forward is a reference by position to an item after it.
+	forward bool
 }
 
 type resolver struct {
@@ -346,13 +349,42 @@ func (r *resolver) link(src *Item, off, end int, t target, method, confidence st
 		return
 	}
 	if dst := r.byID[t.local]; dst != nil {
-		// A proof that names what it proves, and an item that names an item
-		// that holds it, are not edges.
-		if r.provesOf(src) == dst.Local || r.inside(src, dst) {
+		// A proof that names what it proves, an item that names an item that
+		// holds it, and an item that names an item in it, as a proof that
+		// names its own claim, are not edges.
+		if r.provesOf(src) == dst.Local || r.inside(src, dst) || r.inside(dst, src) {
+			return
+		}
+		// A label in a proof is an equation of the argument, and a proof is
+		// not a result that another item uses. The head of an item, as "Case
+		// 1", is not a reference to it.
+		if dst.Proof || (off >= dst.Off && off < dst.Inner) {
 			return
 		}
 	}
 	pred, cue := r.predicate(src, off, end)
+	if dst := r.byID[t.local]; pred == Uses && dst != nil && dst.Kind == "other/case" {
+		// A case is a part of an argument, as "in Case 2", not a result.
+		pred = RefersTo
+	}
+	if pred == Uses && t.forward && (cue == CueNone || cue == "gives" || givenBy.Match(r.in.Doc.Text[max(src.Off, off-40):off])) {
+		// "We first prove the following lemma", "the result is given by the
+		// following theorem" and "the following theorem gives" name what
+		// comes next.
+		pred = RefersTo
+	}
+	if pred == Uses && src.Proof && off < src.Inner && (cue == CueNone || cue == "since") {
+		// The head of a proof, as "Proof of Propositions 2 and 3", names what
+		// it proves; "Proof that Lemma 1 implies Theorem 2" and "Proof of Theorem 2
+		// (using Lemma 1)" use Lemma 1.
+		pred = RefersTo
+	}
+	if pred == Uses && slices.Contains(flags, FlagTitleMismatch) {
+		// "Lemma 4.1" when the paper has no Lemma 4.1 but a Proposition 4.1 is
+		// most often a result of another work, or a part, as "Condition 1".
+		// The edge says that the text names the item, not that it uses it.
+		pred = RefersTo
+	}
 	if t.section {
 		pred = RefersTo
 	}

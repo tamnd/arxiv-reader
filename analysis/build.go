@@ -9,10 +9,12 @@ package analysis
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode"
 
+	"github.com/tamnd/arxiv-reader/census"
 	"github.com/tamnd/arxiv-reader/fingerprint"
 	"github.com/tamnd/arxiv-reader/objects"
 	"github.com/tamnd/arxiv-reader/tex"
@@ -37,6 +39,11 @@ type item struct {
 	// wrapLabels is the labels that the begin code of a wrapper sets, as
 	// \label{l:#1} in \newenvironment{lemma}[1]{\begin{Lem}\label{l:#1}}.
 	wrapLabels []string
+	// wrapRef is a reference that the begin code of a wrapper makes out of
+	// the head, as \newenvironment{PROOF}[2][\proofname.]{\begin{proof}[#1]
+	// \renewcommand{\qedsymbol}{...#2...}} in math/9602216v3, whose use
+	// \begin{PROOF}{\ref{X2.6}} names what the proof proves.
+	wrapRef string
 	// normLen is the length of the normalized body, so that two short or
 	// empty bodies do not count as one item restated.
 	normLen int
@@ -63,10 +70,13 @@ type Builder struct {
 }
 
 var (
-	citeIn     = regexp.MustCompile(`\\cite[a-zA-Z]*\*?\s*(?:\[([^\]]*)\])?\s*(?:\[([^\]]*)\])?\s*\{([^{}]*)\}`)
-	refIn      = regexp.MustCompile(`\\(?:ref|cref|Cref|autoref|eqref)\*?\s*\{([^{}]+)\}`)
+	citeIn = regexp.MustCompile(`\\cite[a-zA-Z]*\*?\s*(?:\[([^\]]*)\])?\s*(?:\[([^\]]*)\])?\s*\{([^{}]*)\}`)
+	refIn  = regexp.MustCompile(`\\(?:ref|cref|Cref|autoref|eqref|thref|Thref)\*?\s*\{([^{}]+)\}`)
+	// leadTarget is a proof whose body opens by naming what it proves, as
+	// "\begin{proof} (of Theorem \ref{a})" or "\begin{proof} \textit{(of Lemma \ref{b})}".
+	leadTarget = regexp.MustCompile(`^\s*(?:\\textit\s*\{|\\emph\s*\{|\{\s*\\(?:it|em|bf)\b\s*)?\s*\(\s*(?:(?i:of|for)\s+)?((?:[A-Za-z]+\.?\s*~?\s*)?\\(?:ref|cref|Cref|autoref|thref)\*?\s*\{[^{}]+\})\s*\)`)
 	labelIn    = regexp.MustCompile(`\\label\s*\{([^{}]*)\}`)
-	paraBreak  = regexp.MustCompile(`\n[ \t]*\n|\\par\b`)
+	paraBreak  = regexp.MustCompile(`\n[ \t\r]*\n|\\par\b`)
 	gapOK      = regexp.MustCompile(`^(?:\s|\\label\s*\{[^{}]*\}|\\(?:qed|qedhere|medskip|smallskip|bigskip|noindent|par|vspace\*?\s*\{[^{}]*\}|vskip\s*[\d.]+\w*|newline|hfill|bigbreak|medbreak|smallbreak|goodbreak|nopagebreak|pagebreak|clearpage|newpage)\b|\\(?:begin|end)\s*\{sloppypar\}|\\\\)*$`)
 	restateCmd = regexp.MustCompile(`\\([A-Za-z@]+)\*`)
 	partStart  = regexp.MustCompile(`\\begin\s*\{(enumerate|enumerate\*|itemize|description|parts|romanenumerate|alphenumerate|enumeratei|enumi|thmenum|conditions)\}(\s*\[[^\]]*\])?`)
@@ -138,7 +148,9 @@ func (b *Builder) envItems(d *tex.Document, set *theorems.Set) []*item {
 			continue
 		}
 		var wrapLabels []string
-		if begin, after, ok := wrapperBegin(d, decl, inner); ok {
+		wrapRef := ""
+		if begin, after, ok := wrapperBegin(d, decl, inner, opt, hasOpt); ok {
+			wrapRef = begin
 			if m := innerOpt.FindStringSubmatch(begin); m != nil {
 				opt, hasOpt = m[1], true
 			}
@@ -146,10 +158,19 @@ func (b *Builder) envItems(d *tex.Document, set *theorems.Set) []*item {
 				wrapLabels = append(wrapLabels, strings.TrimSpace(m[1]))
 			}
 			inner = after
+		} else if a, ok := printedArg(d, decl, name, inner); ok && !hasOpt {
+			// \newenvironment{proofof}[1]{{\bf #1.}}{\qed} prints its argument
+			// as the head, as "Proof of Theorem \ref{a}".
+			opt, hasOpt = a, true
 		}
-		it := &item{off: n.From, inner: inner, close: n.Close, end: n.To, opt: opt, hasOpt: hasOpt, decl: decl, restate: restate, proof: decl.Proof, wrapLabels: wrapLabels}
+		it := &item{off: n.From, inner: inner, close: n.Close, end: n.To, opt: opt, hasOpt: hasOpt, decl: decl, restate: restate, proof: decl.Proof, wrapLabels: wrapLabels, wrapRef: wrapRef}
 		it.rec.Env = name
 		it.rec.Title, it.rec.Item, it.inner = decl.TitleOf(d.Text, inner, b.Titles)
+		if decl.LeadOnly && it.rec.Item == theorems.Unknown {
+			// A numbered heading, not an item. The census still counts
+			// its steps.
+			continue
+		}
 		it.rec.Head = "environment"
 		it.rec.Counter = decl.Counter
 		it.rec.Confidence = "certain"
@@ -159,8 +180,39 @@ func (b *Builder) envItems(d *tex.Document, set *theorems.Set) []*item {
 		if decl.Proof {
 			it.rec.Item = "proof"
 		}
+		if it.rec.Item == "proof" && !it.proof {
+			// An environment with no title whose body leads with "{\bf Proof
+			// of Theorem \ref{a}.}" is a proof, and the lead is its head.
+			it.proof = true
+			if !it.hasOpt {
+				it.opt = it.rec.Title
+			}
+		}
+		if it.proof && !it.hasOpt {
+			if m := leadTarget.FindStringSubmatch(string(d.Text[it.inner:min(it.inner+200, it.close)])); m != nil {
+				it.opt, it.hasOpt = "Proof of "+m[1], true
+			}
+		}
 		out = append(out, it)
 	}
+	// \definition ... \enddefinition is an environment too.
+	// So is a command that writes an environment around its argument.
+	for _, e := range append(census.CommandEnvs(d, set), census.MacroEnvs(d, set)...) {
+		it := &item{off: e.Off, inner: e.Inner, close: e.Close, end: e.End, opt: e.Opt, hasOpt: e.HasOpt, decl: e.Decl, proof: e.Decl.Proof, wrapLabels: e.Labels}
+		it.rec.Env = e.Decl.Env
+		it.rec.Title, it.rec.Item, it.inner = e.Decl.TitleOf(d.Text, e.Inner, b.Titles)
+		it.rec.Head = "environment"
+		it.rec.Counter = e.Decl.Counter
+		it.rec.Confidence = "certain"
+		if !e.Closed {
+			it.rec.Confidence = "high"
+		}
+		if e.Decl.Proof {
+			it.rec.Item = "proof"
+		}
+		out = append(out, it)
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].off < out[j].off })
 	return out
 }
 
@@ -173,7 +225,11 @@ var innerOpt = regexp.MustCompile(`\\begin\s*\{[^{}]+\}\s*\[([^\]]*)\]`)
 // optional argument is the head, and for
 // \newenvironment{lemma}[1]{\begin{Lem}\label{l:#1}}{\end{Lem}} the use
 // \begin{lemma}{bfe1} gives the label l:bfe1.
-func wrapperBegin(d *tex.Document, decl *theorems.Declaration, inner int) (string, int, bool) {
+//
+// A wrapper whose first argument is optional, as
+// \newenvironment{Proof}[1][\proofname]{\begin{proof}[#1]...}, takes the
+// option of the use, which the tree read, or else the default.
+func wrapperBegin(d *tex.Document, decl *theorems.Declaration, inner int, opt string, hasOpt bool) (string, int, bool) {
 	if decl.Inner == "" || d.Macros == nil {
 		return "", 0, false
 	}
@@ -184,22 +240,49 @@ func wrapperBegin(d *tex.Document, decl *theorems.Declaration, inner int) (strin
 	if !innerOpt.MatchString(e.Begin) && !labelIn.MatchString(e.Begin) {
 		return "", 0, false
 	}
-	a, end, ok := tex.ReadArgs(d.Text, inner, strings.Repeat("m", e.Args))
+	var first []string
+	n := e.Args
+	if e.HasDefault {
+		v := e.Default
+		if hasOpt {
+			v = opt
+		}
+		first, n = []string{v}, n-1
+	}
+	a, end, ok := tex.ReadArgs(d.Text, inner, strings.Repeat("m", n))
 	if !ok {
 		return "", 0, false
 	}
+	vals := append(first, a.Values...)
 	begin := e.Begin
 	for k := e.Args; k >= 1; k-- {
-		begin = strings.ReplaceAll(begin, "#"+strconv.Itoa(k), a.Values[k-1])
+		begin = strings.ReplaceAll(begin, "#"+strconv.Itoa(k), vals[k-1])
 	}
 	return begin, end, true
+}
+
+// printedArg is the first argument of a use of a proof environment of the
+// paper that prints it in its head.
+func printedArg(d *tex.Document, decl *theorems.Declaration, name string, inner int) (string, bool) {
+	if !decl.Proof || d.Macros == nil {
+		return "", false
+	}
+	e := d.Macros.Envs[name]
+	if e == nil || e.Args < 1 || e.HasDefault || !strings.Contains(e.Begin, "#1") {
+		return "", false
+	}
+	a, _, ok := tex.ReadArgs(d.Text, inner, "m")
+	if !ok {
+		return "", false
+	}
+	return a.Values[0], true
 }
 
 func (b *Builder) headItems(d *tex.Document, envs []*item) []*item {
 	var skip []tex.Region
 	var stops []int
 	for _, e := range envs {
-		skip = append(skip, tex.Region{From: e.off, To: e.end})
+		skip = append(skip, tex.Region{From: e.off, To: e.end, Part: !e.proof && theorems.PartOfProof(e.rec.Item), Statement: !e.proof && theorems.EndsAProof(e.rec.Item)})
 		if !e.proof && theorems.EndsAProof(e.rec.Item) {
 			stops = append(stops, e.off)
 		}
@@ -374,6 +457,7 @@ func (b *Builder) fill(d *tex.Document, items []*item) {
 			body = string(d.Text[it.inner:it.close])
 		}
 		r.Labels, r.Parts = labels(body, it.inner)
+		r.Labels = append(r.Labels, macroLabels(d.Macros, body)...)
 		r.Labels = append(append([]string(nil), it.wrapLabels...), r.Labels...)
 		if it.hasOpt {
 			for _, m := range labelIn.FindAllStringSubmatch(it.opt, -1) {
@@ -599,6 +683,29 @@ func labels(body string, base int) ([]string, []objects.Part) {
 		parts = nil
 	}
 	return own, parts
+}
+
+// macroLabels gives the labels that a command of the paper sets in the first
+// paragraph of a body, as \newcommand{\prlabel}[1]{\label{pr:#1}} in
+// 0902.4012v5.
+func macroLabels(m *tex.Macros, body string) []string {
+	if m == nil {
+		return nil
+	}
+	if pb := paraBreak.FindStringIndex(body); pb != nil {
+		body = body[:pb[0]]
+	}
+	var out []string
+	for _, x := range refCall.FindAllStringSubmatch(body, -1) {
+		c := m.Commands[x[1]]
+		if c == nil || c.Args != 1 || x[1] == `\label` {
+			continue
+		}
+		if l := labelIn.FindStringSubmatch(c.Body); l != nil && strings.Contains(l[1], "#1") {
+			out = append(out, strings.TrimSpace(strings.ReplaceAll(l[1], "#1", x[2])))
+		}
+	}
+	return out
 }
 
 // autoMarker is the printed marker of the k-th item of an enumeration with an

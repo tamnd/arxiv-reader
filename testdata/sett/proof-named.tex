@@ -1,0 +1,50 @@
+% Pattern: proof/amsthm/amsart. A proof whose head gives the name of a
+% statement, as [Proof of computational adequacy], proves the statement of
+% that name; "Proof of the theorem" proves the last theorem before it; and a
+% table between a statement and its proof does not break them.
+% seen in the gold pilot (set X)
+% want thm-1 statement/theorem 1
+% want lem-1 statement/lemma 2
+% want proof-1 proof - proves=lem-1
+% want proof-2 proof - proves=thm-1
+% want thm-2 statement/theorem 3
+% want lem-2 statement/lemma 4
+% want proof-3 proof - proves=lem-2
+% want proof-4 proof - proves=thm-2
+% want lem-3 statement/lemma 5
+% want proof-5 proof - proves=lem-3
+\documentclass{amsart}
+\usepackage{longtable}
+\newtheorem{thm}{Theorem}
+\newtheorem{lem}[thm]{Lemma}
+\begin{document}
+\begin{thm}[Computational adequacy] Each closed term of ground type halts. \end{thm}
+
+We first prove a lemma.
+
+\begin{lem} Each value halts. \end{lem}
+\begin{proof} By the rules. \end{proof}
+
+Adequacy follows from the lemma.
+\begin{proof}[Proof of computational adequacy \textnormal{(see the code)}]
+Use the logical relation. \end{proof}
+
+\begin{thm} Each tree with $n$ vertices has $n-1$ edges. \end{thm}
+
+We shall prove this by induction.
+
+\begin{lem} Each tree with two vertices or more has a leaf. \end{lem}
+\begin{proof} Take a longest path. \end{proof}
+
+\begin{proof}[Proof of the theorem] Remove a leaf. \end{proof}
+
+\begin{lem} The values of the table are right. \end{lem}
+
+\begin{longtable}{ll}
+$n$ & $n-1$ \\
+\end{longtable}
+
+The table lists the counts.
+
+\begin{proof} Count the edges. \end{proof}
+\end{document}

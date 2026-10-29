@@ -1,0 +1,15 @@
+% Pattern: head/box/article. A head in a \fbox{\parbox{..}{...}} at the start
+% of a paragraph is an item, and a command of the paper that writes "Proof."
+% in a font, with no \noindent, is a proof head.
+% from 0908.3866, dg-ga/9612010
+% want head-1 statement/theorem 1
+% want head-2 proof -
+\documentclass{article}
+\newcommand{\p}{{\em Proof}. }
+\begin{document}
+\noindent \fbox{\parbox{5.0in}{{\bf Theorem 1:} Each tree is a graph.}}
+
+\p A tree has no cycle, and it is a graph.
+
+The word \p is not used so in a sentence.
+\end{document}

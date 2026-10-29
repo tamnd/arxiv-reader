@@ -1,0 +1,17 @@
+% Pattern: head/manual. A head command with no number takes the number in the
+% group after it, as \newcommand{\claim}{{\noindent \bf Claim }} and
+% \claim{2}, and a case head numbers the case in parentheses, as
+% {\em Case (1.1).}.
+% seen in the gold pilot (set X)
+% want head-1 statement/claim 2
+% want head-2 other/case 1.1
+% want head-3 other/case 1.2
+\documentclass{article}
+\newcommand{\claim}{{\noindent \bf Claim }}
+\begin{document}
+\claim{2} Each tree with two vertices or more has a leaf.
+
+{\em Case (1.1).} The tree is a path.
+
+{\em Case (1.2).} The tree is not a path.
+\end{document}

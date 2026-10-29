@@ -14,7 +14,11 @@ type Macro struct {
 	Args       int    `json:"args,omitempty"`
 	Default    string `json:"default,omitempty"`
 	HasDefault bool   `json:"-"`
-	Body       string `json:"body"`
+	// Default2 is the value of the second argument when it is optional too,
+	// as in \newcommandtwoopt{\theo}[3][][]{...}.
+	Default2    string `json:"default2,omitempty"`
+	HasDefault2 bool   `json:"-"`
+	Body        string `json:"body"`
 	// How is the command that defined it: newcommand, def, let or operator.
 	How string `json:"how"`
 	// File is the local style file of the definition, or "" for the paper.
@@ -66,7 +70,7 @@ func (m *Macros) Add(o *Macros) {
 	}
 }
 
-var defineCmd = regexp.MustCompile(`\\(newcommand|renewcommand|providecommand|DeclareRobustCommand|def|gdef|edef|xdef|let|DeclareMathOperator|newenvironment|renewenvironment|NewDocumentCommand|RenewDocumentCommand|DeclareDocumentCommand)\b`)
+var defineCmd = regexp.MustCompile(`\\(newcommand|renewcommand|providecommand|DeclareRobustCommand|def|gdef|edef|xdef|let|DeclareMathOperator|newcommandtwoopt|newenvironment|renewenvironment|NewDocumentCommand|RenewDocumentCommand|DeclareDocumentCommand)\b`)
 
 var defParams = regexp.MustCompile(`^(?:#[1-9])*`)
 
@@ -102,6 +106,14 @@ func (m *Macros) read(text []byte, file string) {
 			}
 			n, _ := strconv.Atoi(strings.TrimSpace(a.Values[1]))
 			m.Commands[name] = &Macro{Name: name, Args: n, Default: a.Values[2], HasDefault: a.Has[2], Body: a.Values[3], How: "newcommand", File: file}
+		case "newcommandtwoopt":
+			a, _, ok := ReadArgs(text, at, "cooom")
+			if !ok || !a.Has[2] || !a.Has[3] {
+				continue
+			}
+			name := strings.TrimSpace(a.Values[0])
+			n, _ := strconv.Atoi(strings.TrimSpace(a.Values[1]))
+			m.Commands[name] = &Macro{Name: name, Args: n, Default: a.Values[2], HasDefault: true, Default2: a.Values[3], HasDefault2: true, Body: a.Values[4], How: "newcommand", File: file}
 		case "def", "gdef", "edef", "xdef":
 			a, end, ok := ReadArgs(text, at, "c")
 			if !ok || !strings.HasPrefix(a.Values[0], `\`) {
@@ -163,6 +175,20 @@ func (m *Macros) read(text []byte, file string) {
 	}
 }
 
+// Spec is the argument spec of a use of the command, for ReadArgs: "o" for
+// each optional argument and "m" for the others.
+func (mac *Macro) Spec() string {
+	opts := 0
+	if mac.HasDefault {
+		opts++
+		if mac.HasDefault2 {
+			opts++
+		}
+	}
+	opts = min(opts, mac.Args)
+	return strings.Repeat("o", opts) + strings.Repeat("m", mac.Args-opts)
+}
+
 // maxExpansion stops the expansion of a text that grows without end.
 const maxExpansion = 1 << 20
 
@@ -198,11 +224,7 @@ func (m *Macros) expandOnce(s string) (string, bool) {
 		if !ok || mac.How == "def" && strings.Contains(mac.Body, "\\def") {
 			continue
 		}
-		spec := strings.Repeat("m", mac.Args)
-		if mac.HasDefault && mac.Args > 0 {
-			spec = "o" + strings.Repeat("m", mac.Args-1)
-		}
-		a, end, ok := ReadArgs(text, loc[1], spec)
+		a, end, ok := ReadArgs(text, loc[1], mac.Spec())
 		if !ok {
 			continue
 		}
@@ -211,6 +233,9 @@ func (m *Macros) expandOnce(s string) (string, bool) {
 			v := a.Values[i]
 			if !a.Has[i] {
 				v = mac.Default
+				if i == 1 {
+					v = mac.Default2
+				}
 			}
 			body = strings.ReplaceAll(body, "#"+strconv.Itoa(i+1), v)
 		}

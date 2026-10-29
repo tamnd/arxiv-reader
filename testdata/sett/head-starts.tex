@@ -1,0 +1,40 @@
+% Pattern: manual/bold/article. Manual heads that do not start a paragraph:
+% a head on the line after a $$ display, a case head on a line after a
+% sentence inside a paragraph, and a head after \noindent inside a paragraph.
+% A case head can write its case in bold after a colon. A head with an article, a qualifier and a typo in its title, and
+% a head named for its role, as "Linearity Criterion:".
+% seen in the gold pilot (set X)
+% want head-1 statement/theorem B
+% want head-2 statement/theorem B'
+% want head-3 statement/criterion -
+% want head-4 other/case I
+% want head-5 other/case II
+% want head-6 other/case 1
+% want head-7 other/case a
+% want head-8 other/case b
+\documentclass{article}
+\begin{document}
+
+{\bf The main Thoerem B} (an extension)\quad Let $p\geq 5$. Then $p$ is odd.
+
+{\bf The main Theorem B'}\quad Let $p\geq 7$. Then $p$ is odd.
+
+\textbf{Linearity Criterion:}
+\emph{A map is affine when its second derivative is zero.}
+
+The bound follows from
+$$ a = b + c $$
+{\bf Case I}. Suppose that $d$ is odd. Then the bound holds
+by the sum above.
+{\bf Case II}. Suppose that $d$ is even. Then the sum is one.
+
+The numbers are defined as in the
+following subcases; \noindent \textbf{Case 1:} If $e$ is timelike, the
+numbers are real.
+
+{\bf{Case (a): \; $H=P\times B$ for an abelian group $B$.}}\\
+Then $H$ is nilpotent.
+
+{\bf{Case (b): \; $H=Q\times B$ for a prime $q$.}}\\
+Then $H$ is nilpotent too.
+\end{document}

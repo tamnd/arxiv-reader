@@ -24,6 +24,19 @@ var argAlias = regexp.MustCompile(`^(\\begin\s*\{[^{}\\#]{1,64}\})((?:\s*\{#[1-9
 
 var argRef = regexp.MustCompile(`#([1-9])`)
 
+// labelAlias is the body of a command that opens a named environment and gives
+// its one argument to a command after the \begin, as
+// \def\lemm#1{\begin{lem}\lbl{#1}}. The call \lemm{a} stands for
+// \begin{lem}\lbl{a}.
+var labelAlias = regexp.MustCompile(`^(\\begin\s*\{[^{}\\#]{1,64}\})\s*(\\[A-Za-z]+)\s*\{#1\}$`)
+
+// labelOf is the body of a command that is \label under another name.
+var labelOf = regexp.MustCompile(`^\\label\s*\{#1\}$`)
+
+// wholeEnv is the body of a command that is a whole environment with no
+// arguments, as \def\st{\begin{sta}\ \end{sta}}: a numbered item with no text.
+var wholeEnv = regexp.MustCompile(`^\\begin\s*\{([^{}\\#]{1,64})\}[^#\n\\]{0,40}(?:\\ [^#\n\\]{0,40})?\\end\s*\{([^{}\\#]{1,64})\}$`)
+
 // structureAliases returns the commands with no arguments that stand for
 // \begin or \end, with what each one stands for. A paper can write
 // \def\>{\end} and close each environment with \>{lemma}, or write
@@ -41,8 +54,15 @@ func (m *Macros) structureAliases() map[string]string {
 			continue
 		}
 		if c.Args > 0 && !c.HasDefault {
-			if a := argAlias.FindStringSubmatch(strings.TrimSpace(c.Body)); a != nil && inOrder(a[2], c.Args) {
+			body := strings.TrimSpace(c.Body)
+			if a := argAlias.FindStringSubmatch(body); a != nil && inOrder(a[2], c.Args) {
 				out[name] = a[1]
+			} else if a := labelAlias.FindStringSubmatch(body); a != nil && c.Args == 1 {
+				out[name] = a[1] + a[2]
+			} else if c.Args == 1 && labelOf.MatchString(body) {
+				// \def\lbl#1{\label{#1}} is \label, so the labels of the
+				// items and the references to them are read.
+				out[name] = `\label`
 			}
 			continue
 		}
@@ -50,8 +70,24 @@ func (m *Macros) structureAliases() map[string]string {
 			continue
 		}
 		body := strings.TrimSpace(c.Body)
+		if texTest.MatchString(body) {
+			// \def\]{\relax\ifmmode ... \end{trivlist}\else ... \fi} of a class
+			// ends a display or a list by the mode. It is not an alias.
+			continue
+		}
 		if body == `\begin` || body == `\end` || (fullAlias.MatchString(body) && len(beginEnd.FindAllStringIndex(body, -1)) == 1) {
 			out[name] = body
+		} else if a := wholeEnv.FindStringSubmatch(body); a != nil && a[1] == a[2] {
+			out[name] = body
+		}
+	}
+	// unalias does not read again what it writes, so \begin{lem}\lbl is
+	// written as \begin{lem}\label when \lbl is \label.
+	for name, with := range out {
+		for alias, label := range out {
+			if label == `\label` && strings.HasSuffix(with, alias) && with != label {
+				out[name] = strings.TrimSuffix(with, alias) + label
+			}
 		}
 	}
 	return out
@@ -70,6 +106,9 @@ func inOrder(args string, n int) bool {
 	}
 	return true
 }
+
+// texTest is a conditional of TeX in the body of a command.
+var texTest = regexp.MustCompile(`\\if[a-z@]*\b|\\else\b|\\fi\b`)
 
 // defining is the commands that define the command after them.
 var defining = regexp.MustCompile(`\\(def|gdef|edef|xdef|let|global|newcommand\*?\s*\{|renewcommand\*?\s*\{|providecommand\*?\s*\{|DeclareRobustCommand\*?\s*\{)\s*$`)
@@ -108,6 +147,10 @@ func (d *Document) unalias() int {
 			i = j - 1
 			continue
 		}
+		// A body of more than one line, as a command of a class that stands
+		// for a whole environment, is written on one line, so that the lines
+		// after it stay right.
+		with = strings.ReplaceAll(with, "\n", " ")
 		out.Write(text[last:i])
 		out.WriteString(with)
 		if fullAlias.MatchString(with) && j < d.End && isLetter(text[j]) {

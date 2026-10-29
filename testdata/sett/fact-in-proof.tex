@@ -1,0 +1,28 @@
+% Pattern: head/in-proof/article. Facts stated by hand inside a proof, each
+% with a number in math, and a proof head right after one of them, are
+% items; the proof they are in still ends at its end.
+% seen in the gold pilot (set X)
+% want theorem-1 statement/theorem 1 status=here
+% want proof-1 proof - proves=theorem-1
+% want head-1 statement/fact D(α) status=none
+% want head-2 statement/fact (β) status=here
+% want head-3 proof - proves=head-2
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\begin{document}
+\begin{theorem} Each tree is a graph. \end{theorem}
+\begin{proof}
+\textbf{Stage D:} Note the following facts:
+
+\noindent\textbf{Subfact D$(\alpha)$:} Each path is a tree.
+
+\smallskip\noindent
+\textbf{Fact $(\beta)$}: Each tree is connected.
+
+\smallskip\noindent
+Proof: By renaming.
+
+So the tree is a graph.
+\end{proof}
+\end{document}

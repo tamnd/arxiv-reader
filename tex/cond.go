@@ -1,7 +1,9 @@
 package tex
 
 import (
+	"path"
 	"regexp"
+	"strings"
 )
 
 // primitives are the conditionals that TeX and the common engines define.
@@ -153,3 +155,104 @@ func (d *Document) conditionals() int {
 	}
 	return decided
 }
+
+var (
+	packageOpts   = regexp.MustCompile(`\\(?:usepackage|RequirePackage|documentclass|LoadClass)\s*\[([^\]]*)\]\s*\{([^{}]*)\}`)
+	declareOption = regexp.MustCompile(`\\DeclareOption\s*\{([^{}]*)\}\s*\{`)
+)
+
+// decideLocal decides the conditionals of a local style file that the file
+// declares with \newif, as the paper loads it. A \footrue in the body of a
+// \DeclareOption{foo} counts only when the paper passes the option foo, as in
+// \usepackage[foo]{style}; another one counts from where it is, and a
+// conditional is false when nothing sets it, as in TeX.
+func decideLocal(text []byte, name string, sty []byte) []byte {
+	declared := map[string]bool{}
+	for _, m := range newIf.FindAllSubmatch(sty, -1) {
+		declared[string(m[1])] = true
+	}
+	flags := map[string]bool{}
+	for _, m := range letFlag.FindAllSubmatch(sty, -1) {
+		flags[string(m[1])] = true
+	}
+	if len(declared) == 0 && len(flags) == 0 {
+		return sty
+	}
+	base := strings.TrimSuffix(path.Base(name), path.Ext(name))
+	opts := map[string]bool{}
+	for _, m := range packageOpts.FindAllSubmatch(text, -1) {
+		for _, p := range strings.Split(string(m[2]), ",") {
+			if strings.TrimSpace(p) != base {
+				continue
+			}
+			for _, o := range strings.Split(string(m[1]), ",") {
+				opts[strings.TrimSpace(o)] = true
+			}
+		}
+	}
+	type span struct {
+		from, to int
+		opt      string
+	}
+	var options []span
+	for _, m := range declareOption.FindAllSubmatchIndex(sty, -1) {
+		if _, end, ok := Group(sty, m[1]-1); ok {
+			options = append(options, span{m[1], end, string(sty[m[2]:m[3]])})
+		}
+	}
+	counts := func(off int) bool {
+		for _, o := range options {
+			if o.from <= off && off < o.to {
+				return opts[o.opt]
+			}
+		}
+		return true
+	}
+	out := append([]byte(nil), sty...)
+	for _, c := range scanConds(out, declared) {
+		n := c.start.name
+		if len(n) <= 2 || !declared[n[2:]] {
+			continue
+		}
+		re := regexp.MustCompile(`\\` + regexp.QuoteMeta(n[2:]) + `(true|false)\b`)
+		v := false
+		for _, m := range re.FindAllSubmatchIndex(sty, -1) {
+			if m[0] < c.start.off && counts(m[0]) {
+				v = string(sty[m[2]:m[3]]) == "true"
+			}
+		}
+		takeBranch(out, c, v)
+	}
+	// A flag that an option sets with \let, as \DeclareOption{numberwithinsect}
+	// {\let\numberwithinsect\relax} of the LIPIcs class, and that the file tests
+	// with \ifx\numberwithinsect\relax: the test is true when the last \let of
+	// the flag that counts before it makes it \relax, and false when nothing
+	// sets it, as an undefined command is not \relax.
+	if len(flags) > 0 {
+		for _, c := range scanConds(out, declared) {
+			if c.start.name != "ifx" {
+				continue
+			}
+			m := ifxRelax.FindSubmatch(out[c.start.off:min(len(out), c.start.off+80)])
+			if m == nil || !flags[string(m[1])] {
+				continue
+			}
+			re := regexp.MustCompile(`\\let\s*\\` + regexp.QuoteMeta(string(m[1])) + `\s*=?\s*\\([a-zA-Z@]+)`)
+			v := false
+			for _, l := range re.FindAllSubmatchIndex(sty, -1) {
+				if l[0] < c.start.off && counts(l[0]) {
+					v = string(sty[l[2]:l[3]]) == "relax"
+				}
+			}
+			takeBranch(out, c, v)
+		}
+	}
+	return out
+}
+
+var (
+	// letFlag is a flag that an option sets: \DeclareOption{x}{\let\x\relax}.
+	letFlag = regexp.MustCompile(`\\DeclareOption\s*\{[^{}]*\}\s*\{\s*\\let\s*\\([a-zA-Z@]+)\s*=?\s*\\relax\s*\}`)
+	// ifxRelax is the test of a flag: \ifx\x\relax.
+	ifxRelax = regexp.MustCompile(`^\\ifx\s*\\([a-zA-Z@]+)\s*\\relax\b`)
+)

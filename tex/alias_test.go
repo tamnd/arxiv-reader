@@ -148,3 +148,42 @@ func TestTheArgumentOfACommandThatPrintsNothing(t *testing.T) {
 		t.Errorf("the text has %d lines, and the source has %d", strings.Count(string(d.Text), "\n"), strings.Count(src, "\n"))
 	}
 }
+
+func TestAnAliasOfMoreThanOneLineKeepsTheLines(t *testing.T) {
+	src := `\documentclass{amsart}
+\newtheorem{lem}{Lemma}
+\newtheorem{rem}{Remark}
+\newcommand{\er}{\relax
+  \end{rem}}
+\def\]{\relax
+  \ifmmode \egroup \end{trivlist}
+  \else \@badmath \fi}
+\begin{document}
+\begin{rem} A tree is a graph. \er
+\begin{rem} A path is a tree. \er
+Each $x$ is \[ x = x \]
+\begin{lem} One. \end{lem}
+\end{document}
+`
+	d, err := tex.ReadFile("main.tex", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rems, lems := 0, 0
+	for _, n := range d.Tree.Nodes {
+		switch {
+		case n.Kind == "env" && n.Name == "rem":
+			rems++
+		case n.Kind == "env" && n.Name == "lem":
+			lems++
+			if p := d.Pos(n.From); p.Line != 13 {
+				t.Errorf("the lemma is on line %d, want 13", p.Line)
+			}
+		case n.Kind == "env" && n.Name == "trivlist":
+			t.Errorf("\\] is read as the end of a trivlist")
+		}
+	}
+	if rems != 2 || lems != 1 {
+		t.Errorf("%d remarks and %d lemmas, want 2 and 1", rems, lems)
+	}
+}

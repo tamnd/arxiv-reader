@@ -1,0 +1,34 @@
+% Pattern: theorem/newenvironment/article. An environment with no title that
+% steps the item counter and sets its body bold writes numbered headings.
+% A use whose body leads with a group of a known title, as {Example}, is an
+% item of that kind. A use with another title is a heading, not an item, but
+% it steps the counter.
+% seen in the gold pilot (set X)
+% want lem-1 statement/lemma 1.1
+% want nonsec-1 example 1.3
+% want nonsec-2 statement/proposition 1.4
+% want lem-2 statement/lemma 1.5
+\documentclass{article}
+\newcounter{item}
+\renewcommand{\theitem}{\arabic{section}.\arabic{item}}
+\renewcommand{\theequation}{\thesection.\arabic{equation}}
+\newenvironment{lem}{
+\setcounter{item}{\value{equation}} \addtocounter{equation}{1}
+\refstepcounter{item}
+\par {\bf \theitem.\hspace{1em}Lemma.} \sl }
+{\par}
+\newenvironment{nonsec}{\bf
+\setcounter{item}{\value{equation}}\addtocounter{equation}{1}
+\refstepcounter{item}
+\par \theitem.\hspace{1em}\ignorespaces }
+{\unskip .\ \ \ }
+\begin{document}
+\section{One}
+\begin{lem} Each tree is a graph. \end{lem}
+\begin{nonsec}{Trees}\end{nonsec}
+\begin{nonsec} {Example} \label{ex} \end{nonsec}
+A path is a tree.
+\begin{nonsec} {Proposition} \end{nonsec}
+Each star is a tree.
+\begin{lem} Each forest is a graph. \end{lem}
+\end{document}

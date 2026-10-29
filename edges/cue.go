@@ -10,7 +10,7 @@ import (
 // reference with no cue.
 var (
 	usesCues    = []string{"by", "using", "use", "uses", "used", "from", "applying", "apply", "applied", "follows from", "in view of", "combining", "combined with", "thanks to", "due to", "according to", "invoking", "via", "because of", "since", "consequence of", "together with", "with the help of", "based on", "relies on", "under the assumptions of", "assumptions of", "hypotheses of", "conditions of"}
-	refersCues  = []string{"see", "cf.", "cf", "compare", "as in", "recall", "similar to", "analogous to", "analogously to", "as we saw in", "is proved in", "will be proved in", "we prove in", "we show in"}
+	refersCues  = []string{"see", "cf. also", "cf also", "compare", "as in", "recall", "similar to", "analogous to", "analogously to", "as we saw in", "is proved in", "will be proved in", "we prove in", "we show in", "proves", "complete the proof of", "completes the proof of", "completing the proof of", "finish the proof of", "finishes the proof of", "finishing the proof of", "finish to prove", "for proving"}
 	generalCues = []string{"generalizes", "generalises", "generalization of", "generalisation of", "extends", "strengthens"}
 	specialCues = []string{"special case of", "particular case of", "specializes", "specialises"}
 	// afterUses is a verb after a reference that makes it a reason: Lemma 3
@@ -18,7 +18,18 @@ var (
 	afterUses = regexp.MustCompile(`^[^.;:]{0,12}?\b(implies|gives|shows|yields|ensures|guarantees)\b`)
 	// afterForward is a forward reference: Theorem 5 below.
 	afterForward = regexp.MustCompile(`^[^.;:]{0,12}?\b(below|later|in the sequel)\b`)
-	cueRe        = buildCues()
+	// afterProved says that the reference is what the proof proves:
+	// "\ref{a} and \ref{b} are proven".
+	afterProved = regexp.MustCompile(`^(?:\s*(?:,|and)\s*(?:[a-z]+\.?(?:~|\s)*)?\\ref\s*\{[^{}]*\})*\s*(?:is|are)\s+(?:now\s+)?(?:proven|proved|established|complete)\b`)
+	// givenBy is a passive "given by" just before a reference, as in "the
+	// rate is given by the following theorem".
+	givenBy = regexp.MustCompile(`(?i)\b(?:is|are)\s+(?:then\s+)?given\s+by\s+$`)
+	cueRe   = buildCues()
+	justBy  = regexp.MustCompile(`\b(?:by|from|applying|using)\s+(?:the\s+)?$`)
+	// sentenceCut is a candidate end of a sentence; cutAt keeps the ones
+	// that do not follow a short word such as "cf." or "Prop.".
+	sentenceCut = regexp.MustCompile(`([a-z.]*)[.;:][ \n]`)
+	abbrev      = map[string]bool{"cf": true, "prop": true, "props": true, "thm": true, "thms": true, "lem": true, "cor": true, "eq": true, "eqs": true, "sec": true, "secs": true, "def": true, "defn": true, "resp": true, "i.e": true, "e.g": true, "ex": true, "rem": true, "fig": true, "ch": true, "chap": true, "no": true, "nos": true, "vol": true, "p": true, "pp": true, "ref": true, "refs": true, "viz": true, "conj": true, "obs": true, "th": true, "pr": true, "cl": true, "al": true}
 )
 
 // CueNone is the cue of a reference with no cue.
@@ -55,15 +66,24 @@ func in(list []string, s string) bool {
 func (r *resolver) predicate(src *Item, off, end int) (string, string) {
 	text := r.in.Doc.Text
 	after := strings.ToLower(string(text[end:min(len(text), end+40)]))
-	if m := afterForward.FindStringSubmatch(after); m != nil {
-		return RefersTo, m[1]
-	}
 	from := max(src.Off, off-80)
 	before := strings.ToLower(string(text[from:off]))
-	if i := strings.LastIndexAny(before, ".;:"); i >= 0 && i+1 < len(before) && (before[i+1] == ' ' || before[i+1] == '\n') {
-		before = before[i+1:]
+	ms := sentenceCut.FindAllStringSubmatchIndex(before, -1)
+	for k := len(ms) - 1; k >= 0; k-- {
+		if m := ms[k]; before[m[1]-2] != '.' || !abbrev[before[m[2]:m[3]]] {
+			before = before[m[1]:]
+			break
+		}
 	}
 	before = strings.ReplaceAll(before, "~", " ")
+	// "Theorem 5 below" names what comes later, and "by the claim below"
+	// uses it.
+	if afterProved.MatchString(strings.ToLower(string(text[end:min(len(text), end+160)]))) {
+		return RefersTo, "proves"
+	}
+	if m := afterForward.FindStringSubmatch(after); m != nil && !justBy.MatchString(before) {
+		return RefersTo, m[1]
+	}
 	if ms := cueRe.FindAllStringSubmatchIndex(before, -1); ms != nil {
 		m := ms[len(ms)-1]
 		c := before[m[2]:m[3]]

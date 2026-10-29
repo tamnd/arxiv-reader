@@ -100,6 +100,20 @@ func TestScorePaper(t *testing.T) {
 	}
 }
 
+func TestScorePaperMatchesTheSpanFirst(t *testing.T) {
+	// m1 agrees with the corollary only in its number; m2 is at its span. m1
+	// comes first, and still m2 is the match of the corollary.
+	g := Record{Set: "X", SetVersion: "v1", Paper: "2312.00752", Version: 2, State: Marked, By: "a person", Marks: []Mark{
+		{ID: "m1", Kind: "statement", Number: "1", File: "a.tex", From: 90, To: 92},
+		{ID: "m2", Kind: "statement", Number: "1", File: "a.tex", From: 10, To: 14},
+	}}
+	recs := []objects.Record{{Kind: "statement", Local: "corollary-1", Version: "2", Path: "source", Item: "statement/corollary", Number: "1", Span: &objects.Span{File: "a.tex", From: 10, To: 13}}}
+	s := ScorePaper(g, recs)
+	if len(s.Missed) != 1 || s.Missed[0] != "m1" {
+		t.Errorf("missed %v, want m1", s.Missed)
+	}
+}
+
 func TestProposeAndCheck(t *testing.T) {
 	r := Propose("X", "v1", GroupNow, "ax/test", "2312.00752", 2, objs())
 	if len(r.Marks) != 3 || r.Marks[1].Proves != "theorem-1" {

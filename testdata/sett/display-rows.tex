@@ -1,0 +1,29 @@
+% Pattern: counter/equation. A theorem numbered with the equations counts one
+% number for an align whose rows are in a split, or in cases, and one number
+% for each row of an align of its own.
+% seen in the gold pilot (set X)
+% want lem-1 statement/lemma 1.1
+% want lem-2 statement/lemma 1.6
+\documentclass{amsart}
+\usepackage{amsmath}
+\numberwithin{equation}{section}
+\newtheorem{lem}[equation]{Lemma}
+\begin{document}
+\section{Trees}
+\begin{lem} Each tree with two vertices or more has a leaf. \end{lem}
+\begin{align}
+\begin{split}
+ a &= b \\
+   &= c
+\end{split}
+\end{align}
+\begin{align}
+ f(x) = \begin{cases} 1 & x > 0 \\ 0 & x \le 0 \end{cases}
+\end{align}
+\begin{align}
+ x &= y \\
+ y &= z \nonumber \\
+ z &= w
+\end{align}
+\begin{lem} Each tree with $n$ vertices has $n-1$ edges. \end{lem}
+\end{document}

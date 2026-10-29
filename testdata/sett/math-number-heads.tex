@@ -1,0 +1,25 @@
+% Pattern: head/number/article. Manual heads whose number is in math, as
+% Theorem $A$ or Fact $(\alpha)$, a head with an article, an abbreviated
+% title with a period before its number, a font group after \noindent, and
+% an alternative proof that names its statement.
+% seen in the gold pilot (set X)
+% want head-1 statement/theorem A status=here
+% want head-2 statement/fact (α) status=none
+% want head-3 statement/theorem B status=none
+% want head-4 statement/proposition 9.3 status=here
+% want head-5 proof - proves=head-4
+% want head-6 proof - proves=head-1
+\documentclass{article}
+\begin{document}
+\noindent{\bf Theorem $A$.} Each tree is a graph.
+
+\noindent{\bf Fact $(\alpha)$.} Each path is a tree.
+
+\noindent{\bf The main Theorem B.} Each path is a graph.
+
+\noindent{\bf Prop. 9.3.} Each cycle is a graph.
+
+\noindent{\it Proof.} A cycle is a closed walk. \qed
+
+{\noindent\bf An alternative proof of Theorem $A$.} A tree is connected. \qed
+\end{document}

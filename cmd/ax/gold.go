@@ -250,6 +250,17 @@ func goldMark(args []string) error {
 	return nil
 }
 
+// goldVersion is the latest version of a paper that has a gold record in the
+// set, or 0.
+func goldVersion(root, set, version string, id axid.ID) int {
+	for v := 40; v >= 1; v-- {
+		if _, err := os.Stat(corpus.GoldPath(root, set, version, id, v)); err == nil {
+			return v
+		}
+	}
+	return 0
+}
+
 // goldScore scores the object records against the marked records of a set.
 func goldScore(args []string) error {
 	fs := flag.NewFlagSet("ax gold score", flag.ContinueOnError)
@@ -281,7 +292,12 @@ func goldScore(args []string) error {
 		}
 		v := latestVersion(recs)
 		if v == 0 {
-			continue
+			// The extractor gave no object, so each mark of the paper is
+			// missed. A paper it stops on still counts against it.
+			v = goldVersion(root, *set, *version, id)
+			if v == 0 {
+				continue
+			}
 		}
 		if c, err := os.ReadFile(corpus.CensusPath(root, id, v)); err == nil {
 			var rec census.Record
@@ -376,7 +392,10 @@ func goldScoreE(root, version string, picks []gold.Pick, report string) error {
 		}
 		v := latestVersion(recs)
 		if v == 0 {
-			continue
+			v = goldVersion(root, "e", version, id)
+			if v == 0 {
+				continue
+			}
 		}
 		g, err := gold.Read(corpus.GoldPath(root, "e", version, id, v))
 		if errors.Is(err, iofs.ErrNotExist) {
@@ -395,7 +414,7 @@ func goldScoreE(root, version string, picks []gold.Pick, report string) error {
 		if err != nil {
 			return err
 		}
-		s.AddPaper(g, es)
+		s.AddPaper(g, recs, es)
 	}
 	md := s.Markdown()
 	fmt.Print(md)

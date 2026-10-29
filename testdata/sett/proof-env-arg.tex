@@ -1,0 +1,22 @@
+% Pattern: environment/proof/article. A proof environment of the paper that
+% prints its argument as the head, as \begin{proofof}{Proof of Theorem
+% \protect{\ref{a}}}, proves the item that the argument names.
+% seen in the gold pilot (set E)
+% want theorem-1 statement/theorem 1 status=here
+% want lemma-1 statement/lemma 2 status=here
+% want proofof-1 proof - proves=theorem-1
+% want proofof-2 proof - proves=lemma-1
+\documentclass{article}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newenvironment{proofof}[1]{\noindent {\bf #1.\/}}{\qed\vskip 0.1in}
+\begin{document}
+\begin{theorem}\label{a} Each set is small. \end{theorem}
+\begin{lemma}\label{b} Each small set is finite. \end{lemma}
+\begin{proofof}{\it Proof of Theorem \protect{\ref{a}}}
+A set is a union of points.
+\end{proofof}
+\begin{proofof}{\it Proof of Lemma \protect{\ref{b}}}
+A small set has few points.
+\end{proofof}
+\end{document}
