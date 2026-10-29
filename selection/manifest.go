@@ -3,6 +3,7 @@ package selection
 import (
 	"errors"
 	"fmt"
+	"github.com/tamnd/arxiv-reader/internal/safefile"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -209,7 +210,7 @@ func (m Manifest) Save(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(path, append([]byte(header), body...), 0o644)
+	return safefile.WriteFile(path, append([]byte(header), body...), 0o644)
 }
 
 // Find returns the entry for one paper, at whatever version was selected.

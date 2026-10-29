@@ -157,3 +157,19 @@ func TestAPaperOutsideThePlaneIsNotInPlane(t *testing.T) {
 		t.Fatalf("got %v, want a paper not in the plane", err)
 	}
 }
+
+func TestTheRenderSampleIsOneInEveryAndStable(t *testing.T) {
+	n := 0
+	for i := 0; i < 10000; i++ {
+		id := fmt.Sprintf("2610.%05d", i)
+		if sampled(id, 10) {
+			n++
+		}
+		if sampled(id, 10) != sampled(id, 10) || !sampled(id, 1) {
+			t.Fatalf("the sample of %s changes", id)
+		}
+	}
+	if n < 900 || n > 1100 {
+		t.Errorf("one in 10 of 10000 papers is %d", n)
+	}
+}

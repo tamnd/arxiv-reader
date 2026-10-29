@@ -3,6 +3,7 @@ package refs
 import (
 	"errors"
 	"fmt"
+	"github.com/tamnd/arxiv-reader/internal/safefile"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -80,7 +81,7 @@ func (m Manifest) Save(path string) (bool, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return false, err
 	}
-	return true, os.WriteFile(path, body, 0o644)
+	return true, safefile.WriteFile(path, body, 0o644)
 }
 
 // Find returns the entry one anchor names.
