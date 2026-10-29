@@ -15,6 +15,7 @@ import (
 	"github.com/tamnd/arxiv-reader/analysis"
 	"github.com/tamnd/arxiv-reader/census"
 	"github.com/tamnd/arxiv-reader/edges"
+	"github.com/tamnd/arxiv-reader/mdrec"
 	"github.com/tamnd/arxiv-reader/objects"
 	"github.com/tamnd/arxiv-reader/theorems"
 )
@@ -106,7 +107,7 @@ func (a Analysis) Run() (Report, error) {
 	if err != nil {
 		return report, err
 	}
-	objectFiles, err := a.glob("objects", "*.jsonl")
+	objectFiles, err := a.glob("objects", "*"+mdrec.Ext)
 	if err != nil {
 		return report, err
 	}
@@ -132,7 +133,7 @@ func (a Analysis) Run() (Report, error) {
 			a.Log(recs[0].Paper)
 		}
 	}
-	edgeFiles, err := a.glob("edges", "*.jsonl")
+	edgeFiles, err := a.glob("edges", "*"+mdrec.Ext)
 	if err != nil {
 		return report, err
 	}
@@ -185,7 +186,7 @@ func (a Analysis) glob(plane, pattern string) ([]string, error) {
 	if a.Shard != "" {
 		shard = a.Shard
 	}
-	files, err := filepath.Glob(filepath.Join(a.Root, "analysis", plane, shard, pattern))
+	files, err := mdrec.Glob(filepath.Join(a.Root, "analysis", plane, shard, pattern))
 	sort.Strings(files)
 	return files, err
 }
@@ -412,7 +413,7 @@ func readCensus(file string) (*census.Record, error) {
 }
 
 func readObjects(file string) ([]objects.Record, error) {
-	b, err := os.ReadFile(file)
+	b, err := mdrec.ReadLines(file)
 	if err != nil {
 		return nil, err
 	}

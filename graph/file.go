@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"strings"
+
+	"github.com/tamnd/arxiv-reader/mdrec"
 )
 
 // Load reads one shard's edges.
@@ -16,7 +17,7 @@ import (
 // manifest in this corpus. A month nobody has built a graph for is a month with
 // no claims in it, which is a fact rather than a fault.
 func Load(path string) ([]Edge, error) {
-	b, err := os.ReadFile(path)
+	b, err := mdrec.ReadLines(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
@@ -56,7 +57,7 @@ func Bytes(edges []Edge) ([]byte, error) {
 		b.Write(line)
 		b.WriteByte('\n')
 	}
-	return []byte(b.String()), nil
+	return mdrec.Encode(mdrec.Lines([]byte(b.String())), "")
 }
 
 // Save writes a shard and says whether the bytes changed.
@@ -68,10 +69,7 @@ func Save(path string, edges []Edge) (bool, error) {
 	if old, err := os.ReadFile(path); err == nil && string(old) == string(body) {
 		return false, nil
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return false, err
-	}
-	return true, os.WriteFile(path, body, 0o644)
+	return true, mdrec.Put(path, body)
 }
 
 // Merge folds a rebuild of some papers into a shard that already holds others.

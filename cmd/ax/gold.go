@@ -17,6 +17,7 @@ import (
 	"github.com/tamnd/arxiv-reader/edges"
 	"github.com/tamnd/arxiv-reader/gold"
 	"github.com/tamnd/arxiv-reader/licence"
+	"github.com/tamnd/arxiv-reader/mdrec"
 	"github.com/tamnd/arxiv-reader/metadata"
 	"github.com/tamnd/arxiv-reader/objects"
 	"github.com/tamnd/arxiv-reader/scope"
@@ -130,7 +131,7 @@ func readObjectsOf(root string, id axid.ID) ([]objects.Record, error) {
 // readObjectFile reads an objects file of the analysis plane, or nothing when
 // there is no file.
 func readObjectFile(file string) ([]objects.Record, error) {
-	b, err := os.ReadFile(file)
+	b, err := mdrec.ReadLines(file)
 	if errors.Is(err, iofs.ErrNotExist) {
 		return nil, nil
 	}

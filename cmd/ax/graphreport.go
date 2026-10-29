@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/tamnd/arxiv-reader/analysis"
 	"github.com/tamnd/arxiv-reader/edges"
 	"github.com/tamnd/arxiv-reader/gold"
+	"github.com/tamnd/arxiv-reader/mdrec"
 	"github.com/tamnd/arxiv-reader/metadata"
 	"github.com/tamnd/arxiv-reader/objects"
 )
@@ -44,11 +44,10 @@ func graphReport(args []string) error {
 		}
 		return "unknown"
 	}
-	files, err := filepath.Glob(filepath.Join(root, "analysis", "edges", "*", "*.jsonl"))
+	files, err := mdrec.Glob(filepath.Join(root, "analysis", "edges", "*", "*"+mdrec.Ext))
 	if err != nil {
 		return err
 	}
-	sort.Strings(files)
 	rp := edges.NewReport()
 	rp.Generated = time.Now()
 	for _, f := range files {

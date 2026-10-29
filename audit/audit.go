@@ -129,7 +129,7 @@ func (f Finding) Where() string {
 		if f.Shard == "" {
 			return ""
 		}
-		file = fmt.Sprintf("metadata/%s.jsonl", f.Shard)
+		file = fmt.Sprintf("metadata/%s.md", f.Shard)
 	}
 	if f.Line == 0 {
 		return file

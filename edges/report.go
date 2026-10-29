@@ -5,12 +5,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/tamnd/arxiv-reader/internal/prose"
+	"github.com/tamnd/arxiv-reader/mdrec"
 	"github.com/tamnd/arxiv-reader/objects"
 )
 
@@ -246,7 +246,7 @@ func (rp *Report) Markdown() string {
 
 // ReadFile reads an edges file of analysis/edges.
 func ReadFile(file string) ([]Edge, error) {
-	b, err := os.ReadFile(file)
+	b, err := mdrec.ReadLines(file)
 	if err != nil {
 		return nil, err
 	}

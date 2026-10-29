@@ -15,6 +15,7 @@ import (
 
 	"github.com/tamnd/arxiv-cli/pkg/axid"
 	"github.com/tamnd/arxiv-reader/corpus"
+	"github.com/tamnd/arxiv-reader/mdrec"
 	"github.com/tamnd/arxiv-reader/scope"
 	"github.com/tamnd/arxiv-reader/witness"
 )
@@ -117,7 +118,7 @@ func witnessImport(args []string) error {
 		}
 	}
 	dir := filepath.Join(root, "analysis", "witness", *index)
-	old, err := filepath.Glob(filepath.Join(dir, "*.jsonl"))
+	old, err := mdrec.Glob(filepath.Join(dir, "*"+mdrec.Ext))
 	if err != nil {
 		return err
 	}
@@ -129,9 +130,11 @@ func witnessImport(args []string) error {
 	// A month that the new import does not have is a month that the old one
 	// had, and its file goes, by its own name.
 	for _, f := range old {
-		if _, ok := res.ByShard[strings.TrimSuffix(filepath.Base(f), ".jsonl")]; !ok {
-			if err := os.Remove(f); err != nil {
-				return err
+		if _, ok := res.ByShard[strings.TrimSuffix(filepath.Base(f), mdrec.Ext)]; !ok {
+			for _, f := range []string{f, strings.TrimSuffix(f, mdrec.Ext) + mdrec.Old} {
+				if err := os.Remove(f); err != nil && !os.IsNotExist(err) {
+					return err
+				}
 			}
 		}
 	}

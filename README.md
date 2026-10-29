@@ -1666,7 +1666,7 @@ It is an object all the same: it carries a tag, and it is what the citation half
 
 ```
 $ ax objects build 2312.00752
-276 objects in /Users/apple/github/tamnd/arxiv/work/objects/2312/2312.00752.jsonl
+276 objects in /Users/apple/github/tamnd/arxiv/work/objects/2312/2312.00752.md
 ```
 
 ```json
@@ -1697,7 +1697,7 @@ A result is a claim with a number in it and an artefact is a dataset or a reposi
 
 ```
 $ ax graph build 2312.00752
-142 edges in /Users/apple/github/tamnd/arxiv/graph/2312.jsonl, 1 of 1 paper extracted
+142 edges in /Users/apple/github/tamnd/arxiv/graph/2312.md, 1 of 1 paper extracted
 ```
 
 ```json
@@ -1757,7 +1757,7 @@ gaps        0
 strength    strong
 ```
 
-With `-write` the command writes `analysis/census/<YYMM>/<id>v<n>.json` and `analysis/objects/<YYMM>/<id>.jsonl` in the corpus.
+With `-write` the command writes `analysis/census/<YYMM>/<id>v<n>.json` and `analysis/objects/<YYMM>/<id>.md` in the corpus.
 A version whose licence does not allow text gives structure only: numbers, labels, kinds, spans and hashes, and no body and no name.
 `ax audit -group D` reads those two planes and checks rules D01, D02, D03, D04, D06, D07, D08, D09, D13 and D15.
 The forms that the census must count are in `testdata/sett/`, one small TeX file for each form with the result it must give, and `go test ./analysis` runs them.
@@ -1810,13 +1810,13 @@ $ ax census report
 written to reports/census.md
 ```
 
-`ax witness import -index theoremsearch` and `-index theoremgraph` read the outside indexes of AX8.5 into `analysis/witness/<index>/<YYMM>.jsonl`. For each paper in scope a witness record gives the count of results, the count of each kind and the printed numbers, and no text. The import reads the dataset on Hugging Face at a pinned revision and writes the revision in `import.json`. It reads the parquet file of TheoremSearch with range requests and the CSV files of TheoremGraph as a stream, so nothing goes to the disk. The batch puts the counts in the field `outside` of the census record, and `ax census report` compares them with the census (AX4.5, AQ21). A version where an index has more than one result more than the census has items goes to the queue census-diff in the report.
+`ax witness import -index theoremsearch` and `-index theoremgraph` read the outside indexes of AX8.5 into `analysis/witness/<index>/<YYMM>.md`. For each paper in scope a witness record gives the count of results, the count of each kind and the printed numbers, and no text. The import reads the dataset on Hugging Face at a pinned revision and writes the revision in `import.json`. It reads the parquet file of TheoremSearch with range requests and the CSV files of TheoremGraph as a stream, so nothing goes to the disk. The batch puts the counts in the field `outside` of the census record, and `ax census report` compares them with the census (AX4.5, AQ21). A version where an index has more than one result more than the census has items goes to the queue census-diff in the report.
 
-`ax census -write` also resolves the edges of AX6 between the items of the paper and writes them to `analysis/edges/<YYMM>/<id>.jsonl`. Each edge has a predicate, a method, a confidence and the place of its cue, and no text of the paper. The methods are attach, ref, text, cite, position, scope and term. A cycle in the in-paper uses graph gets the flag `cycle`. Rule D10 of `ax audit -group D` checks the method and the confidence of each edge, and rule D19 lists each version with a cycle.
+`ax census -write` also resolves the edges of AX6 between the items of the paper and writes them to `analysis/edges/<YYMM>/<id>.md`. Each edge has a predicate, a method, a confidence and the place of its cue, and no text of the paper. The methods are attach, ref, text, cite, position, scope and term. A cycle in the in-paper uses graph gets the flag `cycle`. Rule D10 of `ax audit -group D` checks the method and the confidence of each edge, and rule D19 lists each version with a cycle.
 
-`ax census -write` also marks the candidate sentences of the prose items of AX7.4 and writes them to `analysis/prose/<YYMM>/<id>.jsonl`. A candidate is a sentence outside the items with a cue of `manifests/prose.yaml`, as "we say that" or "it is not known whether", or a sentence with an emphasized term and "if" or "such that". Each record has the kind of the cue, the cue, the section and the span of the sentence, and no text. Three dots in a cue match one to eight words. The understand role reads these candidates in AX7.4 step 2.
+`ax census -write` also marks the candidate sentences of the prose items of AX7.4 and writes them to `analysis/prose/<YYMM>/<id>.md`. A candidate is a sentence outside the items with a cue of `manifests/prose.yaml`, as "we say that" or "it is not known whether", or a sentence with an emphasized term and "if" or "such that". Each record has the kind of the cue, the cue, the section and the span of the sentence, and no text. Three dots in a cue match one to eight words. The understand role reads these candidates in AX7.4 step 2.
 
-It also reads the bibliography of the source for the cited results of AX5.7 and writes it to `analysis/bib/<YYMM>/<id>.jsonl`. It reads `\bibitem` entries in a `.tex` or a `.bbl` file, the `\entry` blocks of a biblatex `.bbl` file, and the entries of a `.bib` file. The entries of a `.bib` file only add to the other forms, because a `.bib` file often has entries that the paper does not cite. Each record has the key, the arXiv id, the DOI and the year that the entry prints, and no text. The importer of math2 uses them to find the cited paper in the corpus.
+It also reads the bibliography of the source for the cited results of AX5.7 and writes it to `analysis/bib/<YYMM>/<id>.md`. It reads `\bibitem` entries in a `.tex` or a `.bbl` file, the `\entry` blocks of a biblatex `.bbl` file, and the entries of a `.bib` file. The entries of a `.bib` file only add to the other forms, because a `.bib` file often has entries that the paper does not cite. Each record has the key, the arXiv id, the DOI and the year that the entry prints, and no text. The importer of math2 uses them to find the cited paper in the corpus.
 
 `ax graph report` counts the edges into `reports/graph.md`. These are the checks of AX6.7: the share of statements with an incoming uses or proves edge, the share of proofs that use nothing, the versions with a cycle, and the share of each method, confidence and predicate. The report gives them for each MSC code at two digits and for each month. A share that moves by more than 5 points from one month to the next, for one code, is listed as a finding.
 
@@ -1917,7 +1917,25 @@ go install github.com/tamnd/arxiv-reader/cmd/ax@latest
 The corpus has two planes and they have different rules.
 
 The **metadata plane** covers every paper on arXiv, which is about 3.17 million of them.
-It is JSONL, one file per month, and it needs no licence gate because arXiv publishes its metadata under CC0.
+It is one file per month, and it needs no licence gate because arXiv publishes its metadata under CC0.
+
+Each file of records of the corpus, a month of the metadata plane or of the graph, and the objects, edges, bibliography, prose candidates and witnesses of a paper, is Markdown with a YAML header.
+The header holds the records under `records:`, in order, each with its fields in the order of its JSON form.
+The text of a record, the `body_md` of an object or the `abstract` of a paper, is in the body of the file under a marker with the key of the record:
+
+```
+---
+records:
+    - local: thm-1
+      kind: statement
+---
+<!-- thm-1: body_md -->
+Each tree is a graph.
+<!-- end thm-1 -->
+```
+
+The files were JSON Lines before, and ax reads a `.jsonl` file where the `.md` file of the same name is not there, and removes it when it writes the `.md` file.
+`ax md move` moves each file of records of a corpus to Markdown and checks that each reads back with all of its records, and `ax md cat <file>` prints the records of files as JSON Lines, one on a line, for grep and jq.
 
 The **content plane** is the papers whose licence permits republishing, extracted into Markdown with the mathematics, figures, tables and bibliographies kept intact.
 It is a small fraction of the first plane and it always will be, so which papers are in it is a decision, and `manifests/selected.yaml` is that decision with a reason on every row.

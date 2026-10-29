@@ -100,7 +100,7 @@ func AliasesPath(root string) string {
 // edits it by hand, and it is the largest thing in the repository. Two kinds of
 // file with two lifetimes should not share a directory.
 func MetadataPath(root, shard string) string {
-	return path.Join(root, "metadata", shard+".jsonl")
+	return path.Join(root, "metadata", shard+".md")
 }
 
 // RenderPath is where arXiv's own HTML rendering of one version is cached.
@@ -217,7 +217,7 @@ func VisionDir(root string, id axid.ID, version int) string {
 // read a paper at a time by every emitter, and a month of them in one file would
 // be rewritten by every extraction in that month.
 func ObjectsPath(root string, id axid.ID) string {
-	return path.Join(root, "work", "objects", Shard(id), PathID(id)+".jsonl")
+	return path.Join(root, "work", "objects", Shard(id), PathID(id)+".md")
 }
 
 // SourcesPath is the manifest recording where every fetched byte came from.
@@ -350,7 +350,7 @@ func LocatorsPath(root string) string {
 //
 // Sharded by the subject's paper, so extracting one paper writes one file.
 func GraphPath(root, shard string) string {
-	return path.Join(root, "graph", shard+".jsonl")
+	return path.Join(root, "graph", shard+".md")
 }
 
 // CensusPath is the census record of one version (AX4.7).
@@ -366,7 +366,7 @@ func CensusPath(root string, id axid.ID, version int) string {
 // It is under analysis/ and is committed, because the object records are the
 // denominator of the corpus and must be versioned (AX12.1).
 func AnalysisObjectsPath(root string, id axid.ID) string {
-	return path.Join(root, "analysis", "objects", Shard(id), PathID(id)+".jsonl")
+	return path.Join(root, "analysis", "objects", Shard(id), PathID(id)+".md")
 }
 
 // StopPath is the stop record of a version that cannot go further (AX1.6).
@@ -390,17 +390,17 @@ func AnalysisTagsPath(root string, id axid.ID) string {
 // EdgesPath is the edge records of one paper (AX6.4). It is committed like
 // the census and the object records.
 func EdgesPath(root string, id axid.ID) string {
-	return path.Join(root, "analysis", "edges", Shard(id), PathID(id)+".jsonl")
+	return path.Join(root, "analysis", "edges", Shard(id), PathID(id)+".md")
 }
 
 // BibPath is the entries of the bibliography of one paper (AX5.7 step 1). A
 // record has the key, the arXiv id, the DOI and the year, and no text.
 func BibPath(root string, id axid.ID) string {
-	return path.Join(root, "analysis", "bib", Shard(id), PathID(id)+".jsonl")
+	return path.Join(root, "analysis", "bib", Shard(id), PathID(id)+".md")
 }
 
 // ProsePath is the candidate sentences of the prose items of one paper
 // (AX7.4 step 1). A record has the span of the sentence and no text.
 func ProsePath(root string, id axid.ID) string {
-	return path.Join(root, "analysis", "prose", Shard(id), PathID(id)+".jsonl")
+	return path.Join(root, "analysis", "prose", Shard(id), PathID(id)+".md")
 }

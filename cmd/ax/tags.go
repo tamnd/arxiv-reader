@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"text/tabwriter"
 
 	"github.com/tamnd/arxiv-cli/pkg/axid"
@@ -15,6 +14,7 @@ import (
 	"github.com/tamnd/arxiv-reader/extract"
 	"github.com/tamnd/arxiv-reader/fetch"
 	"github.com/tamnd/arxiv-reader/internal/prose"
+	"github.com/tamnd/arxiv-reader/mdrec"
 	"github.com/tamnd/arxiv-reader/metadata"
 	"github.com/tamnd/arxiv-reader/tags"
 )
@@ -59,11 +59,10 @@ func tagsAnalysis(args []string) error {
 		return errors.New("usage: ax tags analysis -all, or ax tags analysis <id> [...]")
 	}
 	if *all {
-		files, err := filepath.Glob(filepath.Join(root, "analysis", "objects", "*", "*.jsonl"))
+		files, err := mdrec.Glob(filepath.Join(root, "analysis", "objects", "*", "*"+mdrec.Ext))
 		if err != nil {
 			return err
 		}
-		sort.Strings(files)
 		for _, f := range files {
 			recs, err := readObjectFile(f)
 			if err != nil {

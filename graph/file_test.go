@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/tamnd/arxiv-reader/mdrec"
 )
 
 func cites(from, to, conf, day string) Edge {
@@ -40,9 +42,8 @@ func TestAShardIsWrittenAndReadBack(t *testing.T) {
 	}
 }
 
-// One line per edge, so a shard can be read with grep and appended to by
-// anything, which is the whole reason the manifests are JSONL.
-func TestAShardIsOneLinePerEdge(t *testing.T) {
+// A shard is Markdown with the edges in its header, and reads back the same.
+func TestAShardIsOneRecordPerEdge(t *testing.T) {
 	body, err := Bytes([]Edge{
 		cites("2501.00001", "2401.01234", Certain, "2026-10-14"),
 		cites("2501.00001", "2303.00002", Medium, "2026-10-14"),
@@ -50,11 +51,11 @@ func TestAShardIsOneLinePerEdge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := strings.Count(string(body), "\n"); n != 2 {
-		t.Errorf("%d lines for two edges", n)
+	if !strings.HasPrefix(string(body), "---\nrecords:\n") {
+		t.Errorf("the file does not open with a header of records:\n%s", body)
 	}
-	if !strings.HasSuffix(string(body), "\n") {
-		t.Error("the file does not end in a newline")
+	if recs, err := mdrec.Decode(body); err != nil || len(recs) != 2 {
+		t.Errorf("the file holds %d records (%v), and it must hold two", len(recs), err)
 	}
 	if strings.Contains(string(body), `"locator"`) {
 		t.Error("a citation that named no result still wrote a locator field")

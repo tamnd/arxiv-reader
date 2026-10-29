@@ -15,6 +15,7 @@ import (
 	"github.com/tamnd/arxiv-reader/bib"
 	"github.com/tamnd/arxiv-reader/corpus"
 	"github.com/tamnd/arxiv-reader/cues"
+	"github.com/tamnd/arxiv-reader/mdrec"
 	"github.com/tamnd/arxiv-reader/metadata"
 	"github.com/tamnd/arxiv-reader/objects"
 	"github.com/tamnd/arxiv-reader/tags"
@@ -227,7 +228,7 @@ func tagAnalysis(root string, id axid.ID, paper string, version int, recs []obje
 // the field version, or in evidence.version for an edge.
 func replaceVersion(file string, version int, recs []any) error {
 	var buf bytes.Buffer
-	if old, err := os.ReadFile(file); err == nil {
+	if old, err := mdrec.ReadLines(file); err == nil {
 		v := fmt.Sprint(version)
 		for line := range bytes.SplitSeq(old, []byte("\n")) {
 			if len(bytes.TrimSpace(line)) == 0 {
@@ -259,7 +260,7 @@ func replaceVersion(file string, version int, recs []any) error {
 	if buf.Len() == 0 {
 		return nil
 	}
-	return writeFile(file, buf.Bytes())
+	return mdrec.WriteLines(file, buf.Bytes())
 }
 
 // writeFile writes to a temporary file next to file and renames it over file,

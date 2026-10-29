@@ -62,6 +62,7 @@ var commands = []command{
 	{"audit", "the numbered rules, hard and soft", "M1", runAudit},
 	{"report", "coverage, usage, paths, graph and licence", "M5", runReport},
 	{"size", "weigh the checkout against the split trigger", "M5", runSize},
+	{"md", "move the files of records to Markdown, and print them as JSON Lines", "AX-M3", runMD},
 	{"routes", "configure and probe the model fleet", "M8", nil},
 	{"doctor", "probe every route and every rate limited surface", "M8", nil},
 }

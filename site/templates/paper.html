@@ -19,7 +19,7 @@
   <h2>Source and licence</h2>
   {{if $p.Text}}<p>The text on this page is from <a href="https://arxiv.org/abs/{{$p.Arxiv}}">arXiv:{{$p.Arxiv}}</a> by {{authors $p.Meta.Authors}}, under the licence <a href="{{lurl $p.Licence}}">{{lname $p.Licence}}</a>. The corpus made these changes: it read the items out of the LaTeX source, it expanded the macros of the paper, it put each proof after its statement, and it converted the text to HTML. The formulas are the TeX of the paper, and KaTeX renders them. A formula or a reference can look different from the PDF. The page is published under <a href="{{$p.PublishedURL}}">{{$p.Published}}</a>.</p>
   {{else}}<p>This page has the structure of <a href="https://arxiv.org/abs/{{$p.Arxiv}}">arXiv:{{$p.Arxiv}}</a> by {{authors $p.Meta.Authors}}: the kind, the number, the name and the tag of each item, and the links between the items. The licence of the version, {{lname $p.Licence}}, does not let the corpus publish the text. The structure is published under CC BY 4.0.</p>{{end}}
-  <p>The record of each item is in <a href="https://github.com/tamnd/arxiv/blob/main/analysis/objects/{{$p.Shard}}/{{$p.PathID}}.jsonl">analysis/objects/{{$p.Shard}}/{{$p.PathID}}.jsonl</a>.</p>
+  <p>The record of each item is in <a href="https://github.com/tamnd/arxiv/blob/main/analysis/objects/{{$p.Shard}}/{{$p.PathID}}.md">analysis/objects/{{$p.Shard}}/{{$p.PathID}}.md</a>.</p>
 </section>
 </div>
 <aside class="toc">

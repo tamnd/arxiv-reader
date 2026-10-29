@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"text/tabwriter"
@@ -15,6 +16,7 @@ import (
 	"github.com/tamnd/arxiv-reader/corpus"
 	"github.com/tamnd/arxiv-reader/graph"
 	"github.com/tamnd/arxiv-reader/internal/prose"
+	"github.com/tamnd/arxiv-reader/mdrec"
 	"github.com/tamnd/arxiv-reader/metadata"
 	"github.com/tamnd/arxiv-reader/objects"
 	"github.com/tamnd/arxiv-reader/refs"
@@ -475,10 +477,12 @@ func graphShards(root string) ([]string, error) {
 	}
 	var out []string
 	for _, de := range des {
-		if de.IsDir() || filepath.Ext(de.Name()) != ".jsonl" {
+		ext := filepath.Ext(de.Name())
+		shard := strings.TrimSuffix(de.Name(), ext)
+		if de.IsDir() || ext != mdrec.Ext && ext != mdrec.Old || !metadata.ValidShard(shard) || slices.Contains(out, shard) {
 			continue
 		}
-		out = append(out, strings.TrimSuffix(de.Name(), ".jsonl"))
+		out = append(out, shard)
 	}
 	sort.Strings(out)
 	return out, nil
