@@ -59,42 +59,18 @@ type PaperScore struct {
 func ScorePaper(g Record, recs []objects.Record) PaperScore {
 	s := PaperScore{Paper: g.Paper, Version: g.Version, Group: g.Group, Decade: DecadeOf(yearOf(g.Paper))}
 	items := Items(recs, strconv.Itoa(g.Version))
-	used := make([]bool, len(items))
-	match := map[string]int{}
-	byLocal := map[string]int{}
-	for i, o := range items {
-		byLocal[o.Local] = i
-	}
+	match, used := matchMarks(g.Marks, items)
 	for _, m := range g.Marks {
-		best, bestScore := -1, 0
-		for i, o := range items {
-			if used[i] || o.Kind != m.Kind {
-				continue
-			}
-			sc := 0
-			switch {
-			case m.File != "" && o.Span != nil && o.Span.File == m.File && o.Span.From <= m.To && m.From <= o.Span.To:
-				sc = 3
-			case m.Label != "" && (o.Label == m.Label || contains(o.Labels, m.Label)):
-				sc = 2
-			case m.Number != "" && o.Number == m.Number:
-				sc = 1
-			}
-			if sc > bestScore {
-				best, bestScore = i, sc
-			}
-		}
+		_, hit := match[m.ID]
 		if m.Prose {
 			s.Prose.Of++
 		} else {
 			s.Recall.Of++
 		}
-		if best < 0 {
+		if !hit {
 			s.Missed = append(s.Missed, m.ID)
 			continue
 		}
-		used[best] = true
-		match[m.ID] = best
 		if m.Prose {
 			s.Prose.Hit++
 		} else {
@@ -135,6 +111,73 @@ func ScorePaper(g Record, recs []objects.Record) PaperScore {
 		}
 	}
 	return s
+}
+
+// matchMarks pairs each mark with at most one item of the same kind: one whose
+// span overlaps the mark's, else one with the mark's label, else one with its
+// number. The marks are taken in order and an item is paired once.
+func matchMarks(marks []Mark, items []objects.Record) (map[string]int, []bool) {
+	used := make([]bool, len(items))
+	match := map[string]int{}
+	for _, m := range marks {
+		best, bestScore := -1, 0
+		for i, o := range items {
+			if used[i] || o.Kind != m.Kind {
+				continue
+			}
+			sc := 0
+			switch {
+			case m.File != "" && o.Span != nil && o.Span.File == m.File && o.Span.From <= m.To && m.From <= o.Span.To:
+				sc = 3
+			case m.Label != "" && (o.Label == m.Label || contains(o.Labels, m.Label)):
+				sc = 2
+			case m.Number != "" && o.Number == m.Number:
+				sc = 1
+			}
+			if sc > bestScore {
+				best, bestScore = i, sc
+			}
+		}
+		if best >= 0 {
+			used[best] = true
+			match[m.ID] = best
+		}
+	}
+	return match, used
+}
+
+// InItems gives the record with the marks named as the items they match, so
+// that its uses can be set against edges, which name items. A mark that no
+// item matches is named "gold-" and its id, which no item has. A person or a
+// pass that marks a paper names the marks as it likes, and the names of the
+// items are the extractor's.
+func InItems(g Record, recs []objects.Record) Record {
+	items := Items(recs, strconv.Itoa(g.Version))
+	match, _ := matchMarks(g.Marks, items)
+	name := func(id string) string {
+		if i, ok := match[id]; ok {
+			return items[i].Local
+		}
+		if strings.HasPrefix(id, "bib:") {
+			return id
+		}
+		return "gold-" + id
+	}
+	out := g
+	out.Marks = make([]Mark, len(g.Marks))
+	for i, m := range g.Marks {
+		m.ID = name(m.ID)
+		if m.Proves != "" {
+			m.Proves = name(m.Proves)
+		}
+		out.Marks[i] = m
+	}
+	out.Uses = make([]Use, len(g.Uses))
+	for i, u := range g.Uses {
+		u.Proof, u.To = name(u.Proof), name(u.To)
+		out.Uses[i] = u
+	}
+	return out
 }
 
 func contains(xs []string, x string) bool {
