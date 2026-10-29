@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"hash/fnv"
 	iofs "io/fs"
 	"os"
 	"os/signal"
@@ -49,6 +50,7 @@ func censusBatch(args []string) error {
 	redo := fs.Bool("redo", false, "do each paper again, also when it has a census record or a stop record")
 	accept := fs.Bool("accept", false, "record the new bytes of a source that changed at arXiv, instead of going on to the next paper")
 	norender := fs.Bool("no-render", false, "do not fetch the render, so the census has the source as its only witness")
+	every := fs.Int("render-every", 1, "fetch the render for one paper in this many, chosen by its id, so a batch makes fewer requests")
 	dry := fs.Bool("n", false, "print the count of the papers and the first ten, and do nothing")
 	scopeList := fs.String("scope", "", "take the open and share-alike papers of this scope list, as math, in the order of AX2.6")
 	if err := fs.Parse(args); err != nil {
@@ -104,6 +106,7 @@ func censusBatch(args []string) error {
 		redo:     *redo,
 		accept:   *accept,
 		render:   !*norender,
+		every:    max(*every, 1),
 		resolver: &licence.Resolver{UserAgent: userAgent(), Pace: *pace},
 		fetcher:  &fetch.Fetcher{UserAgent: userAgent(), Pace: *pace},
 	}
@@ -179,6 +182,7 @@ type batch struct {
 	redo     bool
 	accept   bool
 	render   bool
+	every    int
 	resolver *licence.Resolver
 	fetcher  *fetch.Fetcher
 	last     time.Time
@@ -196,6 +200,18 @@ func (b *batch) wait(ctx context.Context) error {
 	}
 	b.last = time.Now()
 	return nil
+}
+
+// sampled tells if the paper is one of the papers in every that get a
+// render. The choice is by a hash of the id, so a paper that is done again
+// gets the same answer.
+func sampled(id string, every int) bool {
+	if every <= 1 {
+		return true
+	}
+	h := fnv.New32a()
+	h.Write([]byte(id))
+	return h.Sum32()%uint32(every) == 0
 }
 
 // one takes one paper as far as it goes. It gives the state, and did is true
@@ -276,7 +292,7 @@ func (b *batch) one(ctx context.Context, ref string) (state string, did bool, er
 	if p.Outside, err = b.witness.Counts(corpus.Shard(id), rec.ID); err != nil {
 		return "", true, err
 	}
-	if b.render && !latest.Created.Before(renderFrom) {
+	if b.render && sampled(rec.ID, b.every) && !latest.Created.Before(renderFrom) {
 		if err := b.wait(ctx); err != nil {
 			return "", true, err
 		}

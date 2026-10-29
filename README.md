@@ -1768,6 +1768,7 @@ Then it writes the census record and the object records, and it removes the down
 A paper that cannot go further gets a stop record in `analysis/stopped/<YYMM>/<id>v<n>.json`, with the reason `no-source`, `withdrawn`, `licence` or `failed`.
 The front end has 60 seconds for each paper.
 All requests keep one pace of 15 seconds, so a paper takes 30 or 45 seconds.
+With `-render-every 10`, a paper gets the render only when a hash of its id picks it, one in 10, so most papers take 30 seconds. `-no-render` fetches no render.
 A paper with a census record or a stop record is not done again, so a stopped batch starts again with the same command.
 
 ```
