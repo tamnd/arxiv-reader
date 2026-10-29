@@ -122,7 +122,7 @@ Those two are the NumPy paper and the second LIGO detection, and between them th
 One is a tar of five files with the document in `paper.tex`, and the other is a PDF the authors produced themselves, which arXiv accepts and which leaves nothing to read as source.
 Nothing announces which of the two arrived, so it is worked out from the bytes, and it is worked out as soon as they land rather than at extraction time, because somebody fetching a hundred papers wants to know which of them have no source before the extraction starts rather than after.
 
-`ax fetch --mode analysis` is refused. That mode is way R2 of AX2.5, which reads a `record` paper in memory and keeps only its structure, and open question AQ01 decides if the corpus may do that. The `open` and `share-alike` papers are read by `ax run analysis`, which does not need that answer.
+`ax fetch --mode analysis <id> [...]` is way R2 of AX2.5, which AQ01 allows. It reads the e-print of the latest version of each paper in memory, whatever its licence, and keeps only its structure: it is `ax census batch -record` for the papers named. The e-print of a `verbatim` or `record` paper is never written to `work/`, and its records hold no text of the paper (rule D06).
 
 Which file the document starts from is the other question a tarball asks, and it is four passes in the order of how much they are worth believing.
 A `00README` naming a top level file is the first, because the submitter saying so outright is the only answer that is not a guess.
@@ -1771,6 +1771,8 @@ All requests keep one pace of 15 seconds, so a paper takes 30 or 45 seconds.
 With `-render-every 10`, a paper gets the render only when a hash of its id picks it, one in 10, so most papers take 30 seconds. `-no-render` fetches no render.
 A paper with a census record or a stop record is not done again, so a stopped batch starts again with the same command.
 
+A `verbatim` or `record` paper stops with the reason `licence`, unless the batch has `-record`. Then it is read by way R2 of AX2.5, which AQ01 allows: the e-print is read into memory and is never written to `work/`, also with `-keep`, the batch fetches no render for it, and the census record and the object records keep only structure and fingerprints: kinds, numbers, labels, spans, edges and hashes, and no body and no name (rule D06). The manifest keeps the hash of the e-print, so a later read is checked against it. A paper that stopped with the reason `licence` is read again by a batch with `-record`, and its stop record goes.
+
 ```
 $ ax census batch -list manifests/gold/x-v1.txt -limit 3
 1/915 math/0003117 extracted
@@ -1779,7 +1781,7 @@ $ ax census batch -list manifests/gold/x-v1.txt -limit 3
 915 papers: 0 extracted before, 3 extracted now
 ```
 
-`ax run analysis` is `ax census batch -scope math`. It takes each open and share-alike paper in the math scope, in the order of AX2.6: open papers first, the newest month first, and the old-style ids last. `-n` prints the count and the first ten papers and does nothing.
+`ax run analysis` is `ax census batch -scope math`. It takes each open and share-alike paper in the math scope, in the order of AX2.6: open papers first, the newest month first, and the old-style ids last. With `-record` it takes the verbatim and record papers too, after the share-alike papers. `-n` prints the count and the first ten papers and does nothing.
 
 ```
 $ ax run analysis -n
@@ -1849,7 +1851,7 @@ $ ax gold draw
   form        300 of 300
 ```
 
-The scope has only 15 open papers from 1991-2000, so that group is short. The rest of it waits for AQ01.
+The scope has only 15 open papers from 1991-2000, so that group is short. The rest of it are record papers. AQ01 allows reading them in memory, but a marker that is a model of a provider may not see their text (AQ08), so they wait for a marker that the project runs or a person, and their marks hold offsets and kinds with no text (AX11.1).
 
 `-set e` makes gold set E, which measures the edge resolver. `ax gold draw -set e` draws 300 papers from set X v1: from each group of set X, the first 60 papers in the order of the seed that have a proof object. The papers of set X are already fetched, so the draw makes no new request to arXiv. `ax gold propose -set e <id>v<n>` proposes the items and, for each proof, the uses and cites-result edges that the resolver found. A person reads each proof, removes the wrong uses and adds the missing ones. `ax gold score -set e -report reports/gold-e.md` gives the precision of each method against the targets of AX11.3 (98% for ref and text, 85% for position, name and term) and the recall of the methods together, with the uses that no edge found.
 

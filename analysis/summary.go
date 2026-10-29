@@ -22,8 +22,13 @@ type Summary struct {
 	NoState   int `json:"no_state"`
 	// Closed is the papers in scope that are not open or share-alike, and
 	// ClosedOutside the ones with a structure from TheoremGraph (way R1).
-	Closed        int `json:"closed"`
-	ClosedOutside int `json:"closed_outside"`
+	// ClosedExtracted, ClosedStopped and ClosedNoState are the states of the
+	// closed papers, which way R2 reads (AX2.5, AQ01).
+	Closed          int `json:"closed"`
+	ClosedOutside   int `json:"closed_outside"`
+	ClosedExtracted int `json:"closed_extracted"`
+	ClosedStopped   int `json:"closed_stopped"`
+	ClosedNoState   int `json:"closed_no_state"`
 	// Versions is the versions with a census record. Gaps is their gaps and
 	// phantoms, and WithGap the versions with at least one.
 	Versions int `json:"versions"`
@@ -45,8 +50,13 @@ type AreaSummary struct {
 	Extracted int `json:"extracted"`
 	Stopped   int `json:"stopped"`
 	NoState   int `json:"no_state"`
-	Versions  int `json:"versions"`
-	Gaps      int `json:"gaps"`
+	// The same for the verbatim and record papers of the code.
+	Closed          int `json:"closed"`
+	ClosedExtracted int `json:"closed_extracted"`
+	ClosedStopped   int `json:"closed_stopped"`
+	ClosedNoState   int `json:"closed_no_state"`
+	Versions        int `json:"versions"`
+	Gaps            int `json:"gaps"`
 }
 
 // Summary returns the counts of the report.
@@ -84,11 +94,15 @@ func (rp *Report) Summary(scopeCounted bool) Summary {
 			a := area(code)
 			a.Scope, a.Extracted, a.Stopped = x.Scope, x.Extracted, x.Halted
 			a.NoState = x.Scope - x.Extracted - x.Halted
+			a.Closed, a.ClosedExtracted, a.ClosedStopped = x.Closed, x.ClosedExtracted, x.ClosedHalted
+			a.ClosedNoState = x.Closed - x.ClosedExtracted - x.ClosedHalted
 			s.Areas[code] = a
 		}
 		s.Scope, s.Extracted, s.Stopped = rp.Scope, rp.Extracted, rp.Halted
 		s.NoState = rp.Scope - rp.Extracted - rp.Halted
 		s.Closed, s.ClosedOutside = rp.Closed, rp.ClosedOutside
+		s.ClosedExtracted, s.ClosedStopped = rp.ClosedExtracted, rp.ClosedHalted
+		s.ClosedNoState = rp.Closed - rp.ClosedExtracted - rp.ClosedHalted
 	}
 	return s
 }

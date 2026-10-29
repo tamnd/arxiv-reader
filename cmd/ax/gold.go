@@ -114,7 +114,7 @@ func goldDraw(args []string) error {
 		strings.ToUpper(*set), *version, len(picks), len(pool), *seed, time.Now().UTC().Format("2006-01-02"))
 	for _, g := range gold.PlanX.Groups {
 		if n := groups[g.Name]; n < g.Size {
-			header += fmt.Sprintf(" The group %s has %d of %d papers, because the scope has only %d open papers in it. The rest of the group waits for AQ01, because a record paper can be marked only after AQ01 allows it (AX11.1).", g.Name, n, g.Size, n)
+			header += fmt.Sprintf(" The group %s has %d of %d papers, because the scope has only %d open papers in it. The rest of the group are record papers, which wait for a marker that may see their text (AQ08) and get marks with no text (AX11.1).", g.Name, n, g.Size, n)
 		}
 	}
 	if err := gold.WriteList(path, header, picks); err != nil {
