@@ -564,3 +564,16 @@ func Glob(pattern string) ([]string, error) {
 	sort.Strings(md)
 	return md, nil
 }
+
+// Which is the file that Read reads for the path: the path, or its .jsonl
+// name when only that is there.
+func Which(path string) string {
+	if _, err := os.Stat(path); err != nil {
+		if o := old(path); o != "" {
+			if _, err := os.Stat(o); err == nil {
+				return o
+			}
+		}
+	}
+	return path
+}
