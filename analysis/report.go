@@ -117,9 +117,11 @@ type Report struct {
 	Scope, Extracted, Halted int
 	// Closed is the papers in scope that are not open or share-alike, and
 	// ClosedOutside the ones with a structure from TheoremGraph (way R1).
-	Closed, ClosedOutside int
-	// Areas is the open and share-alike papers in scope of each MSC code at
-	// two digits, when the scope is known.
+	// ClosedExtracted and ClosedHalted are the ones with a census record and a
+	// stop record for the latest version: way R2 reads them (AX2.5, AQ01).
+	Closed, ClosedOutside, ClosedExtracted, ClosedHalted int
+	// Areas is the papers in scope of each MSC code at two digits, when the
+	// scope is known.
 	Areas map[string]*AreaScope
 
 	// Size is the files and the bytes of each part of the analysis plane, for
@@ -132,15 +134,14 @@ type Report struct {
 	patterns                map[string]*Pattern
 }
 
-// AreaScope is the papers in scope of one MSC code at two digits.
+// AreaScope is the papers in scope of one MSC code at two digits: the open
+// and share-alike papers, and the verbatim and record papers.
 type AreaScope struct {
-	Scope, Extracted, Halted int
+	Scope, Extracted, Halted              int
+	Closed, ClosedExtracted, ClosedHalted int
 }
 
-// AddScope counts one open or share-alike paper in scope, with its MSC code at
-// two digits and whether its latest version has a census record or a stop
-// record.
-func (rp *Report) AddScope(code string, extracted, stopped bool) {
+func (rp *Report) area(code string) *AreaScope {
 	if rp.Areas == nil {
 		rp.Areas = map[string]*AreaScope{}
 	}
@@ -149,6 +150,34 @@ func (rp *Report) AddScope(code string, extracted, stopped bool) {
 		a = &AreaScope{}
 		rp.Areas[code] = a
 	}
+	return a
+}
+
+// AddClosed counts one verbatim or record paper in scope, with its MSC code at
+// two digits, whether TheoremGraph has its structure (way R1), and whether
+// its latest version has a census record or a stop record.
+func (rp *Report) AddClosed(code string, outside, extracted, stopped bool) {
+	a := rp.area(code)
+	rp.Closed++
+	a.Closed++
+	if outside {
+		rp.ClosedOutside++
+	}
+	switch {
+	case extracted:
+		rp.ClosedExtracted++
+		a.ClosedExtracted++
+	case stopped:
+		rp.ClosedHalted++
+		a.ClosedHalted++
+	}
+}
+
+// AddScope counts one open or share-alike paper in scope, with its MSC code at
+// two digits and whether its latest version has a census record or a stop
+// record.
+func (rp *Report) AddScope(code string, extracted, stopped bool) {
+	a := rp.area(code)
 	rp.Scope++
 	a.Scope++
 	switch {
@@ -334,10 +363,37 @@ func (rp *Report) Markdown() string {
 		fmt.Fprintf(&b, "| stopped | %s | %s |\n", prose.Thousands(rp.Halted), share(rp.Halted, rp.Scope))
 		fmt.Fprintf(&b, "| not yet | %s | %s |\n", prose.Thousands(left), share(left, rp.Scope))
 		fmt.Fprintf(&b, "| all | %s | 100.0%% |\n\n", prose.Thousands(rp.Scope))
-		if rp.Closed > 0 {
-			fmt.Fprintf(&b, "The other %s papers in scope are verbatim or record, and the corpus does not read their text. TheoremGraph gives the structure of %s of them (%s), which is way R1 of AX2.5. The rest are stopped with the reason licence until AQ01 is settled.\n\n",
-				prose.Thousands(rp.Closed), prose.Thousands(rp.ClosedOutside), share(rp.ClosedOutside, rp.Closed))
+	}
+	if rp.Closed > 0 {
+		b.WriteString("## The verbatim and record papers in scope\n\n")
+		fmt.Fprintf(&b, "AQ01 allows way R2 of AX2.5: the e-print of a verbatim or record paper is read in memory, and the analysis plane keeps only its structure and fingerprints, with no text of the paper (rule D06). AX-M8 is done when each of them has the state extracted or stopped. TheoremGraph also gives the structure of %s of them (%s), which is way R1.\n\n",
+			prose.Thousands(rp.ClosedOutside), share(rp.ClosedOutside, rp.Closed))
+		b.WriteString("| State | Papers | Share |\n| --- | ---: | ---: |\n")
+		left := rp.Closed - rp.ClosedExtracted - rp.ClosedHalted
+		fmt.Fprintf(&b, "| extracted | %s | %s |\n", prose.Thousands(rp.ClosedExtracted), share(rp.ClosedExtracted, rp.Closed))
+		fmt.Fprintf(&b, "| stopped | %s | %s |\n", prose.Thousands(rp.ClosedHalted), share(rp.ClosedHalted, rp.Closed))
+		fmt.Fprintf(&b, "| not yet | %s | %s |\n", prose.Thousands(left), share(left, rp.Closed))
+		fmt.Fprintf(&b, "| all | %s | 100.0%% |\n\n", prose.Thousands(rp.Closed))
+	}
+	if len(rp.Areas) > 0 {
+		b.WriteString("## The papers in scope of each area\n\n")
+		b.WriteString("Each paper in scope of each MSC code at two digits, of each licence class. The research layer is complete when the papers with no state and the census gaps are zero for each code, and the open rows of math2 are zero too (AX1.5).\n\n")
+		b.WriteString("| Code | Papers | Extracted | Stopped | No state | Census gaps |\n| --- | ---: | ---: | ---: | ---: | ---: |\n")
+		codes := make([]string, 0, len(rp.Areas))
+		for k := range rp.Areas {
+			codes = append(codes, k)
 		}
+		sort.Strings(codes)
+		for _, k := range codes {
+			x := rp.Areas[k]
+			all, done, halted := x.Scope+x.Closed, x.Extracted+x.ClosedExtracted, x.Halted+x.ClosedHalted
+			gaps := 0
+			if r := rp.codes[k]; r != nil {
+				gaps = r.Gaps
+			}
+			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | %s |\n", k, prose.Thousands(all), prose.Thousands(done), prose.Thousands(halted), prose.Thousands(all-done-halted), prose.Thousands(gaps))
+		}
+		b.WriteString("\n")
 	}
 
 	b.WriteString("## The measures of each extractor version\n\n")

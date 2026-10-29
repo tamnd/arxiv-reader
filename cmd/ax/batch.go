@@ -53,12 +53,13 @@ func censusBatch(args []string) error {
 	every := fs.Int("render-every", 1, "fetch the render for one paper in this many, chosen by its id, so a batch makes fewer requests")
 	dry := fs.Bool("n", false, "print the count of the papers and the first ten, and do nothing")
 	scopeList := fs.String("scope", "", "take the open and share-alike papers of this scope list, as math, in the order of AX2.6")
+	readRecord := fs.Bool("record", false, "read the verbatim and record papers too, in memory, and keep only their structure (way R2 of AX2.5, which AQ01 allows)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	ids := fs.Args()
 	if *scopeList != "" {
-		more, err := analysisQueue(corpusRoot(), *scopeList)
+		more, err := analysisQueue(corpusRoot(), *scopeList, *readRecord)
 		if err != nil {
 			return err
 		}
@@ -107,6 +108,7 @@ func censusBatch(args []string) error {
 		accept:   *accept,
 		render:   !*norender,
 		every:    max(*every, 1),
+		record:   *readRecord,
 		resolver: &licence.Resolver{UserAgent: userAgent(), Pace: *pace},
 		fetcher:  &fetch.Fetcher{UserAgent: userAgent(), Pace: *pace},
 	}
@@ -172,17 +174,20 @@ func changedAtSource(err error) bool {
 }
 
 type batch struct {
-	root     string
-	waivers  *analysis.Waivers
-	witness  *witness.Cache
-	plane    metadata.Plane
-	m        *fetch.Manifest
-	pace     time.Duration
-	keep     bool
-	redo     bool
-	accept   bool
-	render   bool
-	every    int
+	root    string
+	waivers *analysis.Waivers
+	witness *witness.Cache
+	plane   metadata.Plane
+	m       *fetch.Manifest
+	pace    time.Duration
+	keep    bool
+	redo    bool
+	accept  bool
+	render  bool
+	every   int
+	// record is true when the batch reads the verbatim and record papers in
+	// memory, by way R2 of AX2.5.
+	record   bool
 	resolver *licence.Resolver
 	fetcher  *fetch.Fetcher
 	last     time.Time
@@ -230,7 +235,7 @@ func (b *batch) one(ctx context.Context, ref string) (state string, did bool, er
 		return "", false, fmt.Errorf("the record has no versions")
 	}
 	v := latest.Version
-	if !b.redo && (exists(corpus.CensusPath(b.root, id, v)) || exists(corpus.StopPath(b.root, id, v))) {
+	if !b.redo && (exists(corpus.CensusPath(b.root, id, v)) || exists(corpus.StopPath(b.root, id, v)) && !b.readsNow(id, v)) {
 		return "done", false, nil
 	}
 	ver := fmt.Sprintf("%sv%d", rec.ID, v)
@@ -247,7 +252,10 @@ func (b *batch) one(ctx context.Context, ref string) (state string, did bool, er
 		latest, _ = rec.VersionAt(v)
 	}
 	if !corpus.AccessFor(latest.Licence).MayPublishText() {
-		return b.stop(id, rec.ID, v, analysis.StopLicence, fmt.Sprintf("the abs page gives %s for v%d", latest.Licence, v))
+		if !b.record {
+			return b.stop(id, rec.ID, v, analysis.StopLicence, fmt.Sprintf("the abs page gives %s for v%d", latest.Licence, v))
+		}
+		return b.inMemory(ctx, id, rec, v)
 	}
 
 	order := fetch.Order{Record: rec, Version: v, Accept: b.accept}
@@ -318,6 +326,65 @@ func (b *batch) one(ctx context.Context, ref string) (state string, did bool, er
 		}
 	}
 
+	return b.analyze(id, rec.ID, v, bundle, p)
+}
+
+// inMemory takes a verbatim or record paper to extracted by way R2 of AX2.5.
+// The e-print is read into memory and is never written to the work area, and
+// the records keep only structure and fingerprints (rule D06). There is no
+// render, because a render would be one more copy of the text.
+func (b *batch) inMemory(ctx context.Context, id axid.ID, rec metadata.Record, v int) (string, bool, error) {
+	if err := b.wait(ctx); err != nil {
+		return "", true, err
+	}
+	body, entry, err := b.fetcher.EPrintInMemory(ctx, b.m, fetch.Order{Record: rec, Version: v, Accept: b.accept})
+	var noEPrint *fetch.NoEPrint
+	var tooLarge *fetch.TooLarge
+	if errors.As(err, &tooLarge) {
+		return b.stop(id, rec.ID, v, analysis.StopFailed, err.Error())
+	}
+	if errors.As(err, &noEPrint) {
+		reason := analysis.StopNoSource
+		if strings.Contains(strings.ToLower(rec.Comments), "withdrawn") {
+			reason = analysis.StopWithdrawn
+		}
+		return b.stop(id, rec.ID, v, reason, err.Error())
+	}
+	if err != nil {
+		return "", true, err
+	}
+	bundle, err := source.Open(body)
+	var pdfOnly *source.PDFOnly
+	if errors.As(err, &pdfOnly) {
+		entry.Holds = fetch.HoldsPDF
+		b.m.Put(entry)
+		return b.stop(id, rec.ID, v, analysis.StopNoSource, "the e-print is a PDF and has no TeX source")
+	}
+	if err != nil {
+		return b.stop(id, rec.ID, v, analysis.StopFailed, "the e-print does not read: "+err.Error())
+	}
+	entry.Holds = fetch.HoldsTeX
+	b.m.Put(entry)
+	p := analysis.Paper{ID: rec.ID, Version: v, Extractor: "ax/" + Version, Waivers: b.waivers.For(rec.ID, v)}
+	if p.Outside, err = b.witness.Counts(corpus.Shard(id), rec.ID); err != nil {
+		return "", true, err
+	}
+	return b.analyze(id, rec.ID, v, bundle, p)
+}
+
+// readsNow tells if a paper with a stop record is read now: a paper that
+// stopped for its licence, in a batch that reads such papers in memory.
+func (b *batch) readsNow(id axid.ID, v int) bool {
+	if !b.record {
+		return false
+	}
+	s, err := analysis.ReadStop(corpus.StopPath(b.root, id, v))
+	return err == nil && s.Reason == analysis.StopLicence
+}
+
+// analyze runs the front end and the census on one bundle, with a time limit,
+// and writes the records.
+func (b *batch) analyze(id axid.ID, paper string, v int, bundle *source.Bundle, p analysis.Paper) (string, bool, error) {
 	type answer struct {
 		res *analysis.Result
 		err error
@@ -336,15 +403,15 @@ func (b *batch) one(ctx context.Context, ref string) (state string, did bool, er
 	select {
 	case got = <-done:
 	case <-time.After(frontEndLimit):
-		return b.stop(id, rec.ID, v, analysis.StopFailed, fmt.Sprintf("the front end did not finish in %s", frontEndLimit))
+		return b.stop(id, paper, v, analysis.StopFailed, fmt.Sprintf("the front end did not finish in %s", frontEndLimit))
 	}
 	if got.err != nil {
-		return b.stop(id, rec.ID, v, analysis.StopFailed, got.err.Error())
+		return b.stop(id, paper, v, analysis.StopFailed, got.err.Error())
 	}
-	if err := writeAnalysis(b.root, rec.ID, v, got.res); err != nil {
+	if err := writeAnalysis(b.root, paper, v, got.res); err != nil {
 		return "", true, err
 	}
-	if b.redo {
+	if b.redo || !p.Text {
 		// The paper stopped before and reads now.
 		if err := os.Remove(corpus.StopPath(b.root, id, v)); err != nil && !errors.Is(err, iofs.ErrNotExist) {
 			return "", true, err

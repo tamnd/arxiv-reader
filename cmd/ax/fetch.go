@@ -23,10 +23,17 @@ func runFetch(args []string) error {
 	if len(args) < 1 {
 		return errors.New("usage: ax fetch render <id>v<n> [...], ax fetch source <id>v<n> [...], ax fetch native <id>v<n> [...], or ax fetch verify")
 	}
-	for _, a := range args {
-		if a == "-mode" || a == "--mode" || strings.HasPrefix(a, "-mode=") || strings.HasPrefix(a, "--mode=") {
-			return errAnalysisMode
+	if mode, rest, ok := fetchMode(args); ok {
+		if mode != "analysis" {
+			return fmt.Errorf("%q is not a mode of ax fetch, which has only the mode analysis", mode)
 		}
+		if len(rest) > 0 && rest[0] == "source" {
+			rest = rest[1:]
+		}
+		if len(rest) == 0 {
+			return errors.New("usage: ax fetch --mode analysis <id> [...]")
+		}
+		return censusBatch(append([]string{"-record"}, rest...))
 	}
 	switch args[0] {
 	case "render":
@@ -42,12 +49,30 @@ func runFetch(args []string) error {
 	}
 }
 
-// errAnalysisMode is the answer to ax fetch --mode analysis. Way R2 of AX2.5
-// reads the e-print of a record paper in memory and keeps only its structure.
-// Whether the corpus may do that is open question AQ01, so the command is
-// refused until AQ01 has an answer. The open and share-alike papers are read by
-// ax run analysis, which needs no such answer.
-var errAnalysisMode = errors.New("ax fetch --mode analysis is refused until AQ01 is settled (AX2.5): way R2 reads a record paper, and AQ01 decides if the corpus may do that. Use ax run analysis for the open and share-alike papers")
+// fetchMode finds the flag --mode in the arguments, and gives its value and
+// the other arguments. ax fetch --mode analysis is way R2 of AX2.5, which AQ01
+// allows: it reads the e-print of the latest version of each paper in memory,
+// whatever its licence, and keeps only its structure. It is ax census batch
+// -record for the papers named.
+func fetchMode(args []string) (mode string, rest []string, ok bool) {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "-mode" || a == "--mode":
+			if i+1 < len(args) {
+				mode = args[i+1]
+				i++
+			}
+			ok = true
+		case strings.HasPrefix(a, "-mode=") || strings.HasPrefix(a, "--mode="):
+			mode = a[strings.Index(a, "=")+1:]
+			ok = true
+		default:
+			rest = append(rest, a)
+		}
+	}
+	return mode, rest, ok
+}
 
 // fetchDownload downloads one surface of the versions it is given.
 //

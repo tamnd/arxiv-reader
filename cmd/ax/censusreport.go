@@ -135,21 +135,21 @@ func censusReport(args []string) error {
 				if latest.LicenceFrom != metadata.SourceAbs {
 					l, _ = licence.Latest(r)
 				}
-				if c := licence.ClassOf(l); c != licence.ClassOpen && c != licence.ClassShareAlikeNC {
-					// A paper that math2 cannot read has its structure from
-					// TheoremGraph by way R1 (AX2.5), when the index has it.
-					rp.Closed++
-					if _, ok, err := wit.Get(witness.TheoremGraph, shard, r.ID); err != nil {
-						return err
-					} else if ok {
-						rp.ClosedOutside++
-					}
-					return nil
-				}
 				ref := fmt.Sprintf("%sv%d", r.ID, latest.Version)
 				code := gold.CodeOf(r)
 				if code == "" {
 					code = "unknown"
+				}
+				if c := licence.ClassOf(l); c != licence.ClassOpen && c != licence.ClassShareAlikeNC {
+					// A paper that may not be published is read by way R2
+					// (AX2.5), and TheoremGraph gives its structure by way R1
+					// when the index has it.
+					_, outside, err := wit.Get(witness.TheoremGraph, shard, r.ID)
+					if err != nil {
+						return err
+					}
+					rp.AddClosed(code, outside, extracted[ref], stopped[ref])
+					return nil
 				}
 				rp.AddScope(code, extracted[ref], stopped[ref])
 				return nil

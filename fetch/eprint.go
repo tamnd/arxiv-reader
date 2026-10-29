@@ -3,8 +3,11 @@ package fetch
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/tamnd/arxiv-cli/pkg/axid"
 	"github.com/tamnd/arxiv-reader/corpus"
+	"github.com/tamnd/arxiv-reader/metadata"
 )
 
 // NoEPrint is the error a version with no e-print fails with.
@@ -55,4 +58,66 @@ func (f *Fetcher) sourceBase() string {
 		return f.SourceBase
 	}
 	return EPrintBase
+}
+
+// ReadGate decides whether a version's e-print may be read in memory, by way R2
+// of AX2.5. It is Gate without the last refusal: the licence must be read from
+// the abs page of the version, and any class may then be read, because nothing
+// of the text is kept. AQ01 allows it.
+func ReadGate(r metadata.Record, version int) error {
+	v, ok := r.VersionAt(version)
+	if !ok {
+		return fmt.Errorf("fetch: the metadata plane has no v%d of %s, so either the reference is wrong or the record is stale", version, r.ID)
+	}
+	ref := fmt.Sprintf("%sv%d", r.ID, version)
+	if v.Licence == "" {
+		return fmt.Errorf("fetch: nobody has read a licence for %s yet, run ax licence resolve -write %s", ref, ref)
+	}
+	if v.LicenceFrom != metadata.SourceAbs {
+		return fmt.Errorf("fetch: the licence for %s was read from %s, which states one licence for the paper and not one for the version, run ax licence resolve -write %s", ref, v.LicenceFrom, ref)
+	}
+	return nil
+}
+
+// EPrintInMemory fetches the e-print of one version and gives its bytes,
+// without writing them anywhere. It is way R2 of AX2.5: a version that the
+// corpus may not publish is read in memory by the process that extracts, and
+// only its structure is kept. The entry for the manifest has the hash and the
+// size, so that a later read is checked against it, and the path where the file
+// would be, which never holds it.
+func (f *Fetcher) EPrintInMemory(ctx context.Context, m *Manifest, o Order) ([]byte, Source, error) {
+	id, err := axid.Parse(o.Record.ID)
+	if err != nil {
+		return nil, Source{}, fmt.Errorf("fetch: %w", err)
+	}
+	if err := ReadGate(o.Record, o.Version); err != nil {
+		return nil, Source{}, err
+	}
+	v, _ := o.Record.VersionAt(o.Version)
+	ref := fmt.Sprintf("%sv%d", id.Canonical, o.Version)
+	entry := Source{
+		ID:          id.Canonical,
+		Version:     o.Version,
+		Route:       RouteSource,
+		URL:         f.sourceBase() + ref,
+		Path:        corpus.EPrintPath("", id, o.Version),
+		Licence:     v.Licence,
+		LicenceFrom: v.LicenceFrom,
+	}
+	if f.Log != nil {
+		f.Log(ref)
+	}
+	body, err := f.do(ctx, request{url: entry.URL, ref: ref, cap: maxEPrint, what: "a submission to arXiv", missing: func(ref, status string) error {
+		return &NoEPrint{Ref: ref, Status: status}
+	}})
+	if err != nil {
+		return nil, Source{}, err
+	}
+	entry.SHA256 = Digest(body)
+	entry.Bytes = int64(len(body))
+	entry.Fetched = time.Now().UTC().Truncate(time.Second)
+	if held, had := m.Find(id.Canonical, o.Version, RouteSource); had && held.SHA256 != entry.SHA256 && !o.Accept {
+		return nil, Source{}, &Changed{Was: held, Now: entry, Where: "at the source"}
+	}
+	return body, entry, nil
 }

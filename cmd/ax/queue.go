@@ -19,16 +19,19 @@ type queued struct {
 	Old   bool
 }
 
-// orderQueue sorts the queue in the order of AX2.6: open first and then
-// share-alike, the newest month first inside a class, and the old-style ids
+// orderQueue sorts the queue in the order of AX2.6: open first, then
+// share-alike, then the verbatim and record papers that way R2 reads, the newest month first inside a class, and the old-style ids
 // last. The priority by citation of K12.3 needs the nodes of math2, so it is
 // not here yet.
 func orderQueue(q []queued) {
 	rank := func(c licence.Class) int {
-		if c == licence.ClassOpen {
+		switch c {
+		case licence.ClassOpen:
 			return 0
+		case licence.ClassShareAlikeNC:
+			return 1
 		}
-		return 1
+		return 2
 	}
 	sort.SliceStable(q, func(i, j int) bool {
 		a, b := q[i], q[j]
@@ -46,8 +49,9 @@ func orderQueue(q []queued) {
 }
 
 // analysisQueue is the open and share-alike papers of a scope list, in the
-// order of AX2.6.
-func analysisQueue(root, list string) ([]string, error) {
+// order of AX2.6. With record, it has the verbatim and record papers too, after
+// them, for way R2 of AX2.5.
+func analysisQueue(root, list string, record bool) ([]string, error) {
 	in, err := scope.Read(scope.Path(root, list))
 	if err != nil {
 		return nil, fmt.Errorf("%w, so run ax select scope first", err)
@@ -66,7 +70,7 @@ func analysisQueue(root, list string) ([]string, error) {
 			l, _ = licence.Latest(r)
 		}
 		c := licence.ClassOf(l)
-		if c != licence.ClassOpen && c != licence.ClassShareAlikeNC {
+		if c != licence.ClassOpen && c != licence.ClassShareAlikeNC && !record {
 			return nil
 		}
 		q = append(q, queued{ID: r.ID, Month: analysis.MonthOf(shard), Class: c, Old: strings.Contains(r.ID, "/")})

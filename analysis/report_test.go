@@ -104,3 +104,26 @@ func TestTheSummaryHasTheNumbersOfEachArea(t *testing.T) {
 		t.Errorf("a summary with no scope has the areas %+v", s.Areas)
 	}
 }
+
+// Way R2 of AX2.5 gives the verbatim and record papers a state too, so the
+// summary and the table of each area count them (AX-M8).
+func TestTheClosedPapersHaveStatesInEachArea(t *testing.T) {
+	rp := NewReport("")
+	rp.AddScope("26", true, false)
+	rp.AddClosed("26", true, true, false)
+	rp.AddClosed("26", false, false, true)
+	rp.AddClosed("26", false, false, false)
+	s := rp.Summary(true)
+	if s.Closed != 3 || s.ClosedOutside != 1 || s.ClosedExtracted != 1 || s.ClosedStopped != 1 || s.ClosedNoState != 1 || s.Scope != 1 {
+		t.Errorf("got %+v", s)
+	}
+	if a := s.Areas["26"]; a.Scope != 1 || a.Closed != 3 || a.ClosedExtracted != 1 || a.ClosedNoState != 1 {
+		t.Errorf("the area 26 has %+v", a)
+	}
+	md := rp.Markdown()
+	for _, want := range []string{"## The verbatim and record papers in scope", "| not yet | 1 | 33.3% |", "| 26 | 4 | 2 | 1 | 1 | 0 |"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("the report has no %q:\n%s", want, md)
+		}
+	}
+}
