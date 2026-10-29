@@ -111,7 +111,7 @@ func Decode(data []byte) ([][]byte, error) {
 	head, rest, ok := strings.Cut(s[4:], "\n---\n")
 	if !ok {
 		if strings.HasSuffix(s[4:], "\n---") {
-			head, rest, ok = strings.TrimSuffix(s[4:], "\n---"), "", true
+			head, rest = strings.TrimSuffix(s[4:], "\n---"), ""
 		} else {
 			return nil, errors.New("mdrec: the YAML header has no end")
 		}
