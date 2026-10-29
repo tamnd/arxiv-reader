@@ -213,8 +213,8 @@ jobs:
           # which mirror it says it came from.
           mkdir -p /tmp/hf-corpus
           ARXIV_CORPUS=/tmp/hf-corpus ax harvest hf /tmp/snapshot.json
-          grep -q '"source":"hf"' /tmp/hf-corpus/metadata/2106.jsonl
-          grep -q '"source":"kaggle"' /tmp/snap-corpus/metadata/2106.jsonl
+          ax md cat /tmp/hf-corpus/metadata/2106.md | grep -q '"source":"hf"'
+          ax md cat /tmp/snap-corpus/metadata/2106.md | grep -q '"source":"kaggle"'
       # An empty plane is the case the four states exist for. A rule that says
       # pass here is a rule that will say pass for the rest of the project
       # without ever having looked at anything.
@@ -243,12 +243,12 @@ jobs:
       - name: a broken record fails the build
         run: |
           mkdir -p /tmp/bad-corpus/metadata
-          sed 's/"source":"kaggle"/"source":"arxiv.org"/' /tmp/snap-corpus/metadata/2106.jsonl > /tmp/bad-corpus/metadata/2106.jsonl
+          ax md cat /tmp/snap-corpus/metadata/2106.md | sed 's/"source":"kaggle"/"source":"arxiv.org"/' > /tmp/bad-corpus/metadata/2106.jsonl
           if ARXIV_CORPUS=/tmp/bad-corpus ax audit --plane meta; then
             echo "a record read from nowhere passed the audit"
             exit 1
           fi
-          ARXIV_CORPUS=/tmp/bad-corpus ax audit --plane meta 2>&1 | grep -q "metadata/2106.jsonl:1"
+          ARXIV_CORPUS=/tmp/bad-corpus ax audit --plane meta 2>&1 | grep -q "metadata/2106.md:1"
       # No -fetch anywhere in CI. The committed copy of arXiv's counts is there
       # so this runs without asking arXiv for anything.
       - name: the harvest report counts the corpus against arXiv's own numbers
@@ -3243,7 +3243,10 @@ jobs:
       - name: an object record is written and says what every object is
         run: |
           ARXIV_CORPUS=/tmp/objects-corpus ax objects build 2501.00001 2>&1 | grep -q "21 objects in"
-          f=/tmp/objects-corpus/work/objects/2501/2501.00001.jsonl
+          # The record is Markdown, and ax md cat gives its objects one on a line.
+          f=/tmp/objects-record.jsonl
+          ax md cat /tmp/objects-corpus/work/objects/2501/2501.00001.md > $f
+          head -2 /tmp/objects-corpus/work/objects/2501/2501.00001.md | grep -q '^records:'
           test "$(grep -c '' $f)" = 21
           # The front matter is the metadata record arXiv published, so it is the
           # one object in a paper whose recognition is certain. Everything read
@@ -3287,7 +3290,7 @@ jobs:
             echo "a corrected paper rebuilt to the same record"
             exit 1
           fi
-          grep -q '"local":"thm-1".*"body_md":"Nothing is still nothing."' /tmp/objects-corpus/work/objects/2501/2501.00001.jsonl
+          ax md cat /tmp/objects-corpus/work/objects/2501/2501.00001.md | grep -q '"local":"thm-1".*"body_md":"Nothing is still nothing."'
       - name: a paper nobody has extracted has no objects rather than none
         run: |
           rm -rf /tmp/objects-empty && mkdir -p /tmp/objects-empty
@@ -3375,7 +3378,8 @@ jobs:
       - name: every edge says what it is worth and how it was found
         run: |
           ARXIV_CORPUS=/tmp/graph-corpus ax graph build 2501.00001 2>&1 | grep -q "11 edges in"
-          f=/tmp/graph-corpus/graph/2501.jsonl
+          f=/tmp/graph-2501.jsonl
+          ax md cat /tmp/graph-corpus/graph/2501.md > $f
           test "$(grep -c '' $f)" = 11
           # An arXiv id in a reference is certain, a DOI is a match against a
           # field the submitting author typed so it is high, and a title match is
@@ -3395,7 +3399,8 @@ jobs:
       # needed the work, rather than which paper mentioned it.
       - name: a citation inside a section runs from the section
         run: |
-          f=/tmp/graph-corpus/graph/2501.jsonl
+          f=/tmp/graph-2501.jsonl
+          ax md cat /tmp/graph-corpus/graph/2501.md > $f
           grep -qF '"s":"ax://paper/2501.00001#VIS1","p":"cites","o":"ax://paper/2401.01234","conf":"certain","via":"arxiv"' $f
       # The one edge in the corpus that could not be read off either plane on its
       # own. The section says "the argument is the one of [3, Theorem 2.1]",
@@ -3404,14 +3409,14 @@ jobs:
       # steps can be wrong.
       - name: a locator finds the theorem in the paper that was cited
         run: |
-          grep -qF '"s":"ax://paper/2501.00001#VIS1","p":"uses","o":"ax://paper/2401.01234#QQ11","conf":"medium","via":"locator","locator":"theorem 2.1"' /tmp/graph-corpus/graph/2501.jsonl
+          grep -qF '"s":"ax://paper/2501.00001#VIS1","p":"uses","o":"ax://paper/2401.01234#QQ11","conf":"medium","via":"locator","locator":"theorem 2.1"' <(ax md cat /tmp/graph-corpus/graph/2501.md)
       # A locator nothing can resolve is not thrown away, it stays on the
       # citation. A paper whose Lemma 4 is named by nine papers already here is
       # worth extracting, and that is a better reason than a citation count
       # because somebody used a specific result out of it.
       - name: a locator nothing could resolve stays on the citation
         run: |
-          grep -qF '"o":"ax://paper/2303.00002","conf":"high","via":"doi","locator":"lemma 4"' /tmp/graph-corpus/graph/2501.jsonl
+          grep -qF '"o":"ax://paper/2303.00002","conf":"high","via":"doi","locator":"lemma 4"' <(ax md cat /tmp/graph-corpus/graph/2501.md)
       # Inside one paper the link is mechanical, so it is high. It is still a
       # reading, which is why the refers-to edge stays beside the uses edge
       # rather than being replaced by it: a proof that says "unlike Lemma 2" is
@@ -3419,7 +3424,8 @@ jobs:
       - name: a proof that refers to a theorem uses it
         run: |
           ARXIV_CORPUS=/tmp/graph-corpus ax graph build 2401.01234 2>&1 | grep -q "6 edges in"
-          f=/tmp/graph-corpus/graph/2401.jsonl
+          f=/tmp/graph-2401.jsonl
+          ax md cat /tmp/graph-corpus/graph/2401.md > $f
           grep -qF '"s":"ax://paper/2401.01234#QQ12","p":"uses","o":"ax://paper/2401.01234#QQ11","conf":"high","via":"proof"' $f
           grep -qF '"s":"ax://paper/2401.01234#QQ12","p":"refers-to","o":"ax://paper/2401.01234#QQ11","conf":"high","via":"ref"' $f
       - name: building the same month twice writes nothing
@@ -3460,8 +3466,8 @@ jobs:
           test "$(grep -c '' /tmp/graph-all.txt)" = 5
           # A paper nobody extracted still has its metadata edges, which is the
           # ordinary case for all but a thousand papers and not a fault.
-          grep -q "3 edges in /tmp/graph-corpus/graph/1901.jsonl, 0 of 1 paper extracted" /tmp/graph-all.txt
-          grep -q "11 edges in /tmp/graph-corpus/graph/2501.jsonl, 1 of 1 paper extracted, unchanged" /tmp/graph-all.txt
+          grep -q "3 edges in /tmp/graph-corpus/graph/1901.md, 0 of 1 paper extracted" /tmp/graph-all.txt
+          grep -q "11 edges in /tmp/graph-corpus/graph/2501.md, 1 of 1 paper extracted, unchanged" /tmp/graph-all.txt
       - name: a corpus nobody has built a graph over says so
         run: |
           rm -rf /tmp/graph-empty && mkdir -p /tmp/graph-empty

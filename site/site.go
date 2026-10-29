@@ -33,6 +33,7 @@ import (
 	"github.com/tamnd/arxiv-cli/pkg/axid"
 	"github.com/tamnd/arxiv-reader/corpus"
 	"github.com/tamnd/arxiv-reader/edges"
+	"github.com/tamnd/arxiv-reader/mdrec"
 	"github.com/tamnd/arxiv-reader/metadata"
 	"github.com/tamnd/arxiv-reader/objects"
 )
@@ -260,11 +261,10 @@ func (s *site) load() error {
 	if b, err := os.ReadFile(filepath.Join(s.opt.Corpus, "reports", "census.json")); err == nil {
 		_ = json.Unmarshal(b, &s.census)
 	}
-	objs, err := filepath.Glob(filepath.Join(s.opt.Corpus, "analysis", "objects", "*", "*.jsonl"))
+	objs, err := mdrec.Glob(filepath.Join(s.opt.Corpus, "analysis", "objects", "*", "*"+mdrec.Ext))
 	if err != nil {
 		return err
 	}
-	sort.Strings(objs)
 	shards := map[string]bool{}
 	for _, f := range objs {
 		p, err := s.readObjects(f)
@@ -346,7 +346,7 @@ func (s *site) load() error {
 // readObjects reads the objects file of one paper and keeps the items of the
 // highest version in it.
 func (s *site) readObjects(file string) (*paper, error) {
-	b, err := os.ReadFile(file)
+	b, err := mdrec.ReadLines(file)
 	if err != nil {
 		return nil, err
 	}

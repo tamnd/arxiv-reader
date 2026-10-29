@@ -10,17 +10,16 @@
 package witness
 
 import (
-	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"path"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/tamnd/arxiv-reader/mdrec"
 )
 
 // The indexes.
@@ -63,44 +62,23 @@ func (r *Record) Add(kind, number string) {
 
 // Path is the witness file of one index and one month.
 func Path(root, index, shard string) string {
-	return path.Join(root, "analysis", "witness", index, shard+".jsonl")
+	return path.Join(root, "analysis", "witness", index, shard+".md")
 }
 
 // Write writes the records of one month, sorted by paper.
 func Write(file string, recs []Record) error {
 	sort.Slice(recs, func(i, j int) bool { return recs[i].Paper < recs[j].Paper })
-	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
-		return err
-	}
-	tmp := file + ".tmp"
-	f, err := os.Create(tmp)
+	lines, err := mdrec.Marshal(recs)
 	if err != nil {
 		return err
 	}
-	w := bufio.NewWriter(f)
-	for _, r := range recs {
-		b, err := json.Marshal(r)
-		if err != nil {
-			f.Close()
-			return err
-		}
-		w.Write(b)
-		w.WriteByte('\n')
-	}
-	if err := w.Flush(); err != nil {
-		f.Close()
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmp, file)
+	return mdrec.Write(file, lines)
 }
 
 // Read reads the records of one month by paper. A file that is not there is
 // no records.
 func Read(file string) (map[string]Record, error) {
-	b, err := os.ReadFile(file)
+	b, err := mdrec.ReadLines(file)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}

@@ -31,6 +31,7 @@ import (
 	"github.com/tamnd/arxiv-cli/pkg/axid"
 	"github.com/tamnd/arxiv-reader/corpus"
 	"github.com/tamnd/arxiv-reader/extract"
+	"github.com/tamnd/arxiv-reader/mdrec"
 	"github.com/tamnd/arxiv-reader/refs"
 	"github.com/tamnd/arxiv-reader/tags"
 )
@@ -689,10 +690,7 @@ func (p Paper) Save(path string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, body, 0o644)
+	return mdrec.Put(path, body)
 }
 
 // Bytes is the record as it would be written.
@@ -710,12 +708,12 @@ func (p Paper) Bytes() ([]byte, error) {
 		b.Write(line)
 		b.WriteByte('\n')
 	}
-	return []byte(b.String()), nil
+	return mdrec.Encode(mdrec.Lines([]byte(b.String())), "body_md")
 }
 
 // Load reads a record back.
 func Load(path string) (Paper, error) {
-	b, err := os.ReadFile(path)
+	b, err := mdrec.ReadLines(path)
 	if err != nil {
 		return Paper{}, err
 	}

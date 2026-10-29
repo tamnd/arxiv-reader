@@ -215,7 +215,9 @@ func TestTheFileHoldsLaTeXUnescaped(t *testing.T) {
 	}
 }
 
-func TestOneRecordPerLine(t *testing.T) {
+// A month is Markdown, with the records in the header and each abstract in
+// the body.
+func TestTheAbstractsAreTheBody(t *testing.T) {
 	p := plane(t)
 	if _, err := p.Write("2106", []Record{rec("2106.00001"), rec("2106.09685")}); err != nil {
 		t.Fatal(err)
@@ -224,11 +226,12 @@ func TestOneRecordPerLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := strings.Count(string(b), "\n"); n != 2 {
-		t.Errorf("two records came out as %d lines", n)
+	if !strings.HasPrefix(string(b), "---\nrecords:\n") || strings.Count(string(b), "<!-- 2106.") != 2 {
+		t.Errorf("the month is not a header of two records and two abstracts:\n%s", b)
 	}
-	if !strings.HasSuffix(string(b), "\n") {
-		t.Error("the file does not end in a newline")
+	got, err := p.Read("2106")
+	if err != nil || len(got) != 2 || got[1].Abstract != rec("2106.09685").Abstract {
+		t.Errorf("the month reads back as %+v (%v)", got, err)
 	}
 }
 
@@ -389,7 +392,7 @@ func TestScanReportsTheLine(t *testing.T) {
 	if err == nil {
 		t.Fatal("a truncated line was read without complaint")
 	}
-	if !strings.Contains(err.Error(), "2106.jsonl:2") {
+	if !strings.Contains(err.Error(), "2106.md:2") {
 		t.Errorf("the error does not name the line: %v", err)
 	}
 }

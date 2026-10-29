@@ -14,6 +14,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/tamnd/arxiv-reader/mdrec"
 )
 
 // Plane is the metadata plane on disk, rooted at a corpus directory.
@@ -37,7 +39,7 @@ func ValidShard(s string) bool { return shardPattern.MatchString(s) }
 
 // Path is the file holding one month.
 func (p Plane) Path(shard string) string {
-	return filepath.Join(p.Root, "metadata", shard+".jsonl")
+	return filepath.Join(p.Root, "metadata", shard+".md")
 }
 
 // Dir is the metadata plane's directory.
@@ -58,14 +60,19 @@ func (p Plane) Shards() ([]string, error) {
 		return nil, err
 	}
 	var shards []string
+	// A month is one file, which is Markdown, or JSON Lines in a corpus that
+	// has not yet moved to Markdown.
+	seen := map[string]bool{}
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".jsonl") {
+		ext := filepath.Ext(e.Name())
+		if e.IsDir() || ext != mdrec.Ext && ext != mdrec.Old {
 			continue
 		}
-		shard := strings.TrimSuffix(e.Name(), ".jsonl")
-		if !ValidShard(shard) {
+		shard := strings.TrimSuffix(e.Name(), ext)
+		if !ValidShard(shard) || seen[shard] {
 			continue
 		}
+		seen[shard] = true
 		shards = append(shards, shard)
 	}
 	sort.Slice(shards, func(i, j int) bool {
@@ -112,12 +119,11 @@ func ShardMonth(shard string) (time.Time, error) {
 // walk it without holding it. A month on its own fits in memory comfortably and
 // Read is there for when that is what you want.
 func (p Plane) Scan(shard string, fn func(Record) error) error {
-	f, err := os.Open(p.Path(shard))
+	data, err := mdrec.ReadLines(p.Path(shard))
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	return scan(f, p.Path(shard), fn)
+	return scan(bytes.NewReader(data), p.Path(shard), fn)
 }
 
 // ScanAll walks every month, oldest first.
@@ -192,19 +198,29 @@ func (p Plane) Write(shard string, recs []Record) (bool, error) {
 		return false, fmt.Errorf("%q is not a YYMM shard", shard)
 	}
 	Sort(recs)
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	// The plane holds LaTeX, and LaTeX is full of < and > and &. Escaping them
-	// would triple the size of a fifth of the abstracts in the corpus to
-	// protect against an HTML injection that cannot happen in a file nothing
-	// serves.
-	enc.SetEscapeHTML(false)
-	for _, r := range recs {
-		if err := enc.Encode(r); err != nil {
-			return false, err
-		}
+	lines, err := mdrec.Marshal(recs)
+	if err != nil {
+		return false, err
 	}
-	return writeIfChanged(p.Path(shard), buf.Bytes())
+	// The abstract of each paper is the body of the month, so the file reads
+	// as Markdown.
+	b, err := mdrec.Encode(lines, "abstract")
+	if err != nil {
+		return false, err
+	}
+	changed, err := writeIfChanged(p.Path(shard), b)
+	if err != nil {
+		return false, err
+	}
+	// The JSON Lines file of the month, which a corpus has before it moves to
+	// Markdown, goes when the Markdown file is written, so that the month is
+	// one file.
+	if err := os.Remove(filepath.Join(p.Dir(), shard+mdrec.Old)); err == nil {
+		changed = true
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return false, err
+	}
+	return changed, nil
 }
 
 // writeIfChanged writes b to path atomically, and reports whether it had to.

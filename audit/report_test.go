@@ -51,7 +51,7 @@ func TestTextListsWhatWasFound(t *testing.T) {
 	for _, want := range []string{
 		"3 findings, and the build fails",
 		"S21 every record names the surface it was read from",
-		"metadata/2106.jsonl:41: 2106.09685: is read from \"arxiv.org\"",
+		"metadata/2106.md:41: 2106.09685: is read from \"arxiv.org\"",
 		"and 1 more finding",
 	} {
 		if !strings.Contains(got, want) {
@@ -68,7 +68,7 @@ func TestTextCountsPastTheCap(t *testing.T) {
 	if got := r.Results[1].Dropped(); got != 1 {
 		t.Fatalf("dropped %d, want 1", got)
 	}
-	if n := strings.Count(r.Text(), "metadata/2106.jsonl"); n != 2 {
+	if n := strings.Count(r.Text(), "metadata/2106.md"); n != 2 {
 		t.Errorf("listed %d findings, want the 2 that were kept", n)
 	}
 }
@@ -172,8 +172,8 @@ func TestWhere(t *testing.T) {
 		f    Finding
 		want string
 	}{
-		{Finding{Shard: "2106", Line: 41}, "metadata/2106.jsonl:41"},
-		{Finding{Shard: "2106"}, "metadata/2106.jsonl"},
+		{Finding{Shard: "2106", Line: 41}, "metadata/2106.md:41"},
+		{Finding{Shard: "2106"}, "metadata/2106.md"},
 		{Finding{}, ""},
 	} {
 		if got := tc.f.Where(); got != tc.want {
@@ -186,7 +186,7 @@ func TestWhere(t *testing.T) {
 // where the paper's id would have been.
 func TestAFindingAboutAFileReadsWithoutAnID(t *testing.T) {
 	f := Finding{Rule: "S23", Shard: "2106", What: "is not in identifier order"}
-	if got, want := f.String(), "metadata/2106.jsonl: is not in identifier order"; got != want {
+	if got, want := f.String(), "metadata/2106.md: is not in identifier order"; got != want {
 		t.Errorf("the finding reads %q, want %q", got, want)
 	}
 }
