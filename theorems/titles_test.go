@@ -9,8 +9,8 @@ import (
 
 func TestALetterAccentNeedsASpaceOrABrace(t *testing.T) {
 	for in, want := range map[string]string{
-		`Gar\c{c}on`: "garçon",
-		`Gar\c con`:  "garçon",
+		`Gar\c{c}on`:   "garçon",
+		`Gar\c con`:    "garçon",
 		`Example \Hex`: "example",
 		`Lemma \cor`:   "lemma",
 	} {

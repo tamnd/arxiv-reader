@@ -733,7 +733,6 @@ func arabicChain(m *model, c string) string {
 	f := `\arabic{` + c + `}`
 	for p := m.parent[c]; p != "" && sectionCmd[p]; p = m.parent[p] {
 		f = `\arabic{` + p + `}.` + f
-		c = p
 	}
 	return f
 }
