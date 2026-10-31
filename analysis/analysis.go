@@ -34,6 +34,10 @@ type Paper struct {
 	// Outside is the count of results of each outside index for the paper
 	// (AX4.5), or nil.
 	Outside map[string]int
+	// Sections is true when the analysis also gives the running text of
+	// each section, for ax prose. The batch leaves it false, because the
+	// text is never written.
+	Sections bool
 }
 
 // Result is the analysis of one version.
@@ -48,6 +52,9 @@ type Result struct {
 	Cycles [][]string
 	// Prose is the candidate sentences of the prose items (AX7.4 step 1).
 	Prose []cues.Candidate
+	// Sections is the running text of each section with its cues, when
+	// Paper.Sections is true (AX7.4 step 2).
+	Sections []cues.Section
 	// Bib is the entries of the bibliography, with the identifiers that they
 	// print (AX5.7 step 1).
 	Bib []bib.Entry
@@ -179,6 +186,13 @@ func Analyze(b *source.Bundle, p Paper, m *Manifests) (*Result, error) {
 				spans[k] = tex.Region{From: x.Off, To: x.End}
 			}
 			res.Prose = append(res.Prose, m.Cues.Find(d, spans, prefix)...)
+			if p.Sections {
+				n := 1
+				for _, sec := range res.Sections {
+					n += len(sec.Sentences)
+				}
+				res.Sections = append(res.Sections, m.Cues.Sections(d, spans, prefix, n)...)
+			}
 		}
 		res.Objects = append(res.Objects, recs...)
 		res.Census = append(res.Census, rec)
