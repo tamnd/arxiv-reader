@@ -102,6 +102,35 @@ var skipped = map[string]bool{
 // sentences in them are not prose. Prefix is the prefix of the section names
 // of the main file, as m2- for the second main file.
 func (c *Cues) Find(d *tex.Document, items []tex.Region, prefix string) []Candidate {
+	var out []Candidate
+	for _, s := range c.read(d, items, prefix) {
+		for _, m := range s.Cues {
+			cd := Candidate{Kind: m.Kind, Cue: m.Cue, Section: s.Section, From: s.From, To: s.To}
+			p, last := d.Pos(s.From), d.Pos(s.To-1)
+			cd.Span = objects.Span{File: p.File, From: p.Line, To: last.Line}
+			out = append(out, cd)
+		}
+	}
+	slices.SortStableFunc(out, func(a, b Candidate) int { return a.From - b.From })
+	return out
+}
+
+// Mark is one cue of a sentence.
+type Mark struct {
+	Kind string `json:"kind"`
+	Cue  string `json:"cue"`
+}
+
+// sentence is one sentence of the running text, with its cues.
+type sentence struct {
+	Section  string
+	From, To int
+	Cues     []Mark
+}
+
+// read gives each sentence of the running text of one main file, in order,
+// with the cues that it has.
+func (c *Cues) read(d *tex.Document, items []tex.Region, prefix string) []sentence {
 	if d.End <= d.Body {
 		return nil
 	}
@@ -130,36 +159,31 @@ func (c *Cues) Find(d *tex.Document, items []tex.Region, prefix string) []Candid
 			}
 		}
 	}
-	var out []Candidate
+	var out []sentence
 	for _, s := range sentences(text, d.Body, d.End, mask) {
+		st := sentence{From: s.From, To: s.To}
+		if d.Tree != nil {
+			if i := d.Tree.Section(s.From); i >= 0 {
+				st.Section = fmt.Sprintf("%ssec-%d", prefix, secIndex[i])
+			}
+		}
 		raw := text[s.From:s.To]
 		ws := words(raw)
-		place := func(kind, cue string) {
-			cd := Candidate{Kind: kind, Cue: cue, From: s.From, To: s.To}
-			if d.Tree != nil {
-				if i := d.Tree.Section(s.From); i >= 0 {
-					cd.Section = fmt.Sprintf("%ssec-%d", prefix, secIndex[i])
-				}
-			}
-			p, last := d.Pos(s.From), d.Pos(s.To-1)
-			cd.Span = objects.Span{File: p.File, From: p.Line, To: last.Line}
-			out = append(out, cd)
-		}
 		definition := false
 		for _, kd := range c.kinds {
 			for _, cu := range kd.cues {
 				if cu.match(ws) {
-					place(kd.name, cu.text)
+					st.Cues = append(st.Cues, Mark{Kind: kd.name, Cue: cu.text})
 					definition = definition || kd.name == "definition"
 					break
 				}
 			}
 		}
 		if !definition && emphasized.Match(raw) && (slices.Contains(ws, "if") || slices.Contains(ws, "iff") || has(ws, []string{"such", "that"}) >= 0) {
-			place("definition", Emphasis)
+			st.Cues = append(st.Cues, Mark{Kind: "definition", Cue: Emphasis})
 		}
+		out = append(out, st)
 	}
-	slices.SortStableFunc(out, func(a, b Candidate) int { return a.From - b.From })
 	return out
 }
 

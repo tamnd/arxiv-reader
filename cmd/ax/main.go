@@ -50,6 +50,7 @@ var commands = []command{
 	{"tags", "assign, diff and verify the permanent identifiers", "M3", runTags},
 	{"tex", "run the TeX front end on one e-print and print what it found", "AX-M0", runTex},
 	{"census", "count each item of a version and match it to an object record", "AX-M0", runCensus},
+	{"prose", "print the running text of a cached e-print with its cues, for the prose pass", "AX-M6", runProse},
 	{"witness", "import the outside indexes as census witnesses", "AX-M3", runWitness},
 	{"gold", "draw, propose, mark and score a gold set", "AX-M2", runGold},
 	{"objects", "the sixteen object kinds, results and artefacts", "M6", runObjects},

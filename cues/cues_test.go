@@ -1,6 +1,7 @@
 package cues
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -18,8 +19,7 @@ func defaultCues(t *testing.T) *Cues {
 	return c
 }
 
-func TestFind(t *testing.T) {
-	src := `\documentclass{amsart}
+const findSource = `\documentclass{amsart}
 \newtheorem{thm}{Theorem}
 \begin{document}
 \section{Introduction}
@@ -38,7 +38,11 @@ A ring is \emph{reduced} if it has no nilpotent elements.
 We conjecture that the bound is sharp.
 \end{document}
 `
-	d, err := tex.ReadFile("main.tex", []byte(src))
+
+// theoremItems reads the source and gives the extents of its theorems.
+func theoremItems(t *testing.T) (*tex.Document, []tex.Region) {
+	t.Helper()
+	d, err := tex.ReadFile("main.tex", []byte(findSource))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,6 +52,11 @@ We conjecture that the bound is sharp.
 			items = append(items, tex.Region{From: n.From, To: n.To})
 		}
 	}
+	return d, items
+}
+
+func TestFind(t *testing.T) {
+	d, items := theoremItems(t)
 	got := defaultCues(t).Find(d, items, "")
 	var lines []string
 	for _, c := range got {
@@ -72,5 +81,31 @@ func TestWords(t *testing.T) {
 	got := strings.Join(words([]byte(`is \emph{called} \(X\) and $Y$~Hahn--Banach's`)), " ")
 	if want := "is called $ and $ hahn--banach's"; got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestSections(t *testing.T) {
+	d, items := theoremItems(t)
+	secs := defaultCues(t).Sections(d, items, "", 1)
+	var lines []string
+	for _, s := range secs {
+		for _, x := range s.Sentences {
+			var marks []string
+			for _, m := range x.Cues {
+				marks = append(marks, m.Kind)
+			}
+			lines = append(lines, fmt.Sprintf("%s %d %s:%d [%s] %s", s.Section, x.N, x.File, x.Line, strings.Join(marks, " "), x.Text))
+		}
+	}
+	want := []string{
+		"sec-1 1 main.tex:5 [definition] We say that a module $M$ is \\emph{tame} if every finitely generated submodule is free.",
+		"sec-1 2 main.tex:6 [] This is e.g. the case for $\\mathbb{Z}$.",
+		"sec-1 3 main.tex:6 [problem] It is not known whether every such space is metrizable.",
+		"sec-1 4 main.tex:14 [definition] Define the rank of $M$ to be the dimension of $M \\otimes \\mathbb{Q}$.",
+		"sec-1 5 main.tex:15 [definition] A ring is \\emph{reduced} if it has no nilpotent elements.",
+		"sec-2 6 main.tex:17 [conjecture] We conjecture that the bound is sharp.",
+	}
+	if strings.Join(lines, "\n") != strings.Join(want, "\n") {
+		t.Errorf("got\n%s\nwant\n%s", strings.Join(lines, "\n"), strings.Join(want, "\n"))
 	}
 }
