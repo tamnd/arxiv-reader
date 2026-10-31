@@ -1,0 +1,22 @@
+% Pattern: attach/nested. Proofs with no head inside an example, one after
+% each of its claims, prove the example. Seen in the gold pilot (set X).
+% want ex-1 example 1.1
+% want proof-1 proof - proves=ex-1
+% want proof-2 proof - proves=ex-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{ex}{Example}[section]
+\begin{document}
+\section{One}
+
+\begin{ex}\label{ex:two}
+Let $G$ be a group of order two. First, $G$ is abelian.
+\begin{proof}
+Every group of prime order is cyclic.
+\end{proof}
+Second, every element of $G$ is its own inverse.
+\begin{proof}
+An element of order dividing two squares to the identity.
+\end{proof}
+\end{ex}
+\end{document}

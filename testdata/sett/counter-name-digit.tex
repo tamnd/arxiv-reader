@@ -1,0 +1,17 @@
+% Pattern: number/counter-name. A counter whose name ends with a digit, as
+% thm0, numbers like any other. Seen in the gold pilot (set X).
+% want thm0-1 statement/theorem 1.1 status=none
+% want lemma-1 statement/lemma 1.1.1 status=none
+% want thm0-2 statement/theorem 2.1 status=none
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{lemma}{Lemma}[subsection]
+\newtheorem{thm0}{Theorem}[section]
+\begin{document}
+\section{Introduction}
+\begin{thm0} Every compact space is bounded. \end{thm0}
+\subsection{Subsets}
+\begin{lemma} Every closed subset of a compact space is compact. \end{lemma}
+\section{Products}
+\begin{thm0} Every finite product of compact spaces is compact. \end{thm0}
+\end{document}

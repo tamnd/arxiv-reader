@@ -1,0 +1,28 @@
+% Pattern: proof/manual/article. Two theorems, each followed by a manual
+% proof head with no end mark. The first head ends at the second theorem, so
+% each head proves the theorem before it.
+% Seen in the gold pilot (set E).
+% want theorem-1 statement/theorem 1 status=here labels=th:a
+% want head-1 proof - proves=theorem-1
+% want theorem-2 statement/theorem 2 status=here labels=th:b
+% want head-2 proof - proves=theorem-2
+\documentclass{article}
+\newtheorem{theorem}{Theorem}
+\newcommand{\off}[1]{}
+\begin{document}
+\begin{theorem}\label{th:a}
+A statement.
+\end{theorem}
+
+{\em Proof:} The proof for Theorem~\ref{th:a} is given later.
+
+\begin{theorem}\label{th:b}
+Another statement.
+\end{theorem}
+\off{An old argument.}
+
+{\em Proof:} The proof for Theorem~\ref{th:b} is given later.
+
+\section{More}
+Some text.
+\end{document}

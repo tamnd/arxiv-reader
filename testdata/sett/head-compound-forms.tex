@@ -1,0 +1,23 @@
+% Pattern: head/title. A second title after "and", as {\bf Notation and
+% Terminology.}, names the same item, of the kind of the first title; and
+% "First Proof." heads a proof, as "Second proof." does. Seen in the gold
+% pilot (set X).
+% want head-1 definition/notation -
+% want head-2 definition/notation -
+% want theorem-1 statement/theorem 1
+% want head-3 proof - proves=theorem-1
+\documentclass{article}
+\newtheorem{theorem}{Theorem}
+\begin{document}
+Some words first.
+
+{\bf Notation and Terminology.} We write $|S|$ for the size of a set.
+
+{\bf Terminologies and Notations}: A set is small if it is finite.
+
+\begin{theorem}
+Every finite set is small.
+\end{theorem}
+
+\textit{First Proof.} A finite set has a largest point.
+\end{document}

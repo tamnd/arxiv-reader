@@ -1,0 +1,21 @@
+% Pattern: title/compound. A title of two item words joined by a hyphen or a
+% slash, as "Lemma-Notation" or "Observation / Convention", is the item the
+% first word names. Seen in the gold pilot (set X).
+% want lemnot-1 statement/lemma 1
+% want obscon-1 statement/fact 2
+% want propdef-1 statement/proposition 3
+\documentclass{article}
+\newtheorem{lemnot}{Lemma-Notation}
+\newtheorem{obscon}[lemnot]{Observation / Convention}
+\newtheorem{propdef}[lemnot]{Proposition-definition}
+\begin{document}
+\begin{lemnot}
+Write $|x|$ for the norm of $x$; then $|x+y|\le|x|+|y|$.
+\end{lemnot}
+\begin{obscon}
+Every set here is finite, and we take its size as its weight.
+\end{obscon}
+\begin{propdef}
+The map $f$ is onto, and we call its fibre over $0$ the kernel.
+\end{propdef}
+\end{document}

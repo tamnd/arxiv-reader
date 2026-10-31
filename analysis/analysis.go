@@ -1,8 +1,11 @@
 package analysis
 
 import (
+	"bytes"
 	"fmt"
 	"path"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/tamnd/arxiv-reader/bib"
@@ -82,6 +85,12 @@ func Analyze(b *source.Bundle, p Paper, m *Manifests) (*Result, error) {
 			aux = append(aux, f.Data)
 		}
 	}
+	// The pf style numbers its steps only when a file asks for numbers, as
+	// \pfmixednumbers does; with cheatpf2 alone a step has no number.
+	mixed := false
+	for _, f := range b.Files {
+		mixed = mixed || bytes.Contains(f.Data, []byte(`\pfmixednumbers`))
+	}
 	res := &Result{Bib: bib.FromSource(b.Files)}
 	for i, d := range docs {
 		set := m.Resolver.Resolve(d)
@@ -111,28 +120,55 @@ func Analyze(b *source.Bundle, p Paper, m *Manifests) (*Result, error) {
 			r := &recs[k]
 			if o, ok := at[ext[k].Off]; ok {
 				r.Census = o.ID
-				if r.Number == "" || o.NumberFrom != "head" {
+				if r.Item != "proof" && (r.Number == "" || o.NumberFrom != "head") {
 					r.Number, r.NumberFrom = o.Number, o.NumberFrom
 				}
 			}
 			refs[k] = census.Ref{Local: r.Local, Census: r.Census, Head: r.Head, Origin: r.Origin, Path: r.Path}
 		}
-		// A restatement prints the number of the item that it restates.
+		// A restatement prints the number of the item that it restates,
+		// unless its environment has no counter, as \newtheorem*. Seen in the
+		// gold pilot (set X).
 		byLocal := map[string]*objects.Record{}
 		for k := range recs {
 			byLocal[recs[k].Local] = &recs[k]
 		}
+		byLabel := map[string]*objects.Record{}
 		for k := range recs {
-			r := &recs[k]
-			if f, ok := byLocal[r.Restates]; ok && r.Number == "" && f.Number != "" {
-				r.Number, r.NumberFrom = f.Number, f.NumberFrom
+			for _, l := range recs[k].Labels {
+				if _, ok := byLabel[l]; !ok {
+					byLabel[l] = &recs[k]
+				}
 			}
 		}
-		rec := c.Match(refs, p.Waivers)
+		for k := range recs {
+			r := &recs[k]
+			if f, ok := byLocal[r.Restates]; ok && r.Number == "" && r.Counter != "" && f.Number != "" {
+				r.Number, r.NumberFrom = f.Number, f.NumberFrom
+			}
+			// A head "Theorem \ref{thm:main}" prints the number of the item
+			// of the label. Seen in the gold pilot (set X).
+			if m := refNumber.FindStringSubmatch(r.Number); m != nil {
+				if f, ok := byLabel[strings.TrimSpace(m[1])]; ok && f != r && f.Number != "" && !refNumber.MatchString(f.Number) {
+					r.Number = f.Number + m[2]
+				}
+			}
+		}
+		if mixed {
+			pfSteps(recs, byLocal)
+		}
+		// A head that only opens a part of the paper is layout, not an item.
+		waivers := p.Waivers
+		for _, off := range bld.Dropped {
+			if o, ok := at[off]; ok {
+				waivers = append(waivers[:len(waivers):len(waivers)], census.Waiver{Occurrence: o.ID, Reason: "layout", By: "rule:section-head"})
+			}
+		}
+		rec := c.Match(refs, waivers)
 		items := make([]edges.Item, len(recs))
 		for k, r := range recs {
 			x := ext[k]
-			items[k] = edges.Item{Local: r.Local, Kind: r.Item, Title: r.Title, Number: r.Number, Name: r.Name, Labels: r.Labels, Parts: r.Parts, Proof: x.Proof, Parent: r.Parent, InProof: r.Scope == "local", Proves: r.Proves, ProvesPart: r.ProvesPart, Restates: r.Restates, Off: x.Off, Inner: x.Inner, Close: x.Close, End: x.End}
+			items[k] = edges.Item{Local: r.Local, Kind: r.Item, Title: r.Title, Number: r.Number, Counter: r.Counter, Name: r.Name, Labels: r.Labels, Parts: r.Parts, Proof: x.Proof, Parent: r.Parent, Nested: x.Nested, InProof: r.Scope == "local", Proves: r.Proves, ProvesPart: r.ProvesPart, Restates: r.Restates, Off: x.Off, Inner: x.Inner, Close: x.Close, End: x.End}
 		}
 		g := edges.Resolve(edges.Input{Paper: p.ID, Version: p.Version, Extractor: p.Extractor, Prefix: prefix, Doc: d, Items: items, Titles: m.Resolver.Titles})
 		res.Edges = append(res.Edges, g.Edges...)
@@ -149,6 +185,32 @@ func Analyze(b *source.Bundle, p Paper, m *Manifests) (*Result, error) {
 	}
 	return res, nil
 }
+
+// refNumber is a number that a head writes as a reference.
+// A letter after the reference goes on the number, as "Theorem \ref{main}A".
+// pfSteps numbers the steps of the pf style of proofs, \begin{step+}, which
+// have no counter of their own: a step is the next one of the proof it is in, after the
+// number of the step that the proof proves, as 3.2 for the second step of the
+// proof of step 3. Seen in the gold pilot (set X).
+func pfSteps(recs []objects.Record, byLocal map[string]*objects.Record) {
+	next := map[string]int{}
+	for k := range recs {
+		r := &recs[k]
+		if r.Env != "step+" && (r.Env != "head" || r.Title != "Step") || r.Number != "" || r.Parent == "" {
+			continue
+		}
+		next[r.Parent]++
+		n := strconv.Itoa(next[r.Parent])
+		if pr := byLocal[r.Parent]; pr != nil {
+			if up := byLocal[pr.Parent]; up != nil && (up.Env == "step+" || up.Env == "head" && up.Title == "Step") && up.Number != "" {
+				n = up.Number + "." + n
+			}
+		}
+		r.Number, r.NumberFrom = n, "counter"
+	}
+}
+
+var refNumber = regexp.MustCompile(`^\\(?:ref|cref|Cref|autoref)\*?\s*\{([^{}]+)\}([A-Z]?'{0,2})$`)
 
 // prefixPaper marks the census ids of the second and later main files.
 func prefixPaper(i int) string {

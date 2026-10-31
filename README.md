@@ -1855,6 +1855,18 @@ The scope has only 15 open papers from 1991-2000, so that group is short. The re
 
 `-set e` makes gold set E, which measures the edge resolver. `ax gold draw -set e` draws 300 papers from set X v1: from each group of set X, the first 60 papers in the order of the seed that have a proof object. The papers of set X are already fetched, so the draw makes no new request to arXiv. `ax gold propose -set e <id>v<n>` proposes the items and, for each proof, the uses and cites-result edges that the resolver found. A person reads each proof, removes the wrong uses and adds the missing ones. `ax gold score -set e -report reports/gold-e.md` gives the precision of each method against the targets of AX11.3 (98% for ref and text, 85% for position, name and term) and the recall of the methods together, with the uses that no edge found.
 
+The first marks of both sets are by claude-opus-5-5, an LLM pass that the owner chose, not by a person. The sets hold open papers only (AQ08). On set E, 253 papers:
+
+| Method | Precision | Above low | Target |
+| --- | ---: | ---: | ---: |
+| ref | 98.2% (4,115 of 4,192) | 98.2% | 98.0% |
+| text | 98.5% (201 of 204) | 98.5% | 98.0% |
+| cite | 96.8% (1,260 of 1,301) | 96.8% | measured |
+| position | 67.4% (31 of 46) | 88.9% (24 of 27) | 85.0% above low |
+| term | 21.9% (261 of 1,190) | none | 85.0% above low |
+
+The name method found no edge, so it has no precision. The recall of methods 1 to 7 together is 76.2% (5,285 of 6,932). The first version has no target for it, and most of the uses that no edge finds are a definition or a cited result named in prose.
+
 `ax select scope` writes the list of the papers in the math scope, `manifests/scope/math.txt`, from the metadata plane.
 A paper is in scope when one of its categories is a math category, math-ph, or one of the old archives alg-geom, dg-ga, funct-an and q-alg.
 The list holds the ids only, sorted, and its first line gives the counts.

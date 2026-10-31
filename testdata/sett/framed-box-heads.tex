@@ -1,0 +1,18 @@
+% Pattern: head/box. The paper sets each statement in a framed box, as
+% \fbox{\parbox{5in}{{\bf Theorem 1:} ...}}, and the head opens the inner box.
+% Seen in the gold pilot (set X).
+% want head-1 statement/theorem 1
+% want head-2 proof - proves=head-1
+% want head-3 statement/lemma 2
+\documentclass{article}
+\begin{document}
+Some text before.
+
+\noindent \fbox{\parbox{5.0in}{{\bf Theorem 1:} Every compact space is
+bounded.}}
+
+\noindent {\it Proof:} Cover the space by balls. $\blacksquare$
+
+\noindent \framebox{\parbox[t]{4in}{{\bf Lemma 2.} A closed part of a compact
+space is compact.}}
+\end{document}

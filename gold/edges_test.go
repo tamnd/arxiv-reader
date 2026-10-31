@@ -66,6 +66,9 @@ func TestSetEScoresEachMethod(t *testing.T) {
 	if !strings.Contains(s.Markdown(), "proof-1 definition-1") {
 		t.Errorf("the report does not list the missed use:\n%s", s.Markdown())
 	}
+	if !strings.Contains(s.Markdown(), "cite proof-1 bib:Ser") {
+		t.Errorf("the report does not list the wrong edge:\n%s", s.Markdown())
+	}
 }
 
 func TestSetEIsDrawnFromSetX(t *testing.T) {
@@ -120,5 +123,52 @@ func TestTheUsesOfMarksWithOtherNamesAreScoredThroughTheItems(t *testing.T) {
 	}
 	if s.Recall.Hit != 2 || s.Recall.Of != 3 {
 		t.Errorf("recall %v", s.Recall)
+	}
+}
+
+// Seen in the gold pilot (set E): a pass marks a "First proof" inside a proof
+// as a proof of its own. The nested mark overlaps the item of the next proof
+// too, and it must not take it from the mark that starts on its line.
+func TestANestedMarkLeavesTheItemOfItsLine(t *testing.T) {
+	items := []objects.Record{
+		{Kind: "proof", Local: "proof-1", Version: "1", Path: "source", Item: "proof", Span: &objects.Span{File: "m.tex", From: 10, To: 40}},
+		{Kind: "proof", Local: "proof-2", Version: "1", Path: "source", Item: "proof", Span: &objects.Span{File: "m.tex", From: 41, To: 50}},
+	}
+	marks := []Mark{
+		{ID: "a", Kind: "proof", File: "m.tex", From: 10, To: 45},
+		{ID: "b", Kind: "proof", File: "m.tex", From: 12, To: 42},
+		{ID: "c", Kind: "proof", File: "m.tex", From: 41, To: 50},
+	}
+	match, _ := matchMarks(marks, items)
+	if match["a"] != 0 || match["c"] != 1 {
+		t.Errorf("match %v", match)
+	}
+	if _, ok := match["b"]; ok {
+		t.Errorf("the nested mark took an item: %v", match)
+	}
+}
+
+// A heuristic method that misses its target drops to low (AX11.3), and its
+// low edges do not count against the target.
+func TestTheTargetOfAHeuristicHoldsAboveLow(t *testing.T) {
+	g := ProposeE("v1", "", "ax/test", "p", 1, edgeObjects(), nil)
+	g.State, g.By = Marked, "A. Person"
+	g.Uses = []Use{{Proof: "proof-1", To: "lemma-1"}}
+	ev := edges.Evidence{Version: 1, Cue: "position"}
+	es := []edges.Edge{
+		{From: "p#proof-1", To: "p#lemma-1", Predicate: edges.Uses, Method: edges.Position, Confidence: edges.Medium, Evidence: ev},
+		{From: "p#proof-1", To: "p#theorem-1", Predicate: edges.Uses, Method: edges.Position, Confidence: edges.Low, Evidence: ev},
+	}
+	var s EdgeScore
+	s.Marked = 1
+	s.AddPaper(g, es)
+	if r := s.Precision[edges.Position]; r.Hit != 1 || r.Of != 2 {
+		t.Errorf("all %v", r)
+	}
+	if r := s.AboveLow[edges.Position]; r.Hit != 1 || r.Of != 1 {
+		t.Errorf("above low %v", r)
+	}
+	if !s.Met() {
+		t.Errorf("the target is not met:\n%s", s.Markdown())
 	}
 }

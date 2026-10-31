@@ -1,0 +1,22 @@
+% Pattern: env/command. The paper numbers its paragraphs with an untitled
+% theorem environment, and writes each one with a command that opens and
+% closes the environment with nothing in it. Seen in the gold pilot (set E).
+% want lem-1 statement/lemma 1.1
+% want sta-1 unknown 1.2
+% want sta-2 unknown 1.3
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{lem}{Lemma}[section]
+\newtheorem{sta}[lem]{}
+\def\st { \begin{sta} \ \end{sta}}
+\begin{document}
+\section{One}
+\begin{lem}
+Every compact space is bounded.
+\end{lem}
+
+\st  We will usually consider rings that are finitely generated.
+
+\st
+A special place is held by rings in positive characteristic.
+\end{document}

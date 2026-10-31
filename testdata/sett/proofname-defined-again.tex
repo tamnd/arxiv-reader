@@ -1,0 +1,21 @@
+% Pattern: proof/attach/announce. \renewcommand{\proofname}{Proof of
+% \thmref{t}} just before a proof announces what it proves. Seen in the gold
+% pilot (set X).
+% want theorem-1 statement/theorem 1 status=here labels=main
+% want lemma-1 statement/lemma 2 status=here labels=aux
+% want proof-1 proof - proves=lemma-1
+% want proof-2 proof - proves=theorem-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newcommand{\thmref}[1]{Theorem~\ref{#1}}
+\begin{document}
+\begin{theorem}\label{main} Every compact space is bounded. \end{theorem}
+\begin{lemma}\label{aux} Every finite union of balls is bounded. \end{lemma}
+\begin{proof} Take the largest radius. \end{proof}
+
+\renewcommand{\proofname}{Proof of \thmref{main}}
+\begin{proof} Take a finite cover and apply Lemma \ref{aux}. \end{proof}
+\renewcommand{\proofname}{Proof}
+\end{document}

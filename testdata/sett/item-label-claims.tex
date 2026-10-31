@@ -1,0 +1,39 @@
+% Pattern: head/item-claim. A proof states its claims as the items of a list
+% with bold labels, as \item[{\bf A1.}], and proves each one after the list
+% with "Proof of A1". Each item is a claim with the number of its label, and
+% each proof proves the claim of its label in the same proof. An item with a
+% label that no proof names is not a claim. Seen in the gold pilot (set X).
+% want proposition-1 statement/proposition 1
+% want proof-1 proof - proves=proposition-1
+% want head-1 statement/claim A1 lines=22-22
+% want head-2 statement/claim A2 lines=23-23
+% want head-3 proof - proves=head-1
+% want head-4 proof - proves=head-2
+% want proposition-2 statement/proposition 2
+% want proof-2 proof - proves=proposition-2
+% want head-5 statement/claim A1 lines=33-33
+% want head-6 proof - proves=head-5
+\documentclass{article}
+\newtheorem{proposition}{Proposition}
+\begin{document}
+\begin{proposition} Every compact space is bounded. \end{proposition}
+\begin{proof} We show two assertions.
+\begin{enumerate}
+\item[{\bf A1.}\,] The space has a finite cover by balls.
+\item[{\bf A2.}\,] Each ball of the cover is bounded.
+\end{enumerate}
+
+{\it Proof of \,{\bf A1}}.\, Cover the space by balls and take a finite cover.
+
+{\it Proof of \,{\bf A2}}.\, Each ball has a finite radius.
+\end{proof}
+\begin{proposition} Every finite space is compact. \end{proposition}
+\begin{proof} We show one assertion.
+\begin{enumerate}
+\item[{\bf A1.}\,] Each cover has a finite subcover.
+\item[{\bf B1.}\,] The space is finite.
+\end{enumerate}
+
+{\it Proof of \,{\bf A1}}.\, Take one set of the cover for each point.
+\end{proof}
+\end{document}

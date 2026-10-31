@@ -1,0 +1,16 @@
+% Pattern: head/proof. An environment with no title whose body starts with a
+% bold proof head is the proof of the target of the head: it has no number
+% of its own. Seen in the gold pilot (set X).
+% want thm-1 statement/theorem 1.1 labels=a
+% want subsec-1 proof - proves=thm-1
+\documentclass{article}
+\newtheorem{thm}{Theorem}[section]
+\newtheorem{subsec}[thm]{}
+\begin{document}
+\section{One}
+\begin{thm}\label{a} Every compact space is bounded. \end{thm}
+
+\begin{subsec} {\bf Proof of Theorem \ref{a}.} Cover the space by finitely
+many balls of radius one.
+\end{subsec}
+\end{document}

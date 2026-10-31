@@ -1,0 +1,16 @@
+% Pattern: number/option-off. A local class resets theorem in a block that
+% only an option of the class runs, and the document does not give the
+% option, so theorem is not reset. Seen in the gold pilot (set X).
+% want theorem-1 statement/theorem 1 status=none
+% want lemma-1 statement/lemma 2 status=none
+% want theorem-2 statement/theorem 3 status=none
+\documentclass{journal}
+\begin{document}
+\section{Introduction}
+\begin{theorem} Every compact space is bounded. \end{theorem}
+\section{Products}
+\subsection{Finite products}
+\begin{lemma} Every finite product of compact spaces is compact. \end{lemma}
+\subsection{Infinite products}
+\begin{theorem} Every product of compact spaces is compact. \end{theorem}
+\end{document}

@@ -119,7 +119,22 @@ func ScorePaper(g Record, recs []objects.Record) PaperScore {
 func matchMarks(marks []Mark, items []objects.Record) (map[string]int, []bool) {
 	used := make([]bool, len(items))
 	match := map[string]int{}
+	// An item that starts on the line of a mark is its item first, so that a
+	// mark nested in another (a "First proof" inside a proof) does not take
+	// the item of a later mark that it overlaps.
 	for _, m := range marks {
+		for i, o := range items {
+			if !used[i] && o.Kind == m.Kind && m.File != "" && o.Span != nil && o.Span.File == m.File && o.Span.From == m.From {
+				used[i] = true
+				match[m.ID] = i
+				break
+			}
+		}
+	}
+	for _, m := range marks {
+		if _, ok := match[m.ID]; ok {
+			continue
+		}
 		best, bestScore := -1, 0
 		for i, o := range items {
 			if used[i] || o.Kind != m.Kind {

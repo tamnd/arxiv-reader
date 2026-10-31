@@ -37,9 +37,16 @@ type item struct {
 	// wrapLabels is the labels that the begin code of a wrapper sets, as
 	// \label{l:#1} in \newenvironment{lemma}[1]{\begin{Lem}\label{l:#1}}.
 	wrapLabels []string
+	// wrapRef is a reference that the begin code of a proof wrapper writes
+	// out of its head, as the argument that
+	// \newenvironment{PROOF}[2][\proofname.]{\begin{proof}[#1]...#2...} puts
+	// in the end mark: it names what the proof proves.
+	wrapRef string
 	// normLen is the length of the normalized body, so that two short or
 	// empty bodies do not count as one item restated.
 	normLen int
+	// blank is true when the body is only spaces, as \begin{sta} \ \end{sta}.
+	blank bool
 }
 
 // Builder builds the object records of one main file.
@@ -60,12 +67,18 @@ type Builder struct {
 	// each offset. The rules of AX3.6 that read a number in a proof head use
 	// it, so the census runs first.
 	Numbers map[int]string
+	// Dropped is the offset of each head that Build dropped as one that
+	// only opens a part of the paper, so that the census waives it.
+	Dropped []int
 }
 
 var (
-	citeIn     = regexp.MustCompile(`\\cite[a-zA-Z]*\*?\s*(?:\[([^\]]*)\])?\s*(?:\[([^\]]*)\])?\s*\{([^{}]*)\}`)
-	refIn      = regexp.MustCompile(`\\(?:ref|cref|Cref|autoref|eqref)\*?\s*\{([^{}]+)\}`)
-	labelIn    = regexp.MustCompile(`\\label\s*\{([^{}]*)\}`)
+	citeIn = regexp.MustCompile(`\\cite[a-zA-Z]*\*?\s*(?:\[([^\]]*)\])?\s*(?:\[([^\]]*)\])?\s*\{([^{}]*)\}`)
+	// refIn also takes the reference commands of packages, as \refeq of
+	// mathtools or \prettyref. Seen in the gold pilot (set X).
+	refIn      = regexp.MustCompile(`\\(?:ref|cref|Cref|autoref|eqref|thref|[a-z]{2,6}ref|ref[a-z]{2,6})\*?\s*\{([^{}]+)\}`)
+	proofGroup = regexp.MustCompile(`^\s*(?:\\[a-z]+\s*)*\{?\s*(?:\\[a-z]+\s*)*(?i:proof)s?\s+of\b`)
+	labelIn    = regexp.MustCompile(`\\(?:th)?label\s*\{([^{}]*)\}`)
 	paraBreak  = regexp.MustCompile(`\n[ \t]*\n|\\par\b`)
 	gapOK      = regexp.MustCompile(`^(?:\s|\\label\s*\{[^{}]*\}|\\(?:qed|qedhere|medskip|smallskip|bigskip|noindent|par|vspace\*?\s*\{[^{}]*\}|vskip\s*[\d.]+\w*|newline|hfill|bigbreak|medbreak|smallbreak|goodbreak|nopagebreak|pagebreak|clearpage|newpage)\b|\\\\)*$`)
 	restateCmd = regexp.MustCompile(`\\([A-Za-z@]+)\*`)
@@ -89,11 +102,14 @@ func (b *Builder) Build(d *tex.Document, set *theorems.Set) ([]objects.Record, [
 	b.local(items)
 	b.fill(d, items)
 	for _, it := range items {
-		if n, ok := b.Numbers[it.off]; ok && n != "" && it.rec.Number == "" {
+		if n, ok := b.Numbers[it.off]; ok && n != "" && it.rec.Number == "" && it.rec.Item != "proof" {
 			it.rec.Number = n
 		}
 	}
+	untitled(items)
 	b.attach(d, items)
+	proven(items)
+	items, b.Dropped = dropSectionHeads(items)
 	b.status(d, items)
 	b.origin(items)
 	out := make([]objects.Record, len(items))
@@ -101,17 +117,18 @@ func (b *Builder) Build(d *tex.Document, set *theorems.Set) ([]objects.Record, [
 	for i, it := range items {
 		it.rec.Order = i + 1
 		out[i] = it.rec
-		ext[i] = Extent{Off: it.off, Inner: it.inner, Close: it.close, End: it.end, Proof: it.proof}
+		ext[i] = Extent{Off: it.off, Inner: it.inner, Close: it.close, End: it.end, Proof: it.proof, Nested: it.head != nil && it.parent != nil && it.parent.head == nil}
 	}
 	return out, ext
 }
 
 // Extent is where an item is in the expanded text: the offset of the \begin
 // or of the head, the offset after the head, the offset of the \end, and the
-// offset after the item. Proof is true for a proof.
+// offset after the item. Proof is true for a proof, and Nested for a manual
+// head inside an environment item.
 type Extent struct {
 	Off, Inner, Close, End int
-	Proof                  bool
+	Proof, Nested          bool
 }
 
 func (b *Builder) envItems(d *tex.Document, set *theorems.Set) []*item {
@@ -138,16 +155,31 @@ func (b *Builder) envItems(d *tex.Document, set *theorems.Set) []*item {
 			continue
 		}
 		var wrapLabels []string
-		if begin, after, ok := wrapperBegin(d, decl, inner); ok {
-			if m := innerOpt.FindStringSubmatch(begin); m != nil {
-				opt, hasOpt = m[1], true
+		wrapRef := ""
+		if begin, after, ok := wrapperBegin(d, decl, inner, opt, hasOpt); ok {
+			rest := begin
+			if m := innerOpt.FindStringSubmatchIndex(begin); m != nil {
+				opt, hasOpt = begin[m[2]:m[3]], true
+				rest = begin[:m[0]] + begin[m[1]:]
+			}
+			if decl.Proof {
+				if m := refIn.FindString(rest); m != "" {
+					wrapRef = m
+				}
 			}
 			for _, m := range labelIn.FindAllStringSubmatch(begin, -1) {
 				wrapLabels = append(wrapLabels, strings.TrimSpace(m[1]))
 			}
 			inner = after
 		}
-		it := &item{off: n.From, inner: inner, close: n.Close, end: n.To, opt: opt, hasOpt: hasOpt, decl: decl, restate: restate, proof: decl.Proof, wrapLabels: wrapLabels}
+		if decl.Proof && !decl.TitleArg && !hasOpt {
+			// \begin{proof}{Proof of Lemma~\ref{a}.}: a group that writes the
+			// head in place of the option. Seen in the gold pilot (set X).
+			if a, end, ok := tex.ReadArgs(d.Text, inner, "m"); ok && proofGroup.MatchString(a.Values[0]) {
+				opt, hasOpt, inner = a.Values[0], true, end
+			}
+		}
+		it := &item{off: n.From, inner: inner, close: n.Close, end: n.To, opt: opt, hasOpt: hasOpt, decl: decl, restate: restate, proof: decl.Proof, wrapLabels: wrapLabels, wrapRef: wrapRef}
 		it.rec.Env = name
 		it.rec.Title, it.rec.Item, it.inner = decl.TitleOf(d.Text, inner, b.Titles)
 		it.rec.Head = "environment"
@@ -172,8 +204,10 @@ var innerOpt = regexp.MustCompile(`\\begin\s*\{[^{}]+\}\s*\[([^\]]*)\]`)
 // \begin{proofof}{Theorem 1} gives \begin{proof}[Proof of Theorem 1], whose
 // optional argument is the head, and for
 // \newenvironment{lemma}[1]{\begin{Lem}\label{l:#1}}{\end{Lem}} the use
-// \begin{lemma}{bfe1} gives the label l:bfe1.
-func wrapperBegin(d *tex.Document, decl *theorems.Declaration, inner int) (string, int, bool) {
+// \begin{lemma}{bfe1} gives the label l:bfe1. When the first argument is
+// optional, as in \newenvironment{Proof}[1][\proofname]{\begin{proof}[#1]},
+// it is the option of the use, or the default, and the rest are read.
+func wrapperBegin(d *tex.Document, decl *theorems.Declaration, inner int, opt string, hasOpt bool) (string, int, bool) {
 	if decl.Inner == "" || d.Macros == nil {
 		return "", 0, false
 	}
@@ -184,25 +218,42 @@ func wrapperBegin(d *tex.Document, decl *theorems.Declaration, inner int) (strin
 	if !innerOpt.MatchString(e.Begin) && !labelIn.MatchString(e.Begin) {
 		return "", 0, false
 	}
-	a, end, ok := tex.ReadArgs(d.Text, inner, strings.Repeat("m", e.Args))
+	var vals []string
+	if e.HasDefault {
+		if !hasOpt {
+			opt = e.Default
+		}
+		vals = append(vals, opt)
+	}
+	a, end, ok := tex.ReadArgs(d.Text, inner, strings.Repeat("m", e.Args-len(vals)))
 	if !ok {
 		return "", 0, false
 	}
+	vals = append(vals, a.Values...)
 	begin := e.Begin
 	for k := e.Args; k >= 1; k-- {
-		begin = strings.ReplaceAll(begin, "#"+strconv.Itoa(k), a.Values[k-1])
+		begin = strings.ReplaceAll(begin, "#"+strconv.Itoa(k), vals[k-1])
 	}
 	return begin, end, true
 }
 
 func (b *Builder) headItems(d *tex.Document, envs []*item) []*item {
-	var skip []tex.Region
+	var spans []theorems.EnvSpan
 	for _, e := range envs {
-		skip = append(skip, tex.Region{From: e.off, To: e.end})
+		spans = append(spans, theorems.EnvSpan{Off: e.off, Inner: e.inner, Close: e.close, Proof: e.proof})
 	}
 	var out []*item
-	for _, h := range theorems.FindHeads(d, b.Titles, skip) {
+	for _, h := range theorems.FindHeads(d, b.Titles, spans) {
 		h := h
+		// A head with no end mark ends at the next environment item too: a
+		// theorem that follows a short manual proof is not a part of it.
+		if !h.EndMark && h.Form != "section" {
+			for _, e := range envs {
+				if e.off >= h.Inner && e.off < h.End {
+					h.End = e.off
+				}
+			}
+		}
 		it := &item{off: h.Off, inner: h.Inner, close: h.End, end: h.End, head: &h, proof: h.Proof}
 		it.rec.Env = "head"
 		it.rec.Title = h.Title
@@ -353,6 +404,23 @@ func (b *Builder) fill(d *tex.Document, items []*item) {
 	for _, it := range items {
 		r := &it.rec
 		r.Paper, r.Version, r.Path, r.Extractor = b.Paper, fmt.Sprint(b.Version), "source", b.Extractor
+		if dc := it.decl; r.Item == theorems.Unknown && dc != nil && strings.TrimSpace(dc.Title) == "" && !dc.TitleArg {
+			// \newtheorem{pkt}{}[section] used as \begin{pkt} {\bf
+			// Definition.}: the head at the start of the body gives the kind.
+			// Seen in the gold pilot (set X).
+			if h, ok := theorems.StartHead(d.Text, it.inner, it.close, b.Titles); ok && h.Item != theorems.Unknown {
+				r.Item = h.Item
+				if h.Proof {
+					// \begin{subsec} {\bf Proof of Theorem \ref{a}.}: the
+					// environment is the proof, with the target of its head
+					// and no number. Seen in the gold pilot (set X).
+					it.proof, r.Number, r.NumberFrom = true, "", ""
+					if !it.hasOpt {
+						it.opt, it.hasOpt = h.Target, h.Target != ""
+					}
+				}
+			}
+		}
 		r.Kind, r.Subkind = theorems.KindOf(r.Item)
 		if r.Item == theorems.Unknown {
 			r.Item = theorems.Unknown
@@ -376,11 +444,14 @@ func (b *Builder) fill(d *tex.Document, items []*item) {
 				r.Labels = append(r.Labels, strings.TrimSpace(m[1]))
 			}
 		}
+		r.Labels, r.Parts = ownLabels(d, items, it, r.Labels, r.Parts)
 		if len(r.Labels) > 0 {
 			r.Label = r.Labels[0]
 		}
-		norm := fingerprint.Normalize(innerOnly(body, items, it, d), d.Macros)
+		inner := innerOnly(body, items, it, d)
+		norm := fingerprint.Normalize(inner, d.Macros)
 		it.normLen = len(norm)
+		it.blank = strings.Trim(strings.ReplaceAll(inner, `\ `, ""), " \t\r\n~") == ""
 		r.Hash = fingerprint.Hash(norm)
 		r.MinHash = fingerprint.MinHash(norm)
 		if b.Text {
@@ -391,6 +462,35 @@ func (b *Builder) fill(d *tex.Document, items []*item) {
 
 // innerOnly is the body of an item without the bodies of the items nested
 // in it, so that a proof with a claim in it and the claim do not share text.
+// ownLabels drops the labels that are in an item nested in it, as the label
+// of a claim inside a proof: that label is the claim's.
+func ownLabels(d *tex.Document, items []*item, it *item, ls []string, parts []objects.Part) ([]string, []objects.Part) {
+	inner := map[string]bool{}
+	for _, o := range items {
+		if o.parent != it || o.off < it.inner || o.end > it.close {
+			continue
+		}
+		for _, m := range labelIn.FindAllSubmatch(d.Text[o.off:o.end], -1) {
+			inner[strings.TrimSpace(string(m[1]))] = true
+		}
+	}
+	if len(inner) == 0 {
+		return ls, parts
+	}
+	var own []string
+	for _, l := range ls {
+		if !inner[l] {
+			own = append(own, l)
+		}
+	}
+	for i := range parts {
+		if inner[parts[i].Label] {
+			parts[i].Label = ""
+		}
+	}
+	return own, parts
+}
+
 func innerOnly(body string, items []*item, it *item, d *tex.Document) string {
 	var b strings.Builder
 	at := it.inner
@@ -641,4 +741,28 @@ func romanOf(v int) string {
 		}
 	}
 	return b.String()
+}
+
+// dropSectionHeads drops the heads written by hand that only open a part of
+// the paper, as {\bf Acknowledgements.} or \paragraph{Summary.}, that no
+// proof made a statement and that hold no item. An environment of the paper
+// for one, as \begin{acknowledgements}, stays an item. Seen in the gold pilot
+// (set X): 83 of 92 such heads have no mark.
+func dropSectionHeads(items []*item) ([]*item, []int) {
+	parents := map[*item]bool{}
+	for _, it := range items {
+		if it.parent != nil {
+			parents[it.parent] = true
+		}
+	}
+	out := items[:0]
+	var dropped []int
+	for _, it := range items {
+		if it.rec.Item == "other/section" && it.rec.Head == "manual" && !parents[it] {
+			dropped = append(dropped, it.off)
+			continue
+		}
+		out = append(out, it)
+	}
+	return out, dropped
 }

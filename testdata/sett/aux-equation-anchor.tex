@@ -1,0 +1,24 @@
+% Pattern: number/aux. A \label after an equation in a definition takes the
+% number of the equation, as the anchor equation.1.1 of the .aux tells, so
+% the definition keeps the number 1.2 of the counter and not the 1 of the
+% label. Seen in the gold pilot (set X).
+% want theorem-1 statement/theorem 1.1
+% want definition-1 definition 1.2
+% want lemma-1 statement/lemma 1.3
+\documentclass{article}
+\usepackage{amsmath}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{lemma}[theorem]{Lemma}
+\begin{document}
+\section{One}
+\begin{theorem}\label{thm:first} Every finite space is compact. \end{theorem}
+\begin{definition}
+A space is fine when
+\begin{equation}
+a = b
+\end{equation}
+\label{def:fine}
+\end{definition}
+\begin{lemma}\label{lem:last} Every point is closed. \end{lemma}
+\end{document}

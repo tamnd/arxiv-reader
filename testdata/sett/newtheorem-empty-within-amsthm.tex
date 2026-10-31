@@ -1,0 +1,14 @@
+% Pattern: number/within. \newtheorem of the amsthm package, loaded in an AMS
+% class, with an empty counter in the brackets prints its number with a 0
+% before it, as the LaTeX kernel does. Seen in the gold pilot (set X).
+% want theorem-1 statement/theorem 01
+% want lemma-1 statement/lemma 02
+\documentclass{amsart}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}[]
+\newtheorem{lemma}[theorem]{Lemma}
+\begin{document}
+\section{One}
+\begin{theorem} Every compact space is bounded. \end{theorem}
+\begin{lemma} Every finite space is compact. \end{lemma}
+\end{document}

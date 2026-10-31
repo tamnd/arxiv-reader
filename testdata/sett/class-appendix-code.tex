@@ -1,0 +1,15 @@
+% Pattern: number/appendix. The \appendix of the class sets the format of the
+% lemmas to A\arabic{lemma} and their counter to 0, so the lemma of the appendix
+% is A1 and not 3. Seen in the gold pilot (set X).
+% want lemma-1 statement/lemma 1
+% want lemma-2 statement/lemma 2
+% want lemma-3 statement/lemma A1
+\documentclass{appjour}
+\begin{document}
+\section{One}
+\begin{Lemma} Every compact space is fine. \end{Lemma}
+\begin{Lemma} Every fine space is compact. \end{Lemma}
+\appendix
+\section{Proofs}
+\begin{Lemma} Every closed space is fine. \end{Lemma}
+\end{document}

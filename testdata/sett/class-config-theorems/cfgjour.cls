@@ -1,0 +1,11 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesClass{cfgjour}
+\newif\if@reveal
+\@revealfalse
+\DeclareOption{reveal}{\@revealtrue}
+\DeclareOption*{\PassOptionsToClass{\CurrentOption}{article}}
+\ProcessOptions\relax
+\LoadClass{article}
+\RequirePackage{amsthm}
+\RequirePackage{comment}
+\InputIfFileExists{cfgjour.cfg}{}{}

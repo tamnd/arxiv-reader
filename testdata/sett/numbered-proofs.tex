@@ -1,0 +1,22 @@
+% Pattern: proof/attach/numbered. A statement with two proofs, headed
+% "Proof 1" and "Proof 2", after a sentence that announces them.
+% Seen in the gold pilot (set E).
+% want prop-1 statement/proposition 1 status=here
+% want proof-1 proof - proves=prop-1
+% want proof-2 proof - proves=prop-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{prop}{Proposition}
+\begin{document}
+\begin{prop}
+A statement.
+\end{prop}
+We give two proofs.
+\begin{proof}[Proof 1]
+A step.
+\end{proof}
+
+\begin{proof}[Proof 2]
+Another step.
+\end{proof}
+\end{document}

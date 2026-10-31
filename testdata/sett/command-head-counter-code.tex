@@ -1,0 +1,37 @@
+% Pattern: number/counter. \lemma and \claim are commands that set their
+% counters from a shared one and print \thelemma, as "Lemma 1.2", in bold, so
+% the items they start take the numbers 1.1, 1.2 and 1.3. Seen in the gold
+% pilot (set X).
+% want head-1 statement/lemma 1.1
+% want head-2 statement/claim 1.2
+% want head-3 statement/lemma 1.3
+\documentclass{article}
+\newcounter{Mycounter}[section]
+\newcounter{lemma}[section]
+\renewcommand{\thelemma}{{Lemma \thesection.\arabic{lemma}}}
+\newcommand{\lemma}{%
+    \setcounter{lemma}{\value{Mycounter}}
+    \refstepcounter{lemma}
+    \stepcounter{Mycounter}
+    {\noindent \bf \thelemma:\ }}
+\newcounter{claim}[section]
+\renewcommand{\theclaim}{{Claim \thesection.\arabic{claim}}}
+\newcommand{\claim}{%
+    \setcounter{claim}{\value{Mycounter}}
+    \refstepcounter{claim}
+    \stepcounter{Mycounter}
+    {\noindent \bf \theclaim:\ }}
+\begin{document}
+\section{One}
+Some text.
+
+\lemma
+{\sl Every compact space is fine.}
+
+\claim
+{\sl Every fine space is compact.}
+
+\lemma
+{\sl Every point is closed.}
+
+\end{document}

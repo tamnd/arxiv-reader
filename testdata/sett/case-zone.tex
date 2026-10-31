@@ -1,0 +1,17 @@
+% Pattern: head/case. A bold "Zone 1:" in a proof is a case of the argument,
+% as "Case 1:" is: each zone is a range of the parameters. Seen in the gold
+% pilot (set X).
+% want head-1 proof -
+% want head-2 other/case 1
+% want head-3 other/case 2
+\documentclass{article}
+\begin{document}
+\section{Bounds}
+We show that the bound holds for each choice of $p$ and $t$.
+
+\noindent{\bf Proof of the bound.} We build a solution in each region.
+
+\textbf{Zone 1:} We take $p>1$ and $t<0$. Then the first estimate applies.
+
+\textbf{Zone 2:} We take $p\le 1$. Then the second estimate applies.
+\end{document}

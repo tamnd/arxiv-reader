@@ -1,0 +1,20 @@
+% Pattern: head/line-break. The paper breaks lines with \\ in place of
+% paragraphs, and each head in bold starts the line after a break, as
+% "{\bf{Lemma 2.1.}}", also after "\\[5pt] \noindent". A head in plain text
+% after a break is not a head. Seen in the gold pilot (set X).
+% want head-1 statement/lemma 2.1
+% want head-2 proof - proves=head-1
+% want head-3 statement/theorem 2.2
+% want head-4 statement/claim 1
+\documentclass{article}
+\begin{document}
+\section{Two}
+Some text before, and a line that ends in a break.\\
+{\bf{Lemma 2.1.}} Every compact space is bounded.
+\\
+\\
+{\bf{Proof.}} Cover the space by balls. $\Box$\\
+{\bf{Theorem 2.2.}} A closed part of a compact space is compact.\\
+Theorem 2.2 says more than it seems. A good tuple is one that fits.\\[5pt] \noindent
+\textbf{Claim 1.} Each good tuple is small.
+\end{document}

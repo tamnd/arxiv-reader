@@ -1,0 +1,19 @@
+% Pattern: declaration/macro. \let\@defthm\newtheorem gives the declaration
+% command another name, and \defthm calls it with two of its three arguments.
+% Seen in the gold pilot (set X).
+% want thm-1 statement/theorem 1
+% want cor-1 statement/corollary 1
+% want defn-1 definition 1
+\documentclass{article}
+\makeatletter
+\let\@defthm\newtheorem
+\def\defthm#1#2#3{\@defthm{#1}{#2}}
+\makeatother
+\newtheorem{thm}{Theorem}
+\defthm{cor}{Corollary}{Corollaries}
+\defthm{defn}{Definition}{Definitions}
+\begin{document}
+\begin{thm} Every compact space is bounded. \end{thm}
+\begin{cor} Every finite space is bounded. \end{cor}
+\begin{defn} A space is fine when it is compact. \end{defn}
+\end{document}

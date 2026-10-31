@@ -1,0 +1,27 @@
+% Pattern: head/case. The short form of a step of the pf style of proofs,
+% \step{label}{statement}, which cheatpf2 defines, heads a case of the proof
+% as \begin{step+} does, and with \pfmixednumbers both are numbered by their
+% place in the proof. A \step out of a proof is not a case. Seen in the gold
+% pilot (set X).
+% want theorem-1 statement/theorem 1
+% want proof-1 proof - proves=theorem-1
+% want step--1 other/case 1
+% want head-1 other/case 2
+\documentclass{article}
+\newtheorem{theorem}{Theorem}
+\newcommand{\pfmixednumbers}[1]{}
+\pfmixednumbers{4}
+\newenvironment{step+}[1]{\par\textbf{Step.} #1\par}{\par}
+\newcommand{\step}[1]{\par\textbf{Step.}}
+\begin{document}
+\begin{theorem}
+Every bounded set is small.
+\end{theorem}
+\begin{proof}
+\begin{step+}{step:large}
+The set has a largest point.
+\end{step+}
+ \step{step:bound}{The largest point bounds the set.}
+This is the definition of a bound.
+\end{proof}
+\end{document}

@@ -1,0 +1,29 @@
+% Pattern: head/list. In a section whose title is a plural kind word, as
+% "Axioms BB1 -- BB3" or "Assumptions", each item of a list with a bold head
+% is an item of that kind: a head in brackets, \item[\textbf{BB1}], is its
+% number, and a head after \item names it. The items of a list in any other
+% section are not items. Seen in the gold pilot (set X).
+% want head-1 statement/axiom BB1
+% want head-2 statement/axiom BB2
+% want head-3 context/hypothesis -
+% want head-4 context/hypothesis -
+\documentclass{article}
+\begin{document}
+\section{Setting}
+\subsection{Axioms  BB1 -- BB3}
+A black box is a device.
+\begin{itemize}
+\item[\textbf{BB1}] It produces strings.
+\item[\textbf{BB2}] It computes products.
+\end{itemize}
+\subsection{Assumptions}
+We first give the intuition.
+\begin{enumerate}
+  \item \textbf{Hessian regularity:} The Hessian is bounded.
+  \item \textbf{Gradient regularity:} The gradient is bounded.
+\end{enumerate}
+\subsection{Results}
+\begin{enumerate}
+  \item \textbf{Speed:} It is fast.
+\end{enumerate}
+\end{document}

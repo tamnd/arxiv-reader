@@ -1,0 +1,31 @@
+% Pattern: env/package. A structured proof of the package cheatpf2: each step
+% is a step+ environment with its label as the argument, and the proof of the
+% step is a prooof environment. Seen in the gold pilot (set E).
+% want lemma-1 statement/lemma 1 status=here
+% want proof-1 proof - proves=lemma-1
+% want step--1 other/case -
+% want prooof-1 proof - proves=step--1
+% want step--2 other/case -
+% want prooof-2 proof - proves=step--2
+\documentclass{article}
+\usepackage{cheatpf2}
+\newtheorem{lemma}{Lemma}
+\begin{document}
+\begin{lemma}
+Every compact space is bounded.
+\end{lemma}
+\begin{proof}
+  \begin{step+}{step:cover}
+    The space has a finite cover by balls.
+  \end{step+}
+  \begin{prooof}
+    By compactness.
+  \end{prooof}
+  \begin{step+}{step:bound}
+    A finite union of balls is bounded.
+  \end{step+}
+  \begin{prooof}
+    Take the largest radius.
+  \end{prooof}
+\end{proof}
+\end{document}

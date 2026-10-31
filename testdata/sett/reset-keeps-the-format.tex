@@ -1,0 +1,23 @@
+% Pattern: number/reset. \@addtoreset and \newcounter[...] reset a counter
+% and leave its format as it is, so the theorem of a class that resets it by
+% chapter, in a paper with no chapters, prints 1 and not 0.1. Seen in the gold
+% pilot (set X).
+% want theorem-1 statement/theorem 1
+% want theorem-2 statement/theorem 2
+% want step-1 statement/lemma 1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\newtheorem{step}{Lemma}
+\makeatletter
+\newcounter{chapter}
+\@addtoreset{theorem}{chapter}
+\newcounter{part}[section]
+\makeatother
+\begin{document}
+\section{One}
+\begin{theorem} Every point is closed. \end{theorem}
+\section{Two}
+\begin{theorem} Every line is closed. \end{theorem}
+\begin{step} Every plane is closed. \end{step}
+\end{document}

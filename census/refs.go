@@ -195,6 +195,9 @@ func sortLongest(xs []string) {
 	}
 }
 
+// sectionCounter is the counters of the section heads.
+var sectionCounter = map[string]bool{"part": true, "chapter": true, "section": true, "subsection": true, "subsubsection": true, "paragraph": true, "subparagraph": true}
+
 // checks runs the checks of AX4.4: agreement and contiguity, and the text
 // references.
 func (c *Census) checks() {
@@ -203,7 +206,11 @@ func (c *Census) checks() {
 	last := map[scope]int{}
 	lastID := map[scope]string{}
 	for _, o := range c.Items() {
-		if o.Type != Env || o.Counter == "" || c.touched[o.Counter] || o.HasFlag("conditional") {
+		if o.Type != Env || o.Counter == "" || c.touched[o.Counter] || o.HasFlag("conditional") || sectionCounter[o.Counter] || o.Counter == "equation" {
+			// The heads of a section counter step it too, as in a class that
+			// numbers its theorems with the subsections, so a gap there is
+			// a head. Seen in the gold pilot (set X). The equations step the
+			// equation counter between the items that share it.
 			continue
 		}
 		n := o.Number

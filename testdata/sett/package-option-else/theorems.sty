@@ -1,0 +1,15 @@
+% A synthetic style file. Its option theorem-section numbers theorem within
+% the section, with a counter of its own; else theorem shares the counter of
+% lemma, which the section resets.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{theorems}
+\newif\if@theoremSection
+\DeclareOption{theorem-section}{\@theoremSectiontrue}
+\ProcessOptions
+\RequirePackage{amsthm}
+\newtheorem{lemma}{Lemma}[section]
+\if@theoremSection
+  \newtheorem{theorem}{Theorem}[section]
+\else
+  \newtheorem{theorem}[lemma]{Theorem}
+\fi

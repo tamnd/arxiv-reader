@@ -1,0 +1,19 @@
+% Pattern: proof/manual/article. A command that prints nothing hides a block
+% between a theorem and its manual proof head, so the proof still follows the
+% theorem.
+% Seen in the gold pilot (set E).
+% want theorem-1 statement/theorem 1 status=here labels=th:a
+% want head-1 proof - proves=theorem-1
+\documentclass{article}
+\newtheorem{theorem}{Theorem}
+\newcommand{\off}[1]{}
+\begin{document}
+\begin{theorem}\label{th:a}
+A statement.
+\end{theorem}
+\off{\textit{Proof(Rate)}: An old argument with $x_{a,b}$ and \qed}
+
+{\em Proof:} The proof for Theorem~\ref{th:a} is short. A step.
+
+Some text.
+\end{document}

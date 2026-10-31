@@ -1,0 +1,16 @@
+% Pattern: number/class-section. revtex4 prints \thesection as \Roman{section},
+% so a theorem numbered within the section prints II.1. Seen in the gold pilot
+% (set X).
+% want thm-1 statement/theorem I.1
+% want lem-1 statement/lemma II.1
+% want thm-2 statement/theorem II.2
+\documentclass[prd]{revtex4}
+\newtheorem{Thm}{Theorem}[section]
+\newtheorem{Lem}[Thm]{Lemma}
+\begin{document}
+\section{One}
+\begin{Thm} Every compact space is bounded. \end{Thm}
+\section{Two}
+\begin{Lem} Every finite space is compact. \end{Lem}
+\begin{Thm} Every finite space is bounded. \end{Thm}
+\end{document}

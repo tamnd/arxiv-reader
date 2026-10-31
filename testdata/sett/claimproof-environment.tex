@@ -1,0 +1,15 @@
+% Pattern: env/class. The claimproof environment, which classes such as
+% lipics define for the proof of a claim, is a proof even when the paper does
+% not declare it. Seen in the gold pilot (set X).
+% want claim-1 statement/claim 1
+% want claimproof-1 proof - proves=claim-1
+\documentclass{article}
+\newtheorem{claim}{Claim}
+\begin{document}
+\begin{claim}
+Every finite set is small.
+\end{claim}
+\begin{claimproof}
+A finite set has a largest point.
+\end{claimproof}
+\end{document}

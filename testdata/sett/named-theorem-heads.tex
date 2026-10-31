@@ -1,0 +1,38 @@
+% Pattern: head/manual. A bold head names an item before its title, as
+% "The Decomposition Theorem", "Smith's Lemma", "Cancelation axiom" in a list
+% item, "Linearity Criterion" or "Geometric construction", and has no number.
+% A bold group of words with no title is not a head. A case head writes a
+% formula and a name in parentheses. Seen in the gold pilot (set X).
+% want head-1 statement/theorem -
+% want head-2 statement/lemma -
+% want head-3 statement/axiom -
+% want head-4 statement/criterion -
+% want head-5 definition/construction -
+% want theorem-1 statement/theorem 1
+% want proof-1 proof - proves=theorem-1
+% want head-6 other/case -
+\documentclass{article}
+\newtheorem{theorem}{Theorem}
+\begin{document}
+Some text before.
+
+\noindent {\bf The Covering Theorem}: Every compact space is bounded.
+
+\noindent {\bf Smith's Lemma}: Every finite space is compact.
+
+\noindent {\bf Bounded Spaces}: A space is bounded when a ball holds it.
+
+\begin{itemize}
+  \item {\bf Cancelation axiom.} Each map of spaces has an inverse.
+\end{itemize}
+
+\textbf{Linearity Criterion:} A map is affine when its second derivative is zero.
+
+\paragraph{\bf Geometric construction.}
+Glue the opposite sides of a square.
+
+\begin{theorem} Every closed ball is compact. \end{theorem}
+\begin{proof}
+\textbf{Case $r<1$ (Small ball).} The ball lies in the unit ball.
+\end{proof}
+\end{document}

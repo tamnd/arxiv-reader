@@ -1,0 +1,28 @@
+% Pattern: head/case. A font command of the paper that heads the steps of
+% proofs, as \newcommand{\st}[1]{\noindent{\bf #1}} written at the start of a
+% line of a proof each time, heads a case of the proof named by its argument,
+% whatever the argument says. A font command that is used outside a proof
+% too is a font, not a head. Seen in the gold pilot (set X).
+% want theorem-1 statement/theorem 1
+% want proof-1 proof - proves=theorem-1
+% want head-1 other/case -
+% want head-2 other/case -
+% want head-3 other/case -
+\documentclass{article}
+\newtheorem{theorem}{Theorem}
+\newcommand{\st}[1]{\noindent{\bf  #1}}
+\newcommand{\term}[1]{\textbf{#1}}
+\begin{document}
+\begin{theorem}
+The three conditions are equivalent.
+\end{theorem}
+\begin{proof}
+\st{$(a)\Rightarrow(b)$} By the bound.
+\st{(ii)} By the choice.
+
+\st{Rough estimates} We bound it.
+
+\term{Small sets} are bounded.
+\end{proof}
+A \term{small set} is bounded.
+\end{document}

@@ -1,0 +1,22 @@
+% Pattern: number/equation. The rows of a split in an align are one equation,
+% so the align with a split steps the equation counter once, the align with two
+% rows twice, and the definition that shares the counter after them is 1.4. Seen
+% in the gold pilot (set X).
+% want definition-1 definition 1.4
+\documentclass{amsart}
+\numberwithin{equation}{section}
+\newtheorem{definition}[equation]{Definition}
+\begin{document}
+\section{One}
+\begin{align}
+\begin{split}
+a &= b + c \\
+  &= d
+\end{split}
+\end{align}
+\begin{align}
+e &= f \\
+g &= h
+\end{align}
+\begin{definition} A space is fine when it is compact. \end{definition}
+\end{document}

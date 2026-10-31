@@ -1,0 +1,24 @@
+% Pattern: head/case. In a proof, a number in parentheses in bold at the
+% start of a line, as \textbf{(1.1)}, heads a case of the proof, and the
+% number keeps its parentheses. Seen in the gold pilot (set X).
+% want theorem-1 statement/theorem 1
+% want proof-1 proof - proves=theorem-1
+% want head-1 other/case (1)
+% want head-2 other/case (1.1)
+% want head-3 other/case (2)
+\documentclass{article}
+\newtheorem{theorem}{Theorem}
+\begin{document}
+\begin{theorem}
+Every bounded set is small.
+\end{theorem}
+\begin{proof}
+We split the argument by the size of the set.
+
+\textbf{(1)}, If the set is empty, there is nothing to show.
+
+{\bf (1.1)} If it has one point, the point is its own bound.
+
+\textbf{(2)}, Otherwise we take the largest point.
+\end{proof}
+\end{document}

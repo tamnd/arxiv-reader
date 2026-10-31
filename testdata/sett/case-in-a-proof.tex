@@ -1,0 +1,28 @@
+% Pattern: head/nested. Bold case and claim heads inside a proof environment
+% are items nested in the proof (AX3.5), and the head written again at the
+% start of a proof is not a second proof. Seen in the gold pilot (set E).
+% want theorem-1 statement/theorem 1 status=here
+% want proof-1 proof - proves=theorem-1
+% want head-1 other/case 1
+% want head-2 statement/claim -
+% want head-3 proof - proves=head-2
+% want head-4 other/case 2
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\begin{document}
+\begin{theorem}
+Every compact space is bounded.
+\end{theorem}
+\begin{proof}
+\noindent{\it Proof.} Take a cover by balls.
+
+\textbf{Case 1:} The cover is finite. Then the space is bounded.
+
+\textbf{Claim.} A finite union of balls is bounded.
+
+\emph{Proof of the claim.} Take the largest radius. $\square$
+
+\textbf{Case 2:} The cover is infinite. Take a finite subcover.
+\end{proof}
+\end{document}

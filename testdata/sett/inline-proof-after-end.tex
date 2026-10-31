@@ -1,0 +1,14 @@
+% Pattern: head/inline-end. A proof command starts on the line of the end of
+% the lemma, as "\end{lem} \proof". A head in bold after the end of an
+% equation on its line is not an item. Seen in the gold pilot (set X).
+% want lem-1 statement/lemma 1
+% want head-1 proof - proves=lem-1
+\documentclass{article}
+\newtheorem{lem}{Lemma}
+\def\proof{ { {\noindent \it Proof} \hbox{       } } }
+\begin{document}
+\begin{lem} Every compact space is
+bounded. \end{lem} \proof Cover the space by balls. $\Box$
+
+\begin{equation} a = b \end{equation} {\bf Theorem 2.} is what we use next.
+\end{document}

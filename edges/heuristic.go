@@ -12,7 +12,8 @@ const positionWindow = 10
 
 // positions is method 5: a reference by position, as "the previous lemma" or
 // "the lemma above". "This theorem" is not read, because in a proof it is
-// what the proof proves.
+// what the proof proves. A reference forward, as "the following lemma", is
+// low: on gold set E it was most often an announcement and not a use.
 func (r *resolver) positions() {
 	alts := r.titles()
 	if len(alts) == 0 {
@@ -28,17 +29,24 @@ func (r *resolver) positions() {
 		if src == nil {
 			return
 		}
-		back := true
+		back, conf := true, Medium
 		switch strings.ToLower(word) {
 		case "following", "next", "subsequent", "below":
-			back = false
+			back, conf = false, Low
 		}
-		dst := r.byPosition(src, off, title, back)
+		// In a proof, "the above theorem" is most often the theorem that the
+		// proof proves, when that is the nearest one: it is not an edge.
+		if back && strings.EqualFold(word, "above") {
+			if p := r.provesOf(src); p != "" && r.byPosition(src, off, title, back, true) == r.byID[p] {
+				return
+			}
+		}
+		dst := r.byPosition(src, off, title, back, false)
 		if dst == nil {
 			r.res.Dangling++
 			return
 		}
-		r.link(src, off, end, target{local: dst.Local}, Position, Medium, nil)
+		r.link(src, off, end, target{local: dst.Local}, Position, conf, nil)
 	}
 	for _, m := range before.FindAllSubmatchIndex(body, -1) {
 		read(d.Body+m[0], d.Body+m[1], string(body[m[2]:m[3]]), string(body[m[4]:m[5]]))
@@ -49,14 +57,21 @@ func (r *resolver) positions() {
 }
 
 // byPosition is the nearest item of the title before or after the offset,
-// within the window and in the same section or the section before.
-func (r *resolver) byPosition(src *Item, off int, title string, back bool) *Item {
+// within the window and in the same section or the section before, out of
+// the item that the proof proves.
+// With proved, the item that the proof proves is not skipped.
+func (r *resolver) byPosition(src *Item, off int, title string, back, proved bool) *Item {
 	kind := theorems.Unknown
 	if r.in.Titles != nil {
 		kind = r.in.Titles.Kind(title)
 	}
 	match := func(it *Item) bool {
 		if it.Proof || it == src || r.inside(src, it) {
+			return false
+		}
+		// In a proof, "the previous proposition" is the one before the
+		// proposition that the proof proves.
+		if p := r.provesOf(src); !proved && p != "" && it.Local == p {
 			return false
 		}
 		return theorems.Normalize(it.Title) == theorems.Normalize(title) || (kind != theorems.Unknown && it.Kind == kind)
@@ -179,6 +194,8 @@ var commonTerms = map[string]bool{
 // terms is method 7: a term that a definition of the paper defines, used in a
 // later item. The term is what the definition emphasizes, and the name of the
 // definition. A use goes to the nearest definition of the term before it.
+// The edge is low: on gold set E most mentions of a term are not a use of
+// its definition, and no heuristic that we tried met the target of AX11.3.
 func (r *resolver) terms() {
 	d := r.in.Doc
 	defs := map[string][]*Item{}
@@ -252,6 +269,6 @@ func (r *resolver) terms() {
 			continue
 		}
 		file, line := r.where(off)
-		r.add(Edge{From: r.id(src.Local), To: r.id(def.Local), Predicate: Uses, Method: Term, Confidence: Medium, Evidence: Evidence{File: file, Line: line, Cue: "term"}})
+		r.add(Edge{From: r.id(src.Local), To: r.id(def.Local), Predicate: Uses, Method: Term, Confidence: Low, Evidence: Evidence{File: file, Line: line, Cue: "term"}})
 	}
 }

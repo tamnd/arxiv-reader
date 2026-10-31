@@ -1,0 +1,22 @@
+% Pattern: class/tac. The class of Theory and Applications of Categories
+% defines \newtheorem again: each theorem-like environment is a subsection,
+% numbered with the subsections, whatever counter the declaration names.
+% Seen in the gold pilot (set X).
+% want lemma-1 statement/lemma 1.1 status=none
+% want proposition-1 statement/proposition 1.2 status=none
+% want definition-1 definition 1.4
+% want lemma-2 statement/lemma 2.1 status=none
+\documentclass{tac}
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem{definition}{Definition}[section]
+\begin{document}
+\section{Braidings}
+\begin{lemma} Every braiding is invertible. \end{lemma}
+\begin{proposition} Every symmetry is a braiding. \end{proposition}
+\subsection{Examples}
+The vector spaces give an example.
+\begin{definition} A braided category is a category with a braiding. \end{definition}
+\section{Centres}
+\begin{lemma} Every centre is braided. \end{lemma}
+\end{document}

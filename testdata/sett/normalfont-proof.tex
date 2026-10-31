@@ -1,0 +1,15 @@
+% Pattern: head/proof. A proof head after a comment and \normalfont, inside
+% the environment of the statement, starts the proof. Seen in the gold pilot
+% (set X).
+% want lem-1 statement/lemma 1
+% want head-1 proof - proves=lem-1
+\documentclass{article}
+\newtheorem{lem}{Lemma}
+\begin{document}
+\section{One}
+\begin{lem} Every compact space is bounded.
+
+%
+\normalfont {\bf Proof.} Cover the space by finitely many balls.
+\end{lem}
+\end{document}

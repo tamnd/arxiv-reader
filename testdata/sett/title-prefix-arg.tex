@@ -1,0 +1,19 @@
+% Pattern: kind/title-prefix. The environment writes its title and then its
+% argument, as "{\bf \theitem.\hspace{1em}Theorem#1.}", and the argument only
+% adds to the title: a label, a citation or a letter. Each use is a theorem.
+% Seen in the gold pilot (set X).
+% want theo-1 statement/theorem 1.1 status=here
+% want pf-1 proof - proves=theo-1 flags=
+% want theo-2 statement/theorem 1.2 status=none
+\documentclass{article}
+\newcounter{item}[section]
+\renewcommand{\theitem}{\arabic{section}.\arabic{item}}
+\newenvironment{theo}[1]{\refstepcounter{item}\par
+\indent {\bf \theitem.\hspace{1em}Theorem#1.} \sl }{\par}
+\newenvironment{pf}{\par\indent {\bf Proof.} }{ $\Box$\par}
+\begin{document}
+\section{One}
+\begin{theo}{\label{a}} Every compact space is bounded. \end{theo}
+\begin{pf} Cover the space by balls. \end{pf}
+\begin{theo}{\cite{ref}} A closed part of a compact space is compact. \end{theo}
+\end{document}

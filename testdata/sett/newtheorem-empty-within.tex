@@ -1,0 +1,16 @@
+% Pattern: number/within. \newtheorem of the LaTeX kernel with an empty
+% counter in the brackets prints its number with a 0 before it. Seen in the
+% gold pilot (set X).
+% want theorem-1 statement/theorem 01
+% want lemma-1 statement/lemma 02
+% want theorem-2 statement/theorem 03
+\documentclass{article}
+\newtheorem{theorem}{Theorem}[]
+\newtheorem{lemma}[theorem]{Lemma}
+\begin{document}
+\section{One}
+\begin{theorem} Every compact space is bounded. \end{theorem}
+\begin{lemma} Every finite space is compact. \end{lemma}
+\section{Two}
+\begin{theorem} Every finite space is bounded. \end{theorem}
+\end{document}

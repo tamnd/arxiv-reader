@@ -1,0 +1,14 @@
+% Pattern: number/class-section. revtex4-1 with the AIP society, as the
+% options aip,jmp, prints \thesection in Arabic, so a theorem numbered within
+% the section prints 2.1. Seen in the gold pilot (set X).
+% want thm-1 statement/theorem 1.1
+% want thm-2 statement/theorem 2.1
+\documentclass[aip,jmp,
+preprint]{revtex4-1}
+\newtheorem{Thm}{Theorem}[section]
+\begin{document}
+\section{One}
+\begin{Thm} Every compact space is bounded. \end{Thm}
+\section{Two}
+\begin{Thm} Every finite space is bounded. \end{Thm}
+\end{document}

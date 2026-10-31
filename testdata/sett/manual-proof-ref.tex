@@ -1,0 +1,23 @@
+% Pattern: head/italic/article. Seen in the gold pilot (set E): a proof head
+% written by hand that names its statement with \ref, in an italic or bold
+% group (rule 1). The \ref in the head attaches the proof; it is not a use.
+% want theorem-1 statement/theorem 1 status=here labels=main
+% want lemma-1 statement/lemma 2 status=here labels=aux
+% want head-1 proof - proves=theorem-1
+% want head-2 proof - proves=lemma-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\begin{document}
+\begin{theorem}\label{main}
+The main result.
+\end{theorem}
+\begin{lemma}\label{aux}
+The helper.
+\end{lemma}
+
+\noindent {\it Proof of Theorem~\ref{main}.} By the helper. \qed
+
+\textbf{Proof of Lemma \ref{aux}.} The key step. \qed
+\end{document}

@@ -1,0 +1,26 @@
+% Pattern: proof/attach/ref. A class that defines \ref again for its own
+% typesetting, as \def\ref#1{{{\rm\@newref{#1}}}}, still writes a reference in
+% the head of a proof. Seen in the gold pilot (set X).
+% want theorem-1 statement/theorem 1 status=here labels=a.thm
+% want theorem-2 statement/theorem 2 status=none labels=b.thm
+% want proof-1 proof - proves=theorem-1
+\documentclass{article}
+\usepackage{amsthm}
+\makeatletter
+\def\@newref#1{\expandafter\@setref\csname r@#1\endcsname\@firstoftwo{#1}}
+\def\ref#1{{{\rm\@newref{#1}}}}
+\makeatother
+\newtheorem{theorem}{Theorem}
+\begin{document}
+\begin{theorem}
+\label{a.thm}Every compact space is bounded.
+\end{theorem}
+\begin{theorem}
+\label{b.thm}Every finite space is compact.
+\end{theorem}
+We turn to the proofs.
+
+\begin{proof}[Proof of Theorem \ref{a.thm}]
+Take a finite cover.
+\end{proof}
+\end{document}

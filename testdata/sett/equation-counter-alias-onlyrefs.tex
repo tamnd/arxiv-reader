@@ -1,0 +1,29 @@
+% Pattern: number/equation. \let\c@equation\c@thm makes the equations step the
+% counter of the theorems, and the showonlyrefs option of mathtools numbers only
+% the equations that an \eqref cites, so the cited equation is 1.2, the others
+% take no number, and the second theorem is 1.3. Seen in the gold pilot (set X).
+% want thm-1 statement/theorem 1.1
+% want thm-2 statement/theorem 1.3
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage[showonlyrefs]{mathtools}
+\newtheorem{thm}{Theorem}[section]
+\makeatletter
+\let\c@equation\c@thm
+\makeatother
+\begin{document}
+\section{One}
+\begin{thm} Every compact space is fine. \end{thm}
+\begin{equation}
+a = b \label{eq:one}
+\end{equation}
+\begin{equation}
+c = d \label{eq:two}
+\end{equation}
+\begin{align}
+e &= f \\
+g &= h
+\end{align}
+By \eqref{eq:one} the claim holds.
+\begin{thm} Every fine space is compact. \end{thm}
+\end{document}

@@ -1,0 +1,28 @@
+% Pattern: restate/option. A theorem printed again before its proof with
+% only a reference as its option, as \begin{repthm}[\ref{a}], restates the
+% item of the label, and the proof after it proves the restatement. Seen in
+% the gold pilot (set X).
+% want theorem-1 statement/theorem 1
+% want repthm-1 statement/theorem - origin=restated status=here
+% want proof-1 proof - proves=repthm-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\newtheorem*{repthm}{Theorem}
+\begin{document}
+\section{Results}
+
+\begin{theorem}\label{t:main}
+A monotone sequence that is bounded has a limit.
+\end{theorem}
+
+\section{Proof}
+
+\begin{repthm}[\ref{t:main}]
+Every bounded monotone sequence converges.
+\end{repthm}
+
+\begin{proof}
+Take the supremum of the terms.
+\end{proof}
+\end{document}

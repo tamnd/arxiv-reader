@@ -1,0 +1,30 @@
+% Pattern: kind/section-title. An environment titled Conclusion is a summary
+% unless a proof proves it; then it is a corollary. The second one has no
+% proof and stays a section-like remark.
+% Seen in the gold pilot (set E).
+% want theorem-1 statement/theorem 1 status=here
+% want proof-1 proof - proves=theorem-1
+% want conclusion-1 statement/corollary 2 status=here
+% want proof-2 proof - proves=conclusion-1
+% want conclusion-2 other/section 3
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\newtheorem{conclusion}[theorem]{Conclusion}
+\begin{document}
+\begin{theorem}
+A statement.
+\end{theorem}
+\begin{proof}
+A step.
+\end{proof}
+\begin{conclusion}
+A consequence.
+\end{conclusion}
+\begin{proof}
+It follows from the theorem.
+\end{proof}
+\begin{conclusion}
+A summary of the section.
+\end{conclusion}
+\end{document}

@@ -1,0 +1,24 @@
+% Pattern: head/case. A \paragraph in a proof whose title reads as a proof
+% that proves nothing, as "Proof for $N=2$", or as an item numbered by a
+% reference, as "Property \ref{small}", is a case of the proof named by its
+% title. Seen in the gold pilot (set X).
+% want lemma-1 statement/lemma 1
+% want proof-1 proof - proves=lemma-1
+% want head-1 other/case -
+% want head-2 other/case -
+\documentclass{article}
+\newtheorem{lemma}{Lemma}
+\begin{document}
+We work with finite sets.
+\begin{lemma}\label{small}
+Every finite set is small.
+\end{lemma}
+\begin{proof}[Proof of Lemma \ref{small}]
+We divide the proof by the size of the set.
+
+\paragraph{Proof for $N=2$.} The two points bound the set.
+
+\paragraph{Property \ref{small}:}
+The bound holds for each point.
+\end{proof}
+\end{document}

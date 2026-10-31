@@ -1,0 +1,19 @@
+% Pattern: number/wrapper. A wrapper sets \theinner to its argument and opens
+% the inner environment, so each use prints the number it gives. Seen in the
+% gold pilot (set X).
+% want customthm-1 statement/theorem A
+% want customthm-2 statement/theorem B
+% want theorem-1 statement/theorem 1.1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{innercustomthm}{Theorem}
+\newenvironment{customthm}[1]
+  {\renewcommand\theinnercustomthm{#1}\innercustomthm}
+  {\endinnercustomthm}
+\begin{document}
+\begin{customthm}{A} Every compact space is bounded. \end{customthm}
+\begin{customthm}{B} Every finite space is bounded. \end{customthm}
+\section{One}
+\begin{theorem} Every finite space is compact. \end{theorem}
+\end{document}

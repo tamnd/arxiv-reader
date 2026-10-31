@@ -1,0 +1,20 @@
+% Pattern: number/appendix. \appendix numbers the sections with \Alph, over a
+% format of the section that a style file set before. Seen in the gold pilot
+% (set X).
+% want theorem-1 statement/theorem 1.1 status=none
+% want theorem-2 statement/theorem A.1 status=none
+% want lemma-1 statement/lemma B.1 status=none
+\documentclass{article}
+\usepackage{conference}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\begin{document}
+\section{Introduction}
+\begin{theorem} Every compact space is bounded. \end{theorem}
+\appendix
+\section{Compact spaces}
+\begin{theorem} Every closed subset of a compact space is compact. \end{theorem}
+\section{Products}
+\begin{lemma} Every finite product of compact spaces is compact. \end{lemma}
+\end{document}

@@ -1,0 +1,14 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesClass{journalart}
+\newif\if@supplement
+\DeclareOption{supplement}{\@supplementtrue}
+\ProcessOptions
+\LoadClass{article}
+\RequirePackage{amsthm}
+\def\jprelabel{}
+\if@supplement
+\def\jprelabel{SM}
+\fi
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\renewcommand{\thetheorem}{\jprelabel\arabic{theorem}}

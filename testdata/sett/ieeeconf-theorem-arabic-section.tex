@@ -1,0 +1,14 @@
+% Pattern: number/class-section. ieeeconf prints \thesection as
+% \Roman{section}, but its \newtheorem{thm}{..}[section] prints
+% \arabic{section}, so the theorem of section II is 2.1. Seen in the gold
+% pilot (set X).
+% want thm-1 statement/theorem 1.1
+% want thm-2 statement/theorem 2.1
+\documentclass[conference]{ieeeconf}
+\newtheorem{Thm}{Theorem}[section]
+\begin{document}
+\section{One}
+\begin{Thm} Every compact space is bounded. \end{Thm}
+\section{Two}
+\begin{Thm} Every finite space is bounded. \end{Thm}
+\end{document}

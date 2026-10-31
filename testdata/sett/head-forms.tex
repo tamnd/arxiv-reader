@@ -1,0 +1,29 @@
+% Pattern: head/forms. A head after \bigbreak on the line before it, a
+% period between the number and the name, as "Theorem 1.1. (Main Theorem)",
+% a title in a group after a font switch, as "\bf {Theorem A}.", a number in a
+% word, as "Theorem One", and the misspelled title "Corrolary". Seen in the
+% gold pilot (set X).
+% want head-1 statement/theorem 1.1
+% want head-2 statement/lemma 2.2
+% want head-3 statement/theorem A
+% want head-4 statement/theorem One
+% want head-5 statement/corollary 1.4
+\documentclass{article}
+\begin{document}
+\section{One}
+We state the results of the paper.
+
+\noindent{\bf Theorem 1.1. (Main Theorem)} \ \ \ {\it Every compact space is
+bounded.}
+
+\bigbreak
+\noindent{\bf Lemma 2.2.} \ \ \ {\it Every finite space is compact.}
+
+\noindent
+\bf {Theorem A}. \\
+{\it \rm Every closed part of a compact space is compact.}
+
+{\bf Theorem One.} Every bounded closed set of the line is compact.
+
+\noindent{\bf Corrolary 1.4.} {\it Every finite set of the line is compact.}
+\end{document}

@@ -1,0 +1,35 @@
+% Pattern: proof/environment/wrapper. A proof environment declared with an
+% optional first argument, as \newenvironment{Proof}[1][Proof]{\begin{proof}[#1]},
+% whose use gives the head as that argument. The head names a lemma that is
+% not the item just before the proof. The second use gives no head.
+% Seen in the gold pilot (set E).
+% want lemma-1 statement/lemma 1 status=here labels=gap
+% want theorem-1 statement/theorem 2 status=none labels=main
+% want proof-1 proof - proves=lemma-1
+% want theorem-2 statement/theorem 3 status=here
+% want proof-2 proof - proves=theorem-2
+\documentclass{article}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newenvironment{Proof}[1][Proof]{\begin{proof}[#1]}{\end{proof}}
+\begin{document}
+\begin{lemma}\label{gap}
+A helper.
+\end{lemma}
+Some text between.
+
+\begin{theorem}\label{main}
+A statement.
+\end{theorem}
+Some more text.
+
+\begin{Proof}[Proof of Lemma~\ref{gap}]
+A step.
+\end{Proof}
+\begin{theorem}
+Another statement.
+\end{theorem}
+\begin{Proof}
+By Lemma~\ref{gap}, we are done.
+\end{Proof}
+\end{document}

@@ -1,0 +1,14 @@
+% Pattern: head/line. A head on the line after a line of only \noindent
+% starts an item, with no empty line before it, and the words after "on"
+% name a head, as "Remark on Horseshoe:". Seen in the gold pilot (set X).
+% want head-1 remark -
+% want head-2 remark -
+\documentclass{article}
+\begin{document}
+\section{One}
+Every compact space is bounded, as we show below.
+\noindent
+{\bf Remark:} The bound depends on the cover.
+
+{\bf Remark on Covers:} A cover by balls of radius one is enough.
+\end{document}

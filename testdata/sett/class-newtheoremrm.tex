@@ -1,0 +1,14 @@
+% Pattern: declaration/class. A class defines \newtheoremrm, a \newtheorem
+% with an upright body, and a paper macro calls it. Seen in the gold pilot
+% (set X).
+% want remark-1 remark 1
+% want eg-1 example 1
+\documentclass{catjournal}
+\makeatletter
+\def\defthm#1#2#3{\newtheoremrm{#1}{#2}}
+\makeatother
+\defthm{eg}{Example}{Examples}
+\begin{document}
+\begin{remark} Every finite space is compact. \end{remark}
+\begin{eg} The unit interval is compact. \end{eg}
+\end{document}

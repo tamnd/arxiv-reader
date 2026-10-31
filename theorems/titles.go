@@ -113,7 +113,13 @@ func (t *Titles) Kind(title string) string {
 	if len(words) == 0 {
 		return Unknown
 	}
-	for _, try := range []string{strings.Join(words[1:], " "), words[0], words[len(words)-1]} {
+	tries := []string{strings.Join(words[1:], " "), words[0], words[len(words)-1]}
+	// "Lemma-Notation" and "Observation / Convention" are the item the first
+	// word names, with a second role. Seen in the gold pilot (set X).
+	if strings.ContainsAny(n, "-/") {
+		tries[0], tries[1] = words[0], strings.Join(words[1:], " ")
+	}
+	for _, try := range tries {
 		if k, ok := t.kinds[try]; ok && try != "" {
 			return k
 		}

@@ -137,11 +137,19 @@ func textFile(name string) bool {
 
 // oldLineEnds changes each CR that has no LF after it to an LF. A file from an
 // old Mac ends its lines with a CR only, and a comment then runs to the end of
-// the file, so the census found no items in 1007.4365v1. The length does not
-// change, so an offset into the file stays correct. A CR LF stays as it is.
+// the file, so the census found no items in 1007.4365v1. The CR of a CR LF
+// becomes a space: with it, a blank line is "\r\n\r\n", which no paragraph
+// break of the front end reads, so no manual head of the file was found. Seen
+// in the gold pilot (set E). The length does not change, so an offset into
+// the file stays correct, and TeX drops a space at the end of a line.
 func oldLineEnds(b []byte) {
 	for i, c := range b {
-		if c == '\r' && (i+1 == len(b) || b[i+1] != '\n') {
+		if c != '\r' {
+			continue
+		}
+		if i+1 < len(b) && b[i+1] == '\n' {
+			b[i] = ' '
+		} else {
 			b[i] = '\n'
 		}
 	}

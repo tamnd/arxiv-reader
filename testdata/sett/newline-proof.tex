@@ -1,0 +1,20 @@
+% Pattern: head/proof. Inside a proof, a line that starts with \newline and a
+% head starts a claim or the proof of the claim, with no empty line before
+% it. Seen in the gold pilot (set X).
+% want thm-1 statement/theorem 1
+% want proof-1 proof - proves=thm-1
+% want head-1 statement/claim 1
+% want head-2 proof - proves=head-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{thm}{Theorem}
+\begin{document}
+\section{One}
+\begin{thm} Every compact space is bounded. \end{thm}
+\begin{proof} Fix a cover of the space by open balls of radius one.
+\newline\textsf{Claim 1.}
+The cover has a finite subcover.
+\newline\textit{Proof of Claim 1.}
+The space is compact. So the space is a finite union of bounded balls.
+\end{proof}
+\end{document}

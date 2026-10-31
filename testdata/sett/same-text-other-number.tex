@@ -1,0 +1,19 @@
+% Pattern: restate/hash. Two heads with the same text and two printed
+% numbers, as "Prop. 9.3.0" and "Proposition 9.3.1", are two items: the
+% second does not restate the first. Seen in the gold pilot (set X).
+% want head-1 statement/proposition 1 origin=own
+% want head-2 proof - proves=head-1
+% want head-3 statement/proposition 2 origin=own
+% want head-4 proof - proves=head-3
+\documentclass{article}
+\begin{document}
+\section{One}
+
+{\bf Proposition 1.}\quad Under the supposition of the main theorem the groups below vanish for every small degree.
+
+{\bf Proof}\quad Use the exact sequence. Q.E.D.
+
+{\bf Proposition 2.}\quad Under the supposition of the main theorem the groups below vanish for every small degree.
+
+{\bf Proof}\quad Use the other exact sequence. Q.E.D.
+\end{document}

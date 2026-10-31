@@ -1,0 +1,19 @@
+% Pattern: label/command. A command of the paper that writes a label with a
+% prefix, as \newcommand{\prlabel}[1]{\label{pr:#1}}, gives the label that
+% \ref{pr:a} names. Seen in the gold pilot (set X).
+% want proposition-1 statement/proposition 1 status=here labels=pr:bounded
+% want proposition-2 statement/proposition 2 status=none
+% want proof-1 proof - proves=proposition-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{proposition}{Proposition}
+\newcommand{\prlabel}[1]{\label{pr:#1}}
+\newcommand{\prref}[1]{Proposition~\ref{pr:#1}}
+\begin{document}
+\begin{proposition}\prlabel{bounded} Every compact space is bounded. \end{proposition}
+\begin{proposition} Every finite space is compact. \end{proposition}
+
+\begin{proof}[Proof of \prref{bounded}]
+Take a finite cover.
+\end{proof}
+\end{document}

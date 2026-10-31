@@ -1,0 +1,22 @@
+% Pattern: number/springer-options. With envcountsame each environment of the
+% class and each \spnewtheorem without a counter share the counter of theorem,
+% and envcountsect numbers it within the section. In svmult, \maketitle steps
+% the chapter and \thesection is \thechapter.\arabic{section}. Seen in the gold
+% pilot (set X).
+% want theorem-1 statement/theorem 6.1.1 status=none
+% want lemma-1 statement/lemma 6.1.2 status=none
+% want defn-1 definition 6.2.1
+% want theorem-2 statement/theorem 6.2.2 status=none
+\documentclass[envcountsame,envcountsect]{svmult}
+\setcounter{chapter}{5}
+\spnewtheorem{defn}{Definition}{\bfseries}{\rmfamily}
+\begin{document}
+\title{Compact spaces}
+\maketitle
+\section{Introduction}
+\begin{theorem} Every compact space is bounded. \end{theorem}
+\begin{lemma} Every closed subset of a compact space is compact. \end{lemma}
+\section{Products}
+\begin{defn} A space is bounded when it lies in a ball. \end{defn}
+\begin{theorem} Every finite product of compact spaces is compact. \end{theorem}
+\end{document}

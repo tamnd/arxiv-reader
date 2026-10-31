@@ -1,0 +1,16 @@
+% Pattern: file/line-ends. A file from Windows ends each line with a CR LF, so
+% a blank line is "\r\n\r\n". The test gives the file to source.Open with CR LF
+% line ends. Seen in the gold pilot (set E).
+% lineends crlf
+% want head-1 statement/theorem C
+% want head-2 statement/corollary E
+\documentclass{article}
+\begin{document}
+Some text before.
+
+\noindent{\bf Theorem C.} Every compact space is bounded.\\
+
+\noindent{\bf Corollary E.}
+
+Every closed subset of a compact space is bounded.
+\end{document}

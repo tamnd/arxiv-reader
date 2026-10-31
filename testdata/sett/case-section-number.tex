@@ -1,0 +1,19 @@
+% Pattern: number/section-case. A case written as a numbered section, as
+% \subsection{Case $n=1$}, prints the number of the section, and a starred
+% one prints none. Seen in the gold pilot (set X).
+% want head-1 other/case 2.1
+% want head-2 other/case 2.2
+% want head-3 other/case -
+\documentclass{article}
+\begin{document}
+\section{Setting}
+We fix the group.
+\section{The bound}
+We prove the bound by the parity of $n$.
+\subsection{Case $n=1$}
+Then the middle term vanishes.
+\subsection{Case of $n=2$}
+Then the two halves match.
+\subsection*{Case $n=0$}
+There is nothing to prove.
+\end{document}

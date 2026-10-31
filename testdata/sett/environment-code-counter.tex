@@ -1,0 +1,22 @@
+% Pattern: number/counter. The begin code of an environment,
+% \setcounter{item}{\value{equation}}\addtocounter{equation}{1}, numbers the
+% items with the equations, and an environment that is not an item steps the
+% equations too, so the lemmas are 1.2 and 1.5. Seen in the gold pilot
+% (set X).
+% want lem-1 statement/lemma 1.2
+% want lem-2 statement/lemma 1.5
+\documentclass{article}
+\numberwithin{equation}{section}
+\newcounter{item}
+\renewcommand{\theitem}{\arabic{section}.\arabic{item}}
+\newenvironment{lem}{\setcounter{item}{\value{equation}}\addtocounter{equation}{1}
+\refstepcounter{item}\par{\bf \theitem.\ Lemma.} }{\par}
+\newenvironment{aside}{\addtocounter{equation}{1}\par}{\par}
+\begin{document}
+\section{One}
+\begin{equation} a = b \end{equation}
+\begin{lem} Every finite space is compact. \end{lem}
+\begin{aside} A note on the spaces. \end{aside}
+\begin{equation} c = d \end{equation}
+\begin{lem} Every point is closed. \end{lem}
+\end{document}

@@ -1,0 +1,36 @@
+% Pattern: head/wrapper. The paper defines a command for each kind, with two
+% optional arguments for the title and the label, that puts its last argument
+% in the environment. A call is the environment, and a \label in the body of
+% the definition is the label of the call. Seen in the gold pilot (set E).
+% want lemma-1 statement/lemma 1 labels=lem.one
+% want claim-1 statement/claim 1.1
+% want proof-1 proof - proves=lemma-1
+% want definition-1 definition 2 labels=def.two
+\documentclass{article}
+\usepackage{amsthm,xargs}
+\newtheorem{lemma}{Lemma}
+\newtheorem{definition}[lemma]{Definition}
+\newtheorem{claim}{Claim}[lemma]
+\newcommandtwoopt{\lemm}[3][][]{
+  \begin{lemma}[#1]\label{#2}
+    #3
+  \end{lemma}}
+\newcommandtwoopt{\defi}[3][][]{
+  \begin{definition}[#1]\label{#2}
+    #3$\hfill\dashv$
+  \end{definition}}
+\newcommand{\clai}[2][]{\begin{claim}[#1]#2\end{claim}}
+\begin{document}
+\section{One}
+Some text before.
+
+\lemm[Small][lem.one]{
+Every compact space is bounded.
+\clai{The cover has a finite part.}
+}
+\begin{proof}
+Cover the space by balls.
+\end{proof}
+
+\defi[][def.two]{A space is nice when it is compact.}
+\end{document}

@@ -67,9 +67,6 @@ var Confidences = []string{Certain, High, Medium, Low}
 
 // The flags of an edge.
 const (
-	// FlagTitleMismatch is a text reference whose title does not agree with
-	// the kind of the item that has the number.
-	FlagTitleMismatch = "title-mismatch"
 	// FlagCycle is a uses edge in a cycle of the in-paper uses graph.
 	FlagCycle = "cycle"
 )
@@ -109,10 +106,16 @@ type Item struct {
 	Labels []string
 	Parts  []objects.Part
 	Proof  bool
+	// Counter is the counter that the environment of the item steps.
+	Counter string
 	// Parent is the local of the enclosing item, and InProof is true when
 	// the item is inside a proof.
 	Parent  string
 	InProof bool
+	// Nested is true for a manual head inside an environment item, as a
+	// bold "Case 1." or "Proof of (i)." in a proof: its uses are the uses of
+	// the item that holds it. Seen in the gold pilot (set E).
+	Nested bool
 	// Proves, ProvesPart and Restates are from the builder.
 	Proves     string
 	ProvesPart string
@@ -158,6 +161,7 @@ func Resolve(in Input) *Result {
 	r.positions()
 	r.scopes()
 	r.terms()
+	r.closed()
 	r.cycles()
 	sort.SliceStable(r.res.Edges, func(i, j int) bool {
 		a, b := r.res.Edges[i], r.res.Edges[j]
@@ -184,6 +188,11 @@ type resolver struct {
 	byID   map[string]*Item
 	order  map[string]int
 	labels map[string]target
+	// named is the items that the head of each proof names as what it
+	// proves, and headUses is the part of the head that names what it uses
+	// ("from Lemma 3").
+	named    map[string]map[string]bool
+	headUses map[string][2]int
 }
 
 func (r *resolver) id(local string) string { return r.in.Paper + "#" + local }
@@ -196,6 +205,11 @@ func (r *resolver) index() {
 		it := &r.in.Items[i]
 		r.byID[it.Local] = it
 		r.order[r.id(it.Local)] = i
+		if it.Kind == "other/case" {
+			// The labels of a case or a step go to the item that holds it,
+			// below. Seen in the gold pilot (set E).
+			continue
+		}
 		for _, l := range it.Labels {
 			r.labels[l] = target{local: it.Local}
 		}
@@ -218,7 +232,14 @@ func (r *resolver) index() {
 			}
 			continue
 		}
-		if it := r.innermost(off); it != nil {
+		it := r.innermost(off)
+		// An equation of a case or a step is an equation of the item that
+		// holds it; a step of an algorithm is not an item of the paper.
+		// Seen in the gold pilot (set E).
+		for it != nil && it.Kind == "other/case" {
+			it = r.byID[it.Parent]
+		}
+		if it != nil {
 			r.labels[k] = target{local: it.Local, part: k}
 			continue
 		}
@@ -226,7 +247,45 @@ func (r *resolver) index() {
 			r.labels[k] = target{local: s, section: true}
 		}
 	}
+	r.named = map[string]map[string]bool{}
+	r.headUses = map[string][2]int{}
+	for i := range r.in.Items {
+		it := &r.in.Items[i]
+		if !it.Proof || it.Inner <= it.Off {
+			continue
+		}
+		head := d.Text[it.Off:it.Inner]
+		from, to := len(head), len(head)
+		if m := headReason.FindSubmatchIndex(head); m != nil {
+			if m[2] >= 0 {
+				// "Proof that Proposition 2 implies Theorem 1": what comes
+				// before the verb is used.
+				from, to = m[2], m[3]
+			} else {
+				from = m[0]
+			}
+		}
+		r.headUses[it.Local] = [2]int{it.Off + from, it.Off + to}
+		for _, m := range refCmd.FindAllSubmatchIndex(head, -1) {
+			if m[0] >= from && m[0] < to {
+				continue
+			}
+			for _, k := range strings.Split(string(head[m[6]:m[7]]), ",") {
+				if t, ok := r.labels[strings.TrimSpace(k)]; ok && !t.section {
+					if r.named[it.Local] == nil {
+						r.named[it.Local] = map[string]bool{}
+					}
+					r.named[it.Local][t.local] = true
+				}
+			}
+		}
+	}
 }
+
+// headReason is the word of a proof head after which the head names what the
+// proof uses: "Proof of Theorem 1 from Lemma 2", "given", "assuming". With
+// "that … implies", the head names the use before the verb.
+var headReason = regexp.MustCompile(`(?i)\b(?:from|given|assuming|using|via|modulo|based on|(that\b.*?\bimplies))\b`)
 
 // mathEnvs are the environments of displayed equations.
 var mathEnvs = map[string]bool{"equation": true, "align": true, "gather": true, "multline": true, "eqnarray": true, "flalign": true, "alignat": true, "subequations": true}
@@ -300,6 +359,42 @@ func (r *resolver) add(e Edge) {
 	r.res.Edges = append(r.res.Edges, e)
 }
 
+// closingCues are the cues of a sentence that closes a proof: "This
+// completes the proof of Lemma 3 and finishes the proof of part (a) of
+// Theorem A".
+var closingCues = []string{"proves", "also proves", "completes the proof of", "concludes the proof of", "finishes the proof of", "complete the proof of", "conclude the proof of", "finish the proof of"}
+
+// closed drops the uses edges of a proof to an item that the proof says it
+// completes the proof of: the proof proves that item too.
+func (r *resolver) closed() {
+	done := map[string]map[string]bool{}
+	for _, e := range r.res.Edges {
+		src := r.byID[strings.TrimPrefix(e.From, r.in.Paper+"#")]
+		if e.Predicate != RefersTo || src == nil || !src.Proof || !in(closingCues, e.Evidence.Cue) {
+			continue
+		}
+		if done[e.From] == nil {
+			done[e.From] = map[string]bool{}
+		}
+		done[e.From][e.To] = true
+	}
+	if len(done) == 0 {
+		return
+	}
+	kept := r.res.Edges[:0]
+	for _, e := range r.res.Edges {
+		if e.Predicate == Uses && done[e.From][e.To] {
+			continue
+		}
+		kept = append(kept, e)
+	}
+	r.res.Edges = kept
+	r.best = map[key]int{}
+	for i, e := range r.res.Edges {
+		r.best[key{e.From, e.To, e.Part, e.Predicate}] = i
+	}
+}
+
 func rank(c string) int {
 	for i, x := range Confidences {
 		if x == c {
@@ -328,15 +423,19 @@ func (r *resolver) attached() {
 }
 
 var (
-	labelCmd = regexp.MustCompile(`\\label\s*\{([^{}]+)\}`)
-	refCmd   = regexp.MustCompile(`\\(ref|cref|Cref|autoref|Autoref|eqref|nameref|vref|Vref|labelcref|cpageref|pageref|hyperref|thmref|subref)\*?\s*(?:\[([^\]]*)\])?\s*\{([^{}]*)\}`)
+	labelCmd = regexp.MustCompile(`\\(?:th)?label\s*\{([^{}]+)\}`)
+	refCmd   = regexp.MustCompile(`\\(ref|cref|Cref|autoref|Autoref|eqref|nameref|vref|Vref|labelcref|cpageref|pageref|hyperref|thmref|thref|subref)\*?\s*(?:\[([^\]]*)\])?\s*\{([^{}]*)\}`)
 )
 
 // from is the item that a reference at the offset is from, or nil when the
 // reference is not in an item, or is a reference of a proof to what it
 // proves.
 func (r *resolver) from(off int) *Item {
-	return r.innermost(off)
+	it := r.innermost(off)
+	for it != nil && it.Nested && r.byID[it.Parent] != nil {
+		it = r.byID[it.Parent]
+	}
+	return it
 }
 
 // link adds an edge from the item at off to the target, with the predicate of
@@ -345,11 +444,33 @@ func (r *resolver) link(src *Item, off, end int, t target, method, confidence st
 	if t.local == src.Local {
 		return
 	}
+	// The head of a proof names what it proves, and a head that names two
+	// items ("Proof of Lemmas 2 and 3") proves both: neither is a use. A
+	// head can also name what the proof uses ("from Lemma 4").
+	if u := r.headUses[src.Local]; src.Proof && off >= src.Off && off < src.Inner && (off < u[0] || off >= u[1]) {
+		return
+	}
 	if dst := r.byID[t.local]; dst != nil {
 		// A proof that names what it proves, and an item that names an item
 		// that holds it, are not edges.
-		if r.provesOf(src) == dst.Local || r.inside(src, dst) {
+		if r.proved(src, dst.Local) || r.inside(src, dst) {
 			return
+		}
+		// A case, a step or a claim of the item itself is a part of its own
+		// argument, not a use (AX6.1).
+		if r.inside(dst, src) {
+			return
+		}
+		// An equation of another proof is a step of the proof of what that
+		// proof proves, so the edge goes to what it proves (AX6.1).
+		if dst.Proof && dst.Proves != "" {
+			t.local = dst.Proves
+			if t.local == src.Local || r.proved(src, t.local) {
+				return
+			}
+			if to := r.byID[t.local]; to != nil && r.inside(src, to) {
+				return
+			}
 		}
 	}
 	pred, cue := r.predicate(src, off, end)
@@ -358,6 +479,24 @@ func (r *resolver) link(src *Item, off, end int, t target, method, confidence st
 	}
 	file, line := r.where(off)
 	r.add(Edge{From: r.id(src.Local), To: r.id(t.local), Part: t.part, Predicate: pred, Method: method, Confidence: confidence, Flags: flags, Evidence: Evidence{File: file, Line: line, Cue: cue}})
+}
+
+// proved tells if the item, or the proof that holds it, proves the target:
+// the target is what it proves, or an item that the head of the proof names
+// ("Proof of Theorem 1.1 and Corollary 1.2").
+func (r *resolver) proved(it *Item, local string) bool {
+	if r.provesOf(it) == local {
+		return true
+	}
+	for x := it; x != nil; x = r.byID[x.Parent] {
+		if r.named[x.Local][local] {
+			return true
+		}
+		if x.Parent == "" {
+			break
+		}
+	}
+	return false
 }
 
 // provesOf is what the item proves, or what the proof that holds it proves.
@@ -440,11 +579,7 @@ func (r *resolver) macroRefs() {
 		if src == nil {
 			continue
 		}
-		spec := strings.Repeat("m", mac.Args)
-		if mac.HasDefault && mac.Args > 0 {
-			spec = "o" + strings.Repeat("m", mac.Args-1)
-		}
-		_, end, ok := tex.ReadArgs(d.Text, d.Body+loc[1], spec)
+		_, end, ok := tex.ReadArgs(d.Text, d.Body+loc[1], mac.Spec())
 		if !ok {
 			continue
 		}

@@ -1,0 +1,51 @@
+% Pattern: proof/attach/remark. A remark environment right after a statement,
+% and a proof right after the remark: the proof proves the statement. A remark
+% after a statement that already has its proof, and an example, keep their own
+% proofs.
+% Seen in the gold pilot (set E).
+% want lemma-1 statement/lemma 1 status=here
+% want remark-1 remark 1
+% want proof-1 proof - proves=lemma-1
+% want lemma-2 statement/lemma 2 status=here
+% want proof-2 proof - proves=lemma-2
+% want remark-2 remark 2
+% want proof-3 proof - proves=remark-2
+% want lemma-3 statement/lemma 3 status=none
+% want example-1 example 1
+% want proof-4 proof - proves=example-1
+\documentclass{article}
+\newtheorem{lemma}{Lemma}
+\newtheorem{remark}{Remark}
+\newtheorem{example}{Example}
+\begin{document}
+\begin{lemma}
+A bound.
+\end{lemma}
+\begin{remark}
+The bound is sharp.
+\end{remark}
+\begin{proof}
+A step.
+\end{proof}
+\begin{lemma}
+A helper.
+\end{lemma}
+\begin{proof}
+Another step.
+\end{proof}
+\begin{remark}
+The helper holds in a wider case.
+\end{remark}
+\begin{proof}
+A third step.
+\end{proof}
+\begin{lemma}
+A last one.
+\end{lemma}
+\begin{example}
+A case.
+\end{example}
+\begin{proof}
+A fourth step.
+\end{proof}
+\end{document}

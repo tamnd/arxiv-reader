@@ -1,0 +1,28 @@
+% Pattern: head/number. Inside a proof the paper writes its facts as bold heads
+% numbered by a Greek letter in parentheses, in math, after a command of its
+% own that is layout only, \sn for \smallskip\noindent. Each fact is a head
+% with the letter as its number, and the proof after it proves it. Seen in
+% the gold pilot (set X).
+% want theorem-1 statement/theorem 1 status=here
+% want proof-1 proof - proves=theorem-1
+% want head-1 statement/fact (α) status=here
+% want proof-2 proof - proves=head-1
+% want head-2 statement/fact (β)+ status=none
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\newcommand{\sn}{\smallskip\noindent}
+\begin{document}
+\begin{theorem} Every regular cardinal is large. \end{theorem}
+\begin{proof}
+We take a club of the cardinal.
+
+\sn
+\textbf{Fact $(\alpha)$}: $\delta > \lambda$.
+
+\begin{proof} Otherwise the club is bounded. \end{proof}
+
+\sn
+\textbf{Fact $(\beta)^+$}: The club is closed.
+\end{proof}
+\end{document}

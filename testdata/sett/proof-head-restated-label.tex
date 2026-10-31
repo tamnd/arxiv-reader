@@ -1,0 +1,38 @@
+% Pattern: proof/attach/label. A theorem of the introduction is restated with
+% the same label before its proof, and the head of the proof refers to the
+% label: the proof proves the restatement. A second head says that a lemma
+% implies the theorem: the proof proves the theorem.
+% Seen in the gold pilot (set E).
+% want theorem-1 statement/theorem 1 status=none labels=main
+% want lemma-1 statement/lemma 2 status=none labels=aux
+% want theorem-2 statement/theorem 3 status=here labels=main
+% want proof-1 proof - proves=theorem-2
+% want theorem-3 statement/theorem 4 status=here labels=other
+% want proof-2 proof - proves=theorem-3
+\documentclass{article}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\begin{document}
+\begin{theorem}\label{main}
+A statement.
+\end{theorem}
+\begin{lemma}\label{aux}
+A helper.
+\end{lemma}
+Some text between.
+
+\begin{theorem}\label{main}
+A statement.
+\end{theorem}
+\begin{proof}[Proof of Theorem~\ref{main}]
+A step.
+\end{proof}
+\begin{theorem}\label{other}
+Another statement.
+\end{theorem}
+Some more text.
+
+\begin{proof}[Proof that Lemma~\ref{aux} implies Theorem~\ref{other}]
+Another step.
+\end{proof}
+\end{document}

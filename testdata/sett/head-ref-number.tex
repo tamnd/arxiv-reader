@@ -1,0 +1,20 @@
+% Pattern: number/ref. A manual head in the introduction that writes its number
+% as a reference prints the number of the item of the label. Seen in the gold
+% pilot (set X).
+% want head-1 statement/theorem 2.2
+% want theorem-1 statement/theorem 2.1
+% want theorem-2 statement/theorem 2.2
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}[section]
+\begin{document}
+\section{Introduction}
+We prove one result.
+
+\noindent
+{\bf Theorem \ref{thm:main}.} {\em Every compact space is bounded.}
+
+\section{Main}
+\begin{theorem}\label{thm:other} Every finite space is compact. \end{theorem}
+\begin{theorem}\label{thm:main} Every compact space is bounded. \end{theorem}
+\end{document}

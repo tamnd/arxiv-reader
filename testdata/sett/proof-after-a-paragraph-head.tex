@@ -1,0 +1,30 @@
+% Pattern: proof/attach/paragraph-head. The proofs of an appendix come after
+% other statements, each under a paragraph head that names its lemma by the
+% number and not by a reference.
+% Seen in the gold pilot (set E).
+% want lemma-1 statement/lemma 1 status=here
+% want lemma-2 statement/lemma 2 status=here
+% want proof-1 proof - proves=lemma-2
+% want proof-2 proof - proves=lemma-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{lemma}{Lemma}
+\begin{document}
+\begin{lemma}
+A statement.
+\end{lemma}
+Some text between them.
+
+\section{Appendix}
+\begin{lemma}
+A helper.
+\end{lemma}
+\begin{proof}
+A step.
+\end{proof}
+
+\paragraph{Proof of Lemma 1}
+\begin{proof}
+By the helper.
+\end{proof}
+\end{document}

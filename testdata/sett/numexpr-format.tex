@@ -1,0 +1,20 @@
+% Pattern: number/numexpr. A paper numbers from zero with a command whose body
+% is \the\numexpr, used in \thesection and \thetheorem. Seen in the gold pilot
+% (set X).
+% want theorem-1 statement/theorem 0.0 status=none
+% want lemma-1 statement/lemma 0.1 status=none
+% want lemma-2 statement/lemma 1.0 status=none
+\documentclass{article}
+\usepackage{amsthm}
+\def\zbased#1{\the\numexpr(\arabic{#1})-1\relax}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\renewcommand\thesection{\zbased{section}}
+\renewcommand\thetheorem{\thesection.\zbased{theorem}}
+\begin{document}
+\section{Introduction}
+\begin{theorem} Every compact space is bounded. \end{theorem}
+\begin{lemma} Every closed subset of a compact space is compact. \end{lemma}
+\section{Products}
+\begin{lemma} Every finite product of compact spaces is compact. \end{lemma}
+\end{document}

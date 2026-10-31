@@ -1,0 +1,19 @@
+% Pattern: head/environment. A theorem environment written as a bare
+% command, \definition ... \enddefinition, with no \begin and \end, is the
+% environment. Seen in the gold pilot (set X).
+% want definition-1 definition 1.1
+% want theorem-1 statement/theorem 1.2
+\documentclass{article}
+\newtheorem{definition}{Definition}[section]
+\newtheorem{theorem}[definition]{Theorem}
+\begin{document}
+\section{One}
+
+\definition\label{d:compact}
+A space is compact when every open cover has a finite subcover.
+\enddefinition
+
+\theorem
+Every closed subset of a compact space is compact.
+\endtheorem
+\end{document}
