@@ -1,0 +1,18 @@
+% Pattern: number/style. A theorem style whose head spec is
+% {\thmname{#1}\thmnote{ #3}} does not print the number, and the note
+% \ref{thm:main} prints the number of thm:main. Seen in the gold pilot
+% (set X).
+% want theorem-1 statement/theorem 1.1
+% want repthm-1 statement/theorem 1.1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}[section]
+\newtheoremstyle{again}{\topsep}{\topsep}{\itshape}{}{\bfseries}{.}{ }{\thmname{#1}\thmnote{ \bfseries #3}}
+\theoremstyle{again}
+\newtheorem{repthm}{Theorem}
+\begin{document}
+\section{One}
+\begin{theorem}\label{thm:main} Every finite space is compact. \end{theorem}
+\section{Two}
+\begin{repthm}[\ref{thm:main}] Every finite space is compact. \end{repthm}
+\end{document}

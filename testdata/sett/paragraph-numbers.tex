@@ -1,0 +1,22 @@
+% Pattern: number/paragraph. The paper numbers its paragraphs, with
+% \setcounter{secnumdepth}{4} and a command \newpar for \paragraph, and opens
+% each paragraph with \newpar{}. A statement environment without a counter
+% right after \newpar{} prints the number of the paragraph, 1.0.2; one after
+% text in the paragraph prints no number. Seen in the gold pilot (set X).
+% want proposition-1 statement/proposition 1.0.2
+% want proposition-2 statement/proposition -
+\documentclass{amsart}
+\setcounter{secnumdepth}{4}
+\renewcommand{\theparagraph}{\arabic{section}.\arabic{subsection}.\arabic{paragraph}}
+\newcommand{\newpar}{\paragraph}
+\newenvironment{Proposition}{\smallskip\noindent{\sc Proposition.}}{\bigskip}
+\begin{document}
+\section{One}
+\newpar{} Some text in the first paragraph.
+
+\newpar{}
+\begin{Proposition} Every compact space is bounded. \end{Proposition}
+
+\newpar{} More text in the third paragraph.
+\begin{Proposition} Every finite space is compact. \end{Proposition}
+\end{document}

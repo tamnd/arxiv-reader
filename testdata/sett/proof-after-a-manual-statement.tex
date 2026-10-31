@@ -1,0 +1,19 @@
+% Pattern: proof/attach/manual. A manual statement head whose statement runs
+% on over a list of paragraphs, past the end that the head reader gives it, then a manual
+% proof head. The proof proves the statement.
+% Seen in the gold pilot (set E).
+% want head-1 statement/proposition 1
+% want head-2 proof - proves=head-1
+\documentclass{article}
+\begin{document}
+{\bf Proposition 1.} The following hold.
+
+(1) A first fact. \\
+
+(2) A second fact. \\
+
+(3) A third fact.
+
+{\bf Proof}: (1) A step.
+(2) Another step.
+\end{document}

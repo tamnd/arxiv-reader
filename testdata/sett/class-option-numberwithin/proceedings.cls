@@ -1,0 +1,11 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesClass{proceedings}
+\DeclareOption{numberwithinsect}{\let\numberwithinsect\relax}
+\ProcessOptions
+\LoadClass{article}
+\RequirePackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\ifx\numberwithinsect\relax
+  \numberwithin{theorem}{section}
+\fi
+\newtheorem{lemma}[theorem]{Lemma}

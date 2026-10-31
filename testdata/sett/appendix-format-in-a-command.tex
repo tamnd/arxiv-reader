@@ -1,0 +1,22 @@
+% Pattern: number/format. A class that sets the section format to letters
+% inside its \appendix command sets it when \appendix runs, not in the
+% preamble. Seen in the gold pilot (set X).
+% want lemma-1 statement/lemma 1.1
+% want lemma-2 statement/lemma 2.1
+% want lemma-3 statement/lemma A.1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{lemma}{Lemma}[section]
+\makeatletter
+\renewcommand\appendix{\par
+  \setcounter{section}{0}\renewcommand\thesection{\Alph{section}}}
+\makeatother
+\begin{document}
+\section{One}
+\begin{lemma} Every point is closed. \end{lemma}
+\section{Two}
+\begin{lemma} Every line is closed. \end{lemma}
+\appendix
+\section{Three}
+\begin{lemma} Every plane is closed. \end{lemma}
+\end{document}

@@ -1,0 +1,18 @@
+% Pattern: number/counter. \\theorem in a table is a line break and the word
+% theorem, not the command \theorem, so it does not step the counter and the
+% lemma after it is 1.2. Seen in the gold pilot (set X).
+% want theorem-1 statement/theorem 1.1
+% want lemma-1 statement/lemma 1.2
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\begin{document}
+\section{One}
+\begin{theorem} Every finite space is compact. \end{theorem}
+\begin{tabular}{l}
+the main\\theorem
+\end{tabular}
+
+\begin{lemma} Every point is closed. \end{lemma}
+\end{document}

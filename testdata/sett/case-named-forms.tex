@@ -1,0 +1,39 @@
+% Pattern: case/title. Case heads named by the words before the title, named by
+% a formula after the title or the number, numbered by a digit and a capital,
+% and phase heads. A bold sentence "In this case." is not a head. Seen in the
+% gold pilot (set X).
+% want lemma-1 statement/lemma 1 status=here
+% want proof-1 proof - proves=lemma-1
+% want head-1 other/case - parent=proof-1
+% want head-2 other/case - parent=proof-1
+% want head-3 other/case - parent=proof-1
+% want head-4 other/case I parent=proof-1
+% want head-5 other/case 0 parent=proof-1
+% want head-6 other/case 1A parent=proof-1
+% want head-7 other/case - parent=proof-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{lemma}{Lemma}
+\begin{document}
+\begin{lemma} Every compact space is bounded. \end{lemma}
+\begin{proof}
+We argue by cases.
+
+\textbf{Central-stable case.}
+The space is finite.
+
+\textbf{Surface-of-revolution case:} Then it holds.
+
+\textbf{Case $u=\epsilon_1.$} The curve holds.
+
+\textbf{Case I $\eta=1$:} In this case we have it.
+
+\noindent \textbf{Phase $0$. Partition $V(G)$}. We first split.
+
+\noindent {\bf Step 1A: Construction of the comparison function:} Recall.
+
+\textbf{In this case.} Nothing.
+
+\textbf{Odd case.} First assume that $k$ is odd.
+\end{proof}
+\end{document}

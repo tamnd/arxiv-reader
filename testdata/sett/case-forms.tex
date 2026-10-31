@@ -1,0 +1,29 @@
+% Pattern: head/case. Case and step heads after a space in math, as
+% "$\qquad$ {\bf Step 1:}", with the number of a count, as "Case 1/2", in
+% bold math, as "$\mathbf{Case \ 2}.$", and with a number word, as "Step
+% one:", which is not a number. Inside a paragraph, a case head with no colon
+% or period after it is a word of the sentence. Seen in the gold pilot (set X).
+% want thm-1 statement/theorem 1
+% want proof-1 proof - proves=thm-1
+% want head-1 other/case 1
+% want head-2 other/case 1/2
+% want head-3 other/case 2
+% want head-4 other/case -
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{thm}{Theorem}
+\begin{document}
+\section{One}
+\begin{thm} Every compact space is bounded. \end{thm}
+\begin{proof} We take a cover of the space by balls.
+
+$\qquad$ {\bf Step 1:} Take a finite subcover.
+
+\textbf{Case 1/2.} The subcover is empty. Then the space is empty.
+
+$\mathbf{Case \ 2}.$ The subcover is not empty.
+
+\textit{Step one: the radius.} Take the largest radius, and go to the
+{\it Final step} with this radius.
+\end{proof}
+\end{document}

@@ -1,0 +1,16 @@
+% Pattern: number/option-on. A local style file declares theorem in the block
+% of an option and again in its \else block, and the document gives the
+% option, so the \else block does not run: theorem has a counter of its own
+% within the section, and the theorem after a lemma is 1.1. Seen in the gold
+% pilot (set X).
+% want lemma-1 statement/lemma 1.1
+% want theorem-1 statement/theorem 1.1
+% want lemma-2 statement/lemma 1.2
+\documentclass{article}
+\usepackage[theorem-section]{theorems}
+\begin{document}
+\section{One}
+\begin{lemma} Every compact space is bounded. \end{lemma}
+\begin{theorem} Every finite space is compact. \end{theorem}
+\begin{lemma} Every point is closed. \end{lemma}
+\end{document}

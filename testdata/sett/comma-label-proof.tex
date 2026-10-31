@@ -1,0 +1,26 @@
+% Pattern: attach/ref. A label can hold a comma, as \label{lem b_n,m}: a
+% proof whose head refers to it proves the item of the whole label. Seen in
+% the gold pilot (set X).
+% want lemma-1 statement/lemma 1.1
+% want lemma-2 statement/lemma 1.2
+% want proof-1 proof - proves=lemma-2
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{lemma}{Lemma}[section]
+\begin{document}
+\section{One}
+
+\begin{lemma}\label{lem b_n}
+Every convergent sequence is bounded.
+\end{lemma}
+
+\begin{lemma}\label{lem b_n,m}
+Every double sequence that converges is bounded from some index on.
+\end{lemma}
+
+\section{Proofs}
+
+\begin{proof}[Proof of Lemma \ref{lem b_n,m}]
+Take the limit and a ball around it.
+\end{proof}
+\end{document}

@@ -128,6 +128,15 @@ func Read(b *source.Bundle) ([]*Document, error) {
 			local[name] = cleaned[name]
 		}
 	}
+	// A class can read its theorems from a configuration file, as
+	// \InputIfFileExists{ntheoremSMF.cfg} in fabsmfart.cls, so a .cfg file
+	// that a local style file loads is a local file too. Seen in the gold
+	// pilot (set X).
+	for name, data := range raw {
+		if strings.EqualFold(path.Ext(name), ".cfg") && loadedBy(path.Base(name), local) {
+			local[name] = Clean(data, excluded)
+		}
+	}
 	var docs []*Document
 	for _, main := range mains {
 		d, err := build(path.Clean(main), cleaned, local, excluded)
@@ -149,6 +158,17 @@ func ReadFile(name string, data []byte) (*Document, error) {
 		return nil, err
 	}
 	return docs[0], nil
+}
+
+// loadedBy tells if a local style file inputs the file of the base name.
+func loadedBy(base string, local map[string][]byte) bool {
+	re := regexp.MustCompile(`\\(?:InputIfFileExists|input)\s*\{\s*` + regexp.QuoteMeta(base) + `\s*\}`)
+	for _, data := range local {
+		if re.Match(data) {
+			return true
+		}
+	}
+	return false
 }
 
 func isStyle(name string) bool {

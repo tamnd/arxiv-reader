@@ -1,0 +1,15 @@
+% Pattern: number/section. The paper writes each section with a command of two
+% arguments that writes \section with the second and labels it with the first,
+% so the theorems numbered within the section are 1.1 and 2.1. Seen in the gold
+% pilot (set X).
+% want theorem-1 statement/theorem 1.1
+% want theorem-2 statement/theorem 2.1 labels=t:b
+\documentclass{article}
+\renewcommand{\sec}[2]{\section{#2}\label{s:#1}}
+\newtheorem{theorem}{Theorem}[section]
+\begin{document}
+\sec{one}{The first part}
+\begin{theorem} Every compact space is bounded. \end{theorem}
+\sec{two}{The second part}
+\begin{theorem}\label{t:b} Every finite space is compact. \end{theorem}
+\end{document}

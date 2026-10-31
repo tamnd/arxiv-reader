@@ -1,0 +1,12 @@
+% Pattern: head/layout. A manual head on the line right after a section head,
+% and after a section head with a label. Seen in the gold pilot (set X).
+% want head-1 statement/theorem 1 lines=8-8
+% want head-2 statement/theorem 2 lines=11-11
+\documentclass{article}
+\begin{document}
+\section{Introduction}
+{\bf Theorem 1.} {\em Every compact space is bounded.}
+
+\section{Main}\label{sec:main}
+\noindent{\bf Theorem 2.} {\em Every finite space is compact.}
+\end{document}

@@ -1,0 +1,20 @@
+% Pattern: case/layout. A case head after a bullet written by hand and thin
+% spaces, and a case head underlined inside an italic group. Seen in the gold
+% pilot (set X).
+% want lemma-1 statement/lemma 1 status=here
+% want proof-1 proof - proves=lemma-1
+% want head-1 other/case 1 parent=proof-1
+% want head-2 other/case 2 parent=proof-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{lemma}{Lemma}
+\begin{document}
+\begin{lemma} Every compact space is bounded. \end{lemma}
+\begin{proof}
+We argue by cases.
+
+$\bullet$\,\,\,{\it Case 1:} The space is finite. Then it is bounded.
+
+{\it \underline{Case 2:} The space is infinite.} Then a finite subcover bounds it.
+\end{proof}
+\end{document}

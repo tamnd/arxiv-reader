@@ -1,0 +1,26 @@
+% Pattern: head/line. A case or a step head in a font at the start of a line,
+% with no blank line before it, is an item, and the words after its number
+% name it. A bold theorem head inside a paragraph is not an item. Seen in the
+% gold pilot (set X).
+% want theorem-1 statement/theorem 1 status=here
+% want proof-1 proof - proves=theorem-1
+% want head-1 other/case 1
+% want head-2 other/case 2
+% want head-3 other/case 1
+% want head-4 other/case 2
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\begin{document}
+\begin{theorem}
+Every compact space is bounded.
+\end{theorem}
+\begin{proof}
+Take a cover by balls. We consider the following cases.\\
+{\bf Case 1:} The cover is finite. Then the space is bounded.
+\textsf{Case 2.} The cover is infinite. Take a finite subcover, and note
+\textbf{Theorem 1} as stated holds for it.
+\paragraph{Step 1: Bound the radius} Take the largest radius.
+\ul{Step 2}. Add the distances.
+\end{proof}
+\end{document}

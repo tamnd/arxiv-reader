@@ -1,0 +1,15 @@
+% Pattern: number/starred-name. \newtheorem{rem*}{Remark} declares a numbered
+% env whose name and counter end in a star, and LaTeX numbers it as any
+% other. Seen in the gold pilot (set X).
+% want theorem-1 statement/theorem 1
+% want rem--1 remark 1
+% want rem--2 remark 2
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\newtheorem{rem*}{Remark}
+\begin{document}
+\begin{theorem} Every compact space is bounded. \end{theorem}
+\begin{rem*} Every finite space is compact. \end{rem*}
+\begin{rem*} Every finite space is bounded. \end{rem*}
+\end{document}

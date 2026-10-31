@@ -3,6 +3,7 @@ package analysis
 import (
 	"bytes"
 	"compress/gzip"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -29,8 +30,21 @@ func TestSetT(t *testing.T) {
 			}
 			wants, rules := readWants(string(data))
 			b := &source.Bundle{Files: []source.File{{Name: "main.tex", Data: data}}}
+			// The files of the directory with the name of the test, as a local
+			// class, go with the main file.
+			extra, _ := filepath.Glob(filepath.Join(strings.TrimSuffix(file, ".tex"), "*"))
+			for _, x := range extra {
+				d, err := os.ReadFile(x)
+				if err != nil {
+					t.Fatal(err)
+				}
+				b.Files = append(b.Files, source.File{Name: filepath.Base(x), Data: d})
+			}
 			if strings.Contains(string(data), "\n% lineends cr\n") {
-				b = oldMac(t, data)
+				b = lineEnds(t, data, "\r")
+			}
+			if strings.Contains(string(data), "\n% lineends crlf\n") {
+				b = lineEnds(t, data, "\r\n")
 			}
 			res, err := Analyze(b, Paper{ID: "test." + name, Version: 1, Extractor: "test"}, m)
 			if err != nil {
@@ -71,13 +85,13 @@ func TestSetT(t *testing.T) {
 	}
 }
 
-// oldMac gives a file to source.Open with CR line ends, as an e-print from an
-// old Mac comes.
-func oldMac(t *testing.T, data []byte) *source.Bundle {
+// lineEnds gives a file to source.Open with the line ends end, as an e-print
+// from an old Mac (CR) or from Windows (CR LF) comes.
+func lineEnds(t *testing.T, data []byte, end string) *source.Bundle {
 	t.Helper()
 	var z bytes.Buffer
 	w := gzip.NewWriter(&z)
-	w.Write(bytes.ReplaceAll(data, []byte("\n"), []byte("\r")))
+	w.Write(bytes.ReplaceAll(data, []byte("\n"), []byte(end)))
 	if err := w.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -125,6 +139,10 @@ func checkWant(t *testing.T, w map[string]string, o objects.Record) {
 		"local": o.Local, "item": o.Item, "number": number, "proves": o.Proves,
 		"part": o.ProvesPart, "status": o.ProofStatus, "origin": o.Origin,
 		"labels": strings.Join(o.Labels, ","), "parent": o.Parent,
+		"flags": strings.Join(o.Flags, ","),
+	}
+	if o.Span != nil {
+		got["lines"] = fmt.Sprintf("%d-%d", o.Span.From, o.Span.To)
 	}
 	for k, v := range w {
 		if k == "flag" {

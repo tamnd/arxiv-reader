@@ -1,0 +1,25 @@
+% Pattern: attach/nested. A head "Proof of (i)" inside a proof is a part of
+% that proof, and proves what it proves. Seen in the gold pilot (set X).
+% want proposition-1 statement/proposition 1.1
+% want proof-1 proof - proves=proposition-1
+% want head-1 proof - proves=proposition-1
+% want head-2 proof - proves=proposition-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{proposition}{Proposition}[section]
+\begin{document}
+\section{One}
+
+\begin{proposition}
+(i) Every finite group has a composition series. (ii) Any two have the
+same length.
+\end{proposition}
+
+\begin{proof}
+We follow the usual route.
+
+\noindent {\bf Proof of (i):} Take a maximal normal subgroup and go on.
+
+\noindent {\bf Proof of (ii):} Compare two series by refinement.
+\end{proof}
+\end{document}

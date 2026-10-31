@@ -1,0 +1,16 @@
+% Pattern: number/section. A command of the paper that writes \section with
+% its argument and resets the equation counter numbers the sections. Seen in
+% the gold pilot (set X).
+% want thm-1 statement/theorem 1.1
+% want thm-2 statement/theorem 2.1
+\documentclass{amsart}
+\newtheorem{thm}{Theorem}[section]
+\renewcommand{\theequation}{\thesection.\arabic{equation}}
+\newcommand{\mysection}[1]{\section{#1}
+\setcounter{equation}{0}}
+\begin{document}
+\mysection{One}
+\begin{thm} Every compact space is bounded. \end{thm}
+\mysection{Two}
+\begin{thm} Every finite space is bounded. \end{thm}
+\end{document}

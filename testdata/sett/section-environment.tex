@@ -1,0 +1,19 @@
+% Pattern: section/environment. \begin{section}{Title} ... \end{section} is a
+% section head, and steps the section counter. Seen in the gold pilot (set X).
+% want theorem-1 statement/theorem 1.1 status=none
+% want lemma-1 statement/lemma 2.1 status=none
+% want lemma-2 statement/lemma 2.2 status=none
+\documentclass{amsart}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\begin{document}
+\begin{section}{Introduction}
+\begin{theorem} Every compact space is bounded. \end{theorem}
+\end{section}
+\begin{section}{Products} \label{sec:products}
+\begin{subsection}{Finite products}
+\begin{lemma} Every finite product of compact spaces is compact. \end{lemma}
+\end{subsection}
+\begin{lemma} Every product of bounded spaces is bounded. \end{lemma}
+\end{section}
+\end{document}

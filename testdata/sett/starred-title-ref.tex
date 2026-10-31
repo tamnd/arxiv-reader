@@ -1,0 +1,15 @@
+% Pattern: number/ref. \newtheorem*{again}{Theorem \ref{thm:main}} restates
+% thm:main under its own head, which prints the number of thm:main, so the
+% restatement is 1.2 too. Seen in the gold pilot (set X).
+% want again-1 statement/theorem 1.2
+% want thm-1 statement/theorem 1.1
+% want thm-2 statement/theorem 1.2
+\documentclass{article}
+\newtheorem{thm}{Theorem}[section]
+\begin{document}
+\section{One}
+\newtheorem*{again}{Theorem \ref{thm:main}}
+\begin{again} Every fine space is compact. \end{again}
+\begin{thm} Every compact space is fine. \end{thm}
+\begin{thm}\label{thm:main} Every fine space is compact. \end{thm}
+\end{document}

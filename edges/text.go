@@ -24,8 +24,20 @@ var (
 	// in [12, Theorem 4.1].
 	beforeOpen = regexp.MustCompile(`\[[^\]]{0,30}$`)
 	// ofCite is a reference to the result of another paper: Theorem 4.1 of
-	// \cite{key}, or Theorem 4.1 in [12].
-	ofCite = regexp.MustCompile(`^\s*(?:of|in|from)\s*(?:~|\s)*(?:\\cite|\[|the\s+paper|\\citet|\\citep|ref\.)`)
+	// \cite{key}, Theorem 4.1 in [12], Theorem 4.1 of Chapter 2 of \cite{key},
+	// or Lemma 2, part 3 in \cite{key}.
+	ofCite = regexp.MustCompile(`^\s*(?:,?\s*(?:(?:of|in)\s+)?(?:Chapter|Section|Part|part|Appendix|Lecture)\s*~?[\w.]+,?\s*)?(?:of|in|from)\s*(?:~|\s)*(?:\\cite|\[|the\s+paper|\\citet|\\citep|ref\.|the\s+supplement)`)
+	// listTail is the rest of a list of results before a citation, as in
+	// "Assumption 6 (a), Assumption 6 (b) and Assumption 7 in \cite{key}".
+	listTail = regexp.MustCompile(`^(?:(?:\s*,\s*(?:and\s+)?|\s+and\s+)(?:the\s+)?[A-Z][a-z]+s?\.?(?:~|\s)*` + number + part + `)+`)
+	// ofAuthor is a result of a work named by its author: Proposition 2.10 of
+	// Smith (1990), Theorem 3 of Smith [4], or Lemma 2 of Smith et al.
+	ofAuthor = regexp.MustCompile(`^\s*(?:of|in)\s+([A-Z][a-z]+)(?:\s+and\s+[A-Z][a-z]+)?(?:\s*(?:\(|\[|\\cite)|\s+et\s+al|'s)`)
+	// citeComma is a citation with the locator after it: (\cite{key}, Theorem 3).
+	citeComma = regexp.MustCompile(`\\(?:cite|citep|citet|citealp|Cite)\*?\s*(?:\[[^\]]*\]\s*)*\{[^{}]+\}\s*,\s*(?:~|\s)*$`)
+	// ofRef is a result numbered in another item: Claim 3 of \ref{t}, or
+	// Step 2 in the proof of Theorem~\ref{t}. The ref method reads the item.
+	ofRef = regexp.MustCompile(`^\s*(?:of|in)\s+(?:the\s+proof\s+of\s+)?(?:[A-Za-z]+\.?\s*)?(?:~|\s)*\\(?:ref|cref|Cref|autoref)\b`)
 	// commaAfter is the locator after a citation: \cite{key}, Theorem 6.
 	commaAfter = regexp.MustCompile(`^\s*,\s*(?:~|\s)*([A-Z][a-z]+\.?(?:~|\s)*` + number + part + `)`)
 	// locatorTitle is a locator that names a result: Theorem 4.1, Lemma 2.
@@ -98,7 +110,7 @@ func (r *resolver) texts() {
 			continue
 		}
 		// A reference to the result of another paper is a citation.
-		if inCite(m[0]) || beforeOpen.Match(body[max(0, m[0]-40):m[0]]) || ofCite.Match(body[m[1]:min(len(body), m[1]+40)]) {
+		if inCite(m[0]) || beforeOpen.Match(body[max(0, m[0]-40):m[0]]) || citeComma.Match(body[max(0, m[0]-120):m[0]]) || r.cited(body[m[1]:min(len(body), m[1]+200)], alts) {
 			continue
 		}
 		title := string(body[m[2]:m[3]])
@@ -117,6 +129,34 @@ func (r *resolver) texts() {
 			r.link(src, off, d.Body+m[1], t, Text, conf, flags)
 		}
 	}
+}
+
+// cited tells if the text after a reference makes it a result of another
+// work or of another item: "of \cite{key}", "of \ref{t}", "of Smith (1990)",
+// also after the rest of a list of results.
+func (r *resolver) cited(after []byte, titles []string) bool {
+	if l := listTail.Find(after); l != nil {
+		after = after[len(l):]
+	}
+	if ofCite.Match(after) || ofRef.Match(after) {
+		return true
+	}
+	m := ofAuthor.FindSubmatch(after)
+	if m == nil {
+		return false
+	}
+	// "of Theorem 2 (b)" or "of Section 3 (see ...)" is not an author.
+	w := strings.ToLower(string(m[1]))
+	switch w {
+	case "section", "chapter", "part", "appendix", "step", "case", "the", "this", "our":
+		return false
+	}
+	for _, t := range titles {
+		if strings.EqualFold(w, t) {
+			return false
+		}
+	}
+	return true
 }
 
 type numbered struct{ n, part string }
@@ -156,35 +196,51 @@ func between(a, b string) []numbered {
 	return out
 }
 
-// byNumber finds the item that has the number. The title must agree with the
-// kind of the item. When it does not, and an item with another title has the
-// number, the edge is medium with the flag title-mismatch (AX6.2).
+// byNumber finds the item that has the number, out of the proofs. The title
+// must agree with the kind of the item. A title that does not agree is not
+// read: an item of another title with the number was the target in none of
+// the five such references of gold set E (AX11.3).
 func (r *resolver) byNumber(title, n string, off int) (target, []string, string, bool) {
 	kind := theorems.Unknown
 	if r.in.Titles != nil {
 		kind = r.in.Titles.Kind(title)
 	}
-	var same, other *Item
+	var same *Item
 	for i := range r.in.Items {
 		it := &r.in.Items[i]
-		if it.Proof || it.Number != n {
+		// A claim or a step inside a proof is numbered in its proof, so
+		// its number written in another proof is not of it.
+		if it.Proof || it.InProof || it.Number != n {
+			continue
+		}
+		// "Case 2" and "Step 3" name a part of the argument that holds
+		// them, not a result. Seen in the gold pilot (set E).
+		if it.Kind == "other/case" || (it.Kind == "statement/claim" && r.claimTwice(it)) {
 			continue
 		}
 		if theorems.Normalize(it.Title) == theorems.Normalize(title) || (kind != theorems.Unknown && it.Kind == kind) {
 			if same == nil || nearer(it, same, off) {
 				same = it
 			}
-		} else if other == nil || nearer(it, other, off) {
-			other = it
 		}
 	}
-	switch {
-	case same != nil:
+	if same != nil {
 		return target{local: same.Local}, nil, High, true
-	case other != nil:
-		return target{local: other.Local}, []string{FlagTitleMismatch}, Medium, true
 	}
 	return target{}, nil, "", false
+}
+
+// claimTwice tells if another claim has the number of the claim it. Claims
+// are numbered afresh in each argument, so "Claim 1" written once more is not
+// known to be it. Seen in the gold pilot (set E).
+func (r *resolver) claimTwice(it *Item) bool {
+	for i := range r.in.Items {
+		o := &r.in.Items[i]
+		if o != it && o.Kind == it.Kind && o.Number == it.Number {
+			return true
+		}
+	}
+	return false
 }
 
 // nearer tells if a is nearer to the offset than b.

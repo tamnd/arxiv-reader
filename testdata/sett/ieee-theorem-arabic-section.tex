@@ -1,0 +1,16 @@
+% Pattern: number/class-section. IEEEtran prints \thesection as Roman, but a
+% theorem numbered within the section prints the section in arabic: 2.1, not
+% II.1. Seen in the gold pilot (set X).
+% want theorem-1 statement/theorem 1.1
+% want lemma-1 statement/lemma 2.1
+% want theorem-2 statement/theorem 2.2
+\documentclass[journal]{IEEEtran}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\begin{document}
+\section{One}
+\begin{theorem} Every compact space is bounded. \end{theorem}
+\section{Two}
+\begin{lemma} Every finite space is compact. \end{lemma}
+\begin{theorem} Every finite space is bounded. \end{theorem}
+\end{document}

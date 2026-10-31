@@ -1,0 +1,16 @@
+% Pattern: head/cite. A head that is a cite with the title and the number of
+% an item of the cited paper states that item again: it is an item of the
+% kind of the title, with no number of this paper. Words after the cite name
+% it. Seen in the gold pilot (set X).
+% want head-1 context/hypothesis -
+% want head-2 context/hypothesis -
+\documentclass{article}
+\begin{document}
+\section{One}
+We check the assumptions of the cited paper.
+
+{\bf \cite[Assumption 4.1]{key}.} The function is continuous on the line.
+
+{\bf \cite[Assumption 4.2]{key} Growth of the function.} The function grows
+at most linearly.
+\end{document}

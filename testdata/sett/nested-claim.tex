@@ -1,0 +1,27 @@
+% Pattern: proof/amsthm/article. A claim inside a proof, and the proof of
+% the claim that names it with \ref. The label of the claim is the claim's,
+% not the outer proof's, so the inner proof proves the claim.
+% Seen in the gold pilot (set E).
+% want lemma-1 statement/lemma 1 status=here labels=lem:a
+% want proof-1 proof - proves=lemma-1 labels=
+% want claim-1 statement/claim 2 labels=cl:one parent=proof-1
+% want proof-2 proof - proves=claim-1 parent=proof-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{lemma}{Lemma}
+\newtheorem{claim}[lemma]{Claim}
+\begin{document}
+\begin{lemma}\label{lem:a}
+A statement.
+\end{lemma}
+\begin{proof}
+A first step.
+\begin{claim}\label{cl:one}
+An inner statement.
+\end{claim}
+\begin{proof}[Proof of Claim~\ref{cl:one}]
+The inner step.
+\end{proof}
+The last step.
+\end{proof}
+\end{document}

@@ -1,0 +1,37 @@
+% Pattern: head/case. The steps of the pf style of proofs, \begin{step+},
+% have no counter of their own. When a file asks for numbers, as
+% \pfmixednumbers does, a step is numbered by its place in its proof,
+% after the number of the step that the proof proves, as 1.2 for the second
+% step of the proof of step 1. Seen in the gold pilot (set X).
+% want theorem-1 statement/theorem 1
+% want proof-1 proof - proves=theorem-1
+% want step--1 other/case 1
+% want proof-2 proof -
+% want step--2 other/case 1.1
+% want step--3 other/case 1.2
+% want step--4 other/case 2
+\documentclass{article}
+\newtheorem{theorem}{Theorem}
+\newcommand{\pfmixednumbers}[1]{}
+\pfmixednumbers{4}
+\newenvironment{step+}[1]{\par\textbf{Step.} #1\par}{\par}
+\begin{document}
+\begin{theorem}
+Every bounded set is small.
+\end{theorem}
+\begin{proof}
+\begin{step+}{The set has a largest point.}
+\begin{proof}
+\begin{step+}{The set is not empty.}
+It has a point by the choice of the set.
+\end{step+}
+\begin{step+}{The points are bounded.}
+The bound holds for each point.
+\end{step+}
+\end{proof}
+\end{step+}
+\begin{step+}{The largest point bounds the set.}
+This is the definition of a bound.
+\end{step+}
+\end{proof}
+\end{document}

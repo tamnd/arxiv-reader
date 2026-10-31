@@ -1,0 +1,27 @@
+% Pattern: env/newenvironment. An environment whose begin code steps a counter
+% and writes the head with the number first, as "2.1. Lemma.". Seen in the
+% gold pilot (set E).
+% want lem-1 statement/lemma 1
+% want pf-1 proof - proves=lem-1
+\documentclass{article}
+\newcounter{item}[section]
+\newenvironment{lem}{
+\refstepcounter{item}
+\par\addvspace{\bigskipamount}
+\indent {\bf \theitem.\hspace{1em}Lemma.\,\ }  \sl }
+{\par\addvspace{\bigskipamount}
+}
+\newenvironment{pf}{
+\par\addvspace{-\smallskipamount}
+\indent {\bf Proof.}$\,\ $ } { $\Box$
+\par\addvspace{\bigskipamount}
+}
+\begin{document}
+\section{One}
+\begin{lem}{} \label{one}
+Every compact space is bounded.
+\end{lem}
+\begin{pf}
+Cover the space by balls.
+\end{pf}
+\end{document}

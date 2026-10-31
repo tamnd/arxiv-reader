@@ -1,0 +1,25 @@
+% Pattern: number/counter. \let\claim\claimx with \let\endclaim\endclaimx
+% makes claim the environment claimx, which steps the counter claimcnt within
+% the theorem, so the claim in theorem 1 is 1.1. Seen in the gold pilot
+% (set X).
+% want theorem-1 statement/theorem 1
+% want claim-1 statement/claim 1.1
+% want claim-2 statement/claim 1.2
+% want theorem-2 statement/theorem 2
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\newtheorem{claim}[theorem]{Claim}
+\newcounter{claimcnt}[theorem]
+\renewcommand{\theclaimcnt}{\thetheorem.\arabic{claimcnt}}
+\newtheorem{claimx}[claimcnt]{Claim}
+\AtBeginDocument{%
+  \let\claim\claimx
+  \let\endclaim\endclaimx
+}
+\begin{document}
+\begin{theorem} Every finite space is compact. \end{theorem}
+\begin{claim} Every point is closed. \end{claim}
+\begin{claim} Every subset is finite. \end{claim}
+\begin{theorem} Every closed set is compact. \end{theorem}
+\end{document}

@@ -1,0 +1,23 @@
+% Pattern: head/case. "The case" heads a case as "Case" does, as {\it The
+% case $1\le |x|\le |y|$}., even when the formula starts with a digit; and
+% formulas that "and" joins name a case, as {\bf Case $s \neq 1$ and
+% $K=K_0$.}. Seen in the gold pilot (set X).
+% want theorem-1 statement/theorem 1
+% want proof-1 proof - proves=theorem-1
+% want head-1 other/case -
+% want head-2 other/case -
+% want head-3 other/case -
+\documentclass{article}
+\newtheorem{theorem}{Theorem}
+\begin{document}
+\begin{theorem}
+Every set is small.
+\end{theorem}
+\begin{proof}
+{\it The case $1\le |x|\le |y|$}. Let us show that it holds.
+
+{\it The case $|x|\le 1$.} Then it holds.
+
+{\bf Case $s \neq 1$ and $K=K_0$.} Then it holds too.
+\end{proof}
+\end{document}

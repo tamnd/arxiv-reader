@@ -1,0 +1,54 @@
+% Pattern: proof/attach/announce. Proofs whose target is named outside a
+% plain optional argument: a head that uses a macro of the paper around
+% \ref, a head in parentheses inside a font command, a sentence just before
+% the proof that announces it, and a subsection head just before it.
+% Seen in the gold pilot (set E).
+% want lemma-1 statement/lemma 1 status=here labels=l:gap
+% want theorem-1 statement/theorem 2 status=here labels=first
+% want theorem-2 statement/theorem 3 status=here labels=second
+% want theorem-3 statement/theorem 4 status=here labels=third
+% want lemma-2 statement/lemma 5 status=none
+% want proof-1 proof - proves=lemma-1
+% want proof-2 proof - proves=theorem-1
+% want proof-3 proof - proves=theorem-2
+% want proof-4 proof - proves=theorem-3
+\documentclass{article}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newcommand{\refl}[1]{Lemma~\ref{l:#1}}
+\begin{document}
+\begin{lemma}\label{l:gap}
+A helper.
+\end{lemma}
+\begin{theorem}\label{first}
+A statement.
+\end{theorem}
+\begin{theorem}\label{second}
+A second statement.
+\end{theorem}
+\begin{theorem}\label{third}
+A third statement.
+\end{theorem}
+\begin{lemma}
+Another helper.
+\end{lemma}
+Some text about the lemma.
+
+More text.
+
+\begin{proof}[Proof of \refl{gap}]
+A step.
+\end{proof}
+\begin{proof} \textit{(of Theorem \ref{first})}
+Another step.
+\end{proof}
+We are now ready for the proof of Theorem~\ref{second}.\\
+\begin{proof}
+A third step.
+\end{proof}
+\subsection{Proof of Theorem~\ref{third}}
+\label{secproof}
+\begin{proof}
+A fourth step.
+\end{proof}
+\end{document}

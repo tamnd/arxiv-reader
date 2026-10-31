@@ -1,0 +1,19 @@
+% Pattern: head/case. "{\it Case} 1: ..." writes the number of the case after
+% the font group of its title. Seen in the gold pilot (set X).
+% want lemma-1 statement/lemma 1
+% want proof-1 proof - proves=lemma-1
+% want head-1 other/case 1
+% want head-2 other/case 2
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{lemma}{Lemma}
+\begin{document}
+\begin{lemma} Every finite space is compact. \end{lemma}
+\begin{proof}
+Let $x$ be a point.
+
+{\it Case} 1: $x=0$. Then the claim is clear.
+
+{\it Case} 2: $x\neq 0$. Then the claim is clear too.
+\end{proof}
+\end{document}

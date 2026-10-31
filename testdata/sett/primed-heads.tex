@@ -1,0 +1,18 @@
+% Pattern: number/prime. A head in bold numbers a variant of a statement with
+% a prime, as "Theorem 1B'", or with a letter after a reference to it, as
+% "Theorem {\ref{main}A}", which prints the number of the label and the
+% letter. Seen in the gold pilot (set X).
+% want thm-1 statement/theorem 1.1
+% want head-1 statement/theorem 1.1A
+% want head-2 statement/theorem 2'
+\documentclass{article}
+\newtheorem{thm}{Theorem}[section]
+\begin{document}
+\section{One}
+\begin{thm}\label{main} Every compact space is bounded. \end{thm}
+
+\noindent {\bf Theorem {\ref{main}A}} {\em Every closed part of a compact
+space is bounded.}
+
+\noindent {\bf Theorem 2'} {\em A closed part of a compact space is compact.}
+\end{document}

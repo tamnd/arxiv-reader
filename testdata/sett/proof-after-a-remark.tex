@@ -1,0 +1,52 @@
+% Pattern: proof/attach/gap. A proof that comes after its statement with one
+% paragraph of text between them, which remarks on the statement. A second
+% proof comes after a statement with two paragraphs of more than seven lines
+% between them, and a third
+% after a statement and a section head; both stay orphans.
+% Seen in the gold pilot (set E).
+% want lemma-1 statement/lemma 1 status=here labels=key,eq:key
+% want proof-1 proof - proves=lemma-1
+% want theorem-1 statement/theorem 2 status=none
+% want proof-2 proof - proves=
+% want lemma-2 statement/lemma 3 status=none
+% want proof-3 proof - proves=
+\documentclass{article}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\begin{document}
+\begin{lemma}\label{key}
+An identity
+\begin{equation}\label{eq:key}
+a = b.
+\end{equation}
+\end{lemma}
+The identity \eqref{eq:key} is used throughout, and
+\begin{equation*}
+c = d
+\end{equation*}
+is a special case.
+\begin{proof}
+A step.
+\end{proof}
+\begin{theorem}
+A statement.
+\end{theorem}
+A first paragraph of text,
+which runs on
+over three lines.
+
+A second paragraph of text,
+which runs on
+over three lines too.
+
+\begin{proof}
+Another step.
+\end{proof}
+\begin{lemma}
+A helper.
+\end{lemma}
+\section{More}
+\begin{proof}
+A third step.
+\end{proof}
+\end{document}

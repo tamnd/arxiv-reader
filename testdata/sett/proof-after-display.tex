@@ -1,0 +1,15 @@
+% Pattern: head/proof. A proof head in bold on the line right after the \]
+% of a display that ends the statement, with no empty line between them,
+% starts the proof. Seen in the gold pilot (set X).
+% want head-1 statement/lemma 1.1
+% want head-2 proof - proves=head-1
+\documentclass{article}
+\begin{document}
+\section{One}
+
+{\bf Lemma 1.1:} Every compact space $X$ satisfies
+\[
+  \dim X < \infty.
+\]
+{\bf Proof:} Cover the space by finitely many balls. $\Box$
+\end{document}

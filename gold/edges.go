@@ -31,11 +31,17 @@ type Use struct {
 const PerGroupE = 60
 
 // TargetsE are the precision targets of AX11.3 for each method. A method that
-// is not here has its precision measured and no target.
+// is not here has its precision measured and no target. The targets of the
+// heuristic methods hold for their edges above low: AX11.3 lets a method that
+// misses its target drop to low, so a low edge is a candidate and not a
+// claim. The targets of ref and text hold for all their edges.
 var TargetsE = map[string]float64{
 	edges.Ref: 0.98, edges.Text: 0.98,
 	edges.Position: 0.85, edges.Name: 0.85, edges.Term: 0.85,
 }
+
+// heuristicE are the methods whose target holds for the edges above low.
+var heuristicE = map[string]bool{edges.Position: true, edges.Name: true, edges.Term: true}
 
 // DrawE draws set E from the papers of set X. In each group of X, the papers
 // are taken in the order of the seed, and a paper with no proof object is not
@@ -116,9 +122,15 @@ type EdgeScore struct {
 	// use accounts for. Recall is the uses that an edge of the methods 1 to
 	// 7 accounts for.
 	Precision map[string]Ratio
-	Recall    Ratio
+	// AboveLow is the precision of each method on its edges with the
+	// confidence medium or high.
+	AboveLow map[string]Ratio
+	Recall   Ratio
 	// Missed is the uses that no edge accounts for, by paper.
 	Missed map[string][]string
+	// Wrong is the edges from a marked proof that no use accounts for, by
+	// paper, each as method, proof, target and the line of its evidence.
+	Wrong map[string][]string
 }
 
 // AddPaper scores the edges of one version against its marked record.
@@ -126,6 +138,13 @@ func (s *EdgeScore) AddPaper(g Record, es []edges.Edge) {
 	if s.Precision == nil {
 		s.Precision, s.Missed = map[string]Ratio{}, map[string][]string{}
 	}
+	if s.Wrong == nil {
+		s.Wrong = map[string][]string{}
+	}
+	if s.AboveLow == nil {
+		s.AboveLow = map[string]Ratio{}
+	}
+	ref := fmt.Sprintf("%sv%d", g.Paper, g.Version)
 	proofs := map[string]bool{}
 	for _, m := range g.Marks {
 		if m.Kind == "proof" {
@@ -146,15 +165,22 @@ func (s *EdgeScore) AddPaper(g Record, es []edges.Edge) {
 			continue
 		}
 		k := from + " " + localOf(e.To)
-		r := s.Precision[e.Method]
+		r, a := s.Precision[e.Method], s.AboveLow[e.Method]
 		r.Of++
+		if e.Confidence != edges.Low {
+			a.Of++
+		}
 		if marked[k] {
 			r.Hit++
+			if e.Confidence != edges.Low {
+				a.Hit++
+			}
 			found[k] = true
+		} else {
+			s.Wrong[ref] = append(s.Wrong[ref], fmt.Sprintf("%s %s (%s:%d)", e.Method, k, e.Evidence.File, e.Evidence.Line))
 		}
-		s.Precision[e.Method] = r
+		s.Precision[e.Method], s.AboveLow[e.Method] = r, a
 	}
-	ref := fmt.Sprintf("%sv%d", g.Paper, g.Version)
 	for _, u := range g.Uses {
 		k := u.Proof + " " + u.To
 		s.Recall.Of++
@@ -172,11 +198,19 @@ func (s EdgeScore) Met() bool {
 		return false
 	}
 	for m, t := range TargetsE {
-		if s.Precision[m].Value() < t {
+		if s.target(m).Value() < t {
 			return false
 		}
 	}
 	return true
+}
+
+// target is the ratio that the target of the method holds for.
+func (s EdgeScore) target(m string) Ratio {
+	if heuristicE[m] {
+		return s.AboveLow[m]
+	}
+	return s.Precision[m]
 }
 
 // Markdown is the report of the score, as reports/gold-e.md.
@@ -188,7 +222,7 @@ func (s EdgeScore) Markdown() string {
 	if s.Marked == 0 {
 		b.WriteString("No record is marked yet, so there is no score. A person must read each proof and decide what it uses (AX11.1).\n\n")
 	}
-	b.WriteString("| Method | Precision | Target |\n| --- | ---: | ---: |\n")
+	b.WriteString("| Method | Precision | Above low | Target |\n| --- | ---: | ---: | ---: |\n")
 	for _, m := range edges.Methods {
 		if m == edges.Attach {
 			continue
@@ -196,9 +230,13 @@ func (s EdgeScore) Markdown() string {
 		t := "measured"
 		if v, ok := TargetsE[m]; ok {
 			t = prose.Percent(v)
+			if heuristicE[m] {
+				t += " above low"
+			}
 		}
-		fmt.Fprintf(&b, "| %s | %s | %s |\n", m, s.Precision[m], t)
+		fmt.Fprintf(&b, "| %s | %s | %s | %s |\n", m, s.Precision[m], s.AboveLow[m], t)
 	}
+	b.WriteString("\nThe targets of position, name and term hold for their edges above low (AX11.3). The others hold for all the edges of the method.\n")
 	fmt.Fprintf(&b, "\nThe recall of the methods 1 to 7 together is %s. The first version has no target for it.\n", s.Recall)
 	if len(s.Missed) > 0 {
 		b.WriteString("\n## The uses that no edge accounts for\n\n| Version | Proof and target |\n| --- | --- |\n")
@@ -209,6 +247,17 @@ func (s EdgeScore) Markdown() string {
 		sort.Strings(refs)
 		for _, r := range refs {
 			fmt.Fprintf(&b, "| %s | %s |\n", r, strings.Join(s.Missed[r], ", "))
+		}
+	}
+	if len(s.Wrong) > 0 {
+		b.WriteString("\n## The edges that no use accounts for\n\n| Version | Method, proof, target and evidence |\n| --- | --- |\n")
+		var refs []string
+		for r := range s.Wrong {
+			refs = append(refs, r)
+		}
+		sort.Strings(refs)
+		for _, r := range refs {
+			fmt.Fprintf(&b, "| %s | %s |\n", r, strings.Join(s.Wrong[r], ", "))
 		}
 	}
 	return b.String()

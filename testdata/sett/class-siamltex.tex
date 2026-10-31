@@ -1,0 +1,16 @@
+% Pattern: env/class. The class siamltex defines theorem, lemma, corollary,
+% proposition and definition on one counter within the section, and the
+% paper declares none of them. Seen in the gold pilot (set X).
+% want definition-1 definition 1.1
+% want proposition-1 statement/proposition 1.2
+% want theorem-1 statement/theorem 2.1
+% want proof-1 proof - proves=theorem-1
+\documentclass[final]{siamltex}
+\begin{document}
+\section{One}
+\begin{definition} A space is bounded when a ball holds it. \end{definition}
+\begin{proposition} Every finite space is bounded. \end{proposition}
+\section{Two}
+\begin{theorem} Every compact space is bounded. \end{theorem}
+\begin{proof} Take a finite cover by balls. \end{proof}
+\end{document}

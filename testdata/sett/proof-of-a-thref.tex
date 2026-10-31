@@ -1,0 +1,27 @@
+% Pattern: proof/attach/thref. The theoremref package labels a theorem with
+% \thlabel and refers to it with \thref. A proof that names its theorem by
+% \thref, after other statements, attaches by the reference.
+% Seen in the gold pilot (set E).
+% want thm-1 statement/theorem 1 status=here labels=THM:main
+% want lemma-1 statement/lemma 2 status=here
+% want proof-1 proof - proves=lemma-1
+% want proof-2 proof - proves=thm-1
+\documentclass{article}
+\usepackage{amsthm}
+\usepackage{theoremref}
+\newtheorem{thm}{Theorem}
+\newtheorem{lemma}[thm]{Lemma}
+\begin{document}
+\begin{thm}\thlabel{THM:main}
+A statement.
+\end{thm}
+\begin{lemma}
+A helper.
+\end{lemma}
+\begin{proof}
+A step.
+\end{proof}
+\begin{proof}[Proof of \thref{THM:main}]
+By the lemma.
+\end{proof}
+\end{document}

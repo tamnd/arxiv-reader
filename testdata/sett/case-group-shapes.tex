@@ -1,0 +1,27 @@
+% Pattern: case/layout. Case heads after a layout switch in the group, after a
+% space in the group, named by a formula, and numbered by a letter and a digit.
+% Seen in the gold pilot (set X).
+% want lemma-1 statement/lemma 1 status=here
+% want proof-1 proof - proves=lemma-1
+% want head-1 other/case 1 parent=proof-1
+% want head-2 other/case 1 parent=proof-1
+% want head-3 other/case - parent=proof-1
+% want head-4 other/case B1 parent=proof-1
+\documentclass{article}
+\usepackage{amsthm}
+\usepackage{soul}
+\newtheorem{lemma}{Lemma}
+\begin{document}
+\begin{lemma} Every compact space is bounded. \end{lemma}
+\begin{proof}
+We argue by cases.
+
+{\flushleft\bf Case 1.} The space is finite.
+
+{\it \hskip2em First Case. We have $\mu=0$.} Then it holds.
+
+\ul{Case $p = y_{2}$:} The proof is analogous.
+
+\underline{Case B1 (i): $r \leq C$.} Then it holds.
+\end{proof}
+\end{document}

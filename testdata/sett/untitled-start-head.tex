@@ -1,0 +1,27 @@
+% Pattern: kind/untitled. An environment with no title, numbered within the
+% section, numbers the paragraphs of the paper. A paragraph that starts with
+% a bold head, after its label, is an item of the kind of the head; one with
+% no head is a numbered paragraph. Seen in the gold pilot (set X).
+% want pkt-1 unknown 1.1
+% want pkt-2 definition 1.2 labels=def
+% want pkt-3 statement/proposition 1.3 status=here labels=prop
+% want proof-1 proof - proves=pkt-3
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{pkt}{}[section]
+\newcommand{\bpk}{\begin{pkt}\rm }
+\newcommand{\epk}{\end{pkt}}
+\begin{document}
+\section{One}
+\bpk
+We recall the setting of the problem and the spaces that we use.
+\epk
+
+\bpk\label{def} {\bf Definition.}
+A space is nice when it is compact.
+\epk
+
+\bpk \label{prop} {\bf Proposition.} {\em Every nice space is bounded.}
+\begin{proof} Cover the space by balls. \end{proof}
+\epk
+\end{document}

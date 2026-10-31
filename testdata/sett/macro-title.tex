@@ -1,0 +1,23 @@
+% Pattern: kind/macro-title. LyX writes the title of a theorem as a macro,
+% defined with \providecommand after the declaration.
+% Seen in the gold pilot (set E).
+% want thm-1 statement/theorem 1 status=here
+% want proof-1 proof - proves=thm-1
+% want prop-1 statement/proposition 2 status=none
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{thm}{\protect\theoremname}
+\newtheorem{prop}[thm]{\protect\propositionname}
+\providecommand{\theoremname}{Theorem}
+\providecommand{\propositionname}{Proposition}
+\begin{document}
+\begin{thm}
+A statement.
+\end{thm}
+\begin{proof}
+A step.
+\end{proof}
+\begin{prop}
+Another statement.
+\end{prop}
+\end{document}

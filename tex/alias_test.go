@@ -148,3 +148,72 @@ func TestTheArgumentOfACommandThatPrintsNothing(t *testing.T) {
 		t.Errorf("the text has %d lines, and the source has %d", strings.Count(string(d.Text), "\n"), strings.Count(src, "\n"))
 	}
 }
+
+// A class can redefine \] to close a trivlist of its own, over several lines
+// and under \ifmmode. That is no alias: written in for each \], it would add
+// lines and an \end the paper does not have. Seen in the gold pilot (set E).
+func TestADisplayEndOfAClassIsNoAlias(t *testing.T) {
+	src := `\documentclass{amsart}
+\usepackage{amsthm}
+\def\]{\relax
+  \ifmmode \egroup
+  \end{trivlist}
+  \else \fi}
+\begin{document}
+\[ a \]
+\[ b \]
+\begin{proof} One. \end{proof}
+\end{document}
+`
+	d, err := tex.ReadFile("main.tex", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(d.Text[d.Body:]), "trivlist") {
+		t.Errorf("\\] was written in as an alias")
+	}
+	if p := d.Pos(strings.Index(string(d.Text), "One")); p.Line != 10 {
+		t.Errorf("One is on line %d, want 10", p.Line)
+	}
+}
+
+func TestWrappers(t *testing.T) {
+	src := `\documentclass{amsart}
+\newtheorem{lemma}{Lemma}
+\newcommandtwoopt{\lemm}[3][][]{
+  \begin{lemma}[#1]\label{#2}
+    #3
+  \end{lemma}}
+\newcommand{\eq}[1]{\begin{align*} #1 \end{align*}}
+\begin{document}
+\lemm[Small][one]{
+One.}
+\eq{a=b}
+\lemm{Two.}
+\end{document}
+`
+	d, err := tex.ReadFile("main.tex", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	lines := map[string]int{}
+	for _, n := range d.Tree.Nodes {
+		if n.Kind != "env" {
+			continue
+		}
+		in := strings.Join(strings.Fields(string(d.Text[n.Inner:n.Close])), " ")
+		got = append(got, n.Name+" "+in)
+		lines[n.Name+" "+in] = d.Pos(n.From).Line
+	}
+	want := []string{`lemma \label{one} One.`, `lemma Two.`}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	if lines[want[0]] != 9 || lines[want[1]] != 12 {
+		t.Errorf("the lemmas are on lines %v, want 9 and 12", lines)
+	}
+	if !strings.Contains(string(d.Text), `\eq{a=b}`) {
+		t.Errorf("the wrapper of a formula is unwrapped")
+	}
+}

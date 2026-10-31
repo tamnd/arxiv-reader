@@ -1,0 +1,20 @@
+% Pattern: proof/extent. A \proof without an end mark ends at two empty lines
+% in a row, and the remark after them is not part of the proof. A comment line
+% is not empty. Seen in the gold pilot (set E).
+% want theorem-1 statement/theorem 1 status=here
+% want head-1 proof - proves=theorem-1 lines=12-15
+% want lemma-1 statement/lemma 2 status=none
+\documentclass{amsart}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\begin{document}
+\begin{theorem} Every compact space is bounded. \end{theorem}
+\proof Cover the space by balls and take a finite subcover.
+%
+%
+The union of finitely many balls is bounded.
+
+
+The theorem can also be proved with nets.
+\begin{lemma} Every closed subset of a compact space is compact. \end{lemma}
+\end{document}

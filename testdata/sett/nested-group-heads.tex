@@ -1,0 +1,16 @@
+% Pattern: head/manual. A head in a group that holds only the head,
+% {{\emph{Remark 1:}}}, is the head of the font group inside. Seen in the gold
+% pilot (set X).
+% want head-1 remark 1
+% want head-2 example 1
+% want head-3 remark 2
+\documentclass{article}
+\begin{document}
+Some text before.
+
+{{\emph{Remark 1:}}} The bound holds for each compact space.
+
+{{\emph{Example 1:}}} Take the unit interval as the space.
+
+{ {\bf Remark 2.} } The bound is sharp.
+\end{document}

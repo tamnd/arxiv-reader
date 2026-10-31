@@ -1,0 +1,47 @@
+% Pattern: case/section. Case heads with a formula after a colon, sub-case
+% titles, a name after a dash, and case and step sections inside a proof, with
+% \texorpdfstring and a short title. Seen in the gold pilot (set X).
+% want lemma-1 statement/lemma 1 status=here
+% want proof-1 proof - proves=lemma-1
+% want head-1 other/case - parent=proof-1
+% want head-2 other/case - parent=proof-1
+% want head-3 other/case (a) parent=proof-1
+% want head-4 other/case - parent=proof-1
+% want head-5 other/case 1 parent=proof-1
+% want head-6 other/case - parent=proof-1 lines=35-37
+% want head-7 other/case 1 parent=proof-1
+% want head-8 other/case 1.0.1 parent=proof-1
+% want head-9 other/case 1.1 parent=proof-1
+\documentclass{article}
+\usepackage{amsthm}
+\usepackage{hyperref}
+\newtheorem{lemma}{Lemma}
+\begin{document}
+\section{One}
+\begin{lemma} Every compact space is bounded. \end{lemma}
+\begin{proof}
+We argue by cases.
+
+{\bf Case: $3$ and $3'$ are $3$-vertices.}  In this case, we may assume it.
+
+{\bf Sub-case:} $t_1\geq 2$. This inequality holds.
+
+{\bf{Case (a): \; $H=P_1\times B$ for some group.}} Then it holds.
+
+\textit{Case: $w_{*}' = 0$ and $N = \{0\}$.} Then it holds.
+
+\paragraph{Case 1 -- $r(x)\neq 0$:} Then it holds.
+
+\subsection*{Case: $n=1$}
+Then it holds.
+
+\subsection*{\texorpdfstring{Step 1: Trace constraints for $\varphi$}{Step 1}}
+Then it holds.
+
+\subsubsection{The inhomogeneous case}
+Then it holds.
+
+\subsection[Case $p\equiv 1$]{Case $\boldsymbol{p\equiv 1}$}
+Then it holds.
+\end{proof}
+\end{document}

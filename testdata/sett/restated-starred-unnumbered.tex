@@ -1,0 +1,13 @@
+% Pattern: number/restated. A copy of a numbered proposition in a
+% \newtheorem* environment restates it, and prints no number. Seen in the
+% gold pilot (set X).
+% want proposition-1 statement/proposition 1
+% want proposition--1 statement/proposition -
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{proposition}{Proposition}
+\newtheorem*{proposition*}{Proposition}
+\begin{document}
+\begin{proposition} Every finite topological space is compact, and every closed subset of it is compact. \end{proposition}
+\begin{proposition*} Every finite topological space is compact, and every closed subset of it is compact. \end{proposition*}
+\end{document}

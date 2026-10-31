@@ -1,0 +1,10 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesClass{appjour}
+\LoadClass{article}
+\newcounter{lemma}
+\newtheorem{Lemma}[lemma]{Lemma}
+\renewcommand{\appendix}{%
+\setcounter{section}{0}%
+\gdef\thesection{\@Alph\c@section}%
+\renewcommand{\thelemma}{A\arabic{lemma}}%
+\setcounter{lemma}{0}}

@@ -2,6 +2,7 @@ package tex
 
 import (
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -14,7 +15,11 @@ type Macro struct {
 	Args       int    `json:"args,omitempty"`
 	Default    string `json:"default,omitempty"`
 	HasDefault bool   `json:"-"`
-	Body       string `json:"body"`
+	// Default2 is the value of the second argument when the command has two
+	// optional arguments, as \newcommandtwoopt of the xargs package defines.
+	Default2 string `json:"default2,omitempty"`
+	Opts     int    `json:"-"`
+	Body     string `json:"body"`
 	// How is the command that defined it: newcommand, def, let or operator.
 	How string `json:"how"`
 	// File is the local style file of the definition, or "" for the paper.
@@ -66,7 +71,7 @@ func (m *Macros) Add(o *Macros) {
 	}
 }
 
-var defineCmd = regexp.MustCompile(`\\(newcommand|renewcommand|providecommand|DeclareRobustCommand|def|gdef|edef|xdef|let|DeclareMathOperator|newenvironment|renewenvironment|NewDocumentCommand|RenewDocumentCommand|DeclareDocumentCommand)\b`)
+var defineCmd = regexp.MustCompile(`\\(newcommandtwoopt|renewcommandtwoopt|newcommand|renewcommand|providecommand|DeclareRobustCommand|def|gdef|edef|xdef|let|DeclareMathOperator|newenvironment|renewenvironment|NewDocumentCommand|RenewDocumentCommand|DeclareDocumentCommand)\b`)
 
 var defParams = regexp.MustCompile(`^(?:#[1-9])*`)
 
@@ -81,86 +86,185 @@ func ReadMacros(text []byte, local map[string][]byte) *Macros {
 	return m
 }
 
+// refCmds are the commands of the cross references. A class that defines
+// \ref again for its own typesetting, as birkmult.cls does with
+// \def\ref#1{{{\rm\@newref{#1}}}}, would hide the reference from each reader
+// that expands the macros first, so a definition of one of them that does not
+// give a reference again is not read. Seen in the gold pilot (set X).
+var refCmds = map[string]bool{`\ref`: true, `\eqref`: true, `\pageref`: true, `\label`: true, `\cref`: true, `\Cref`: true, `\autoref`: true}
+
+var refBody = regexp.MustCompile(`\\(?:ref|eqref|pageref|label|cref|Cref|autoref)\b`)
+
+// definerAlias is a short name for a command that defines commands, as
+// \newcommand{\nc}{\newcommand} or \let\nc\newcommand. Seen in the gold pilot
+// (set X).
+var definerAlias = regexp.MustCompile(`\\(?:(?:re)?newcommand\*?\s*\{\s*\\([a-zA-Z]+)\s*\}\s*\{\s*|def\s*\\([a-zA-Z]+)\s*\{\s*|let\s*\\([a-zA-Z]+)\s*=?\s*)\\(newcommand|renewcommand|providecommand|newenvironment|renewenvironment|def)\b(\s*\})?`)
+
+// definers is defineCmd with the short names of the text for the commands
+// that define commands.
+func definers(text []byte) (*regexp.Regexp, map[string]string) {
+	how := map[string]string{}
+	for _, m := range definerAlias.FindAllSubmatch(text, -1) {
+		name := string(m[1]) + string(m[2]) + string(m[3])
+		if (len(m[3]) > 0) == (len(m[5]) > 0) || defineCmd.MatchString(`\`+name) {
+			// A \newcommand or \def body closes after the command, and a
+			// \let has no brace.
+			continue
+		}
+		how[name] = string(m[4])
+	}
+	if len(how) == 0 {
+		return defineCmd, how
+	}
+	names := make([]string, 0, len(how))
+	for n := range how {
+		names = append(names, n)
+	}
+	slices.Sort(names)
+	return regexp.MustCompile(`\\(` + strings.Join(names, "|") + `|` + strings.TrimSuffix(strings.TrimPrefix(defineCmd.String(), `\\(`), `)\b`) + `)\b`), how
+}
+
 func (m *Macros) read(text []byte, file string) {
-	for _, loc := range defineCmd.FindAllSubmatchIndex(text, -1) {
+	re, alias := definers(text)
+	for _, loc := range re.FindAllSubmatchIndex(text, -1) {
 		if escaped(text, loc[0]) {
 			continue
 		}
+		name, prev := "", (*Macro)(nil)
+		if a, _, ok := ReadArgs(text, loc[1], "*c"); ok {
+			name = strings.TrimSpace(a.Values[0])
+			prev = m.Commands[name]
+		}
 		how := string(text[loc[2]:loc[3]])
-		at := loc[1]
-		switch how {
-		case "newcommand", "renewcommand", "providecommand", "DeclareRobustCommand":
-			a, _, ok := ReadArgs(text, at, "*coom")
-			if !ok {
-				continue
+		if a, ok := alias[how]; ok {
+			how = a
+		}
+		m.readOne(text, file, how, loc)
+		if c := m.Commands[name]; refCmds[name] && c != nil && !refBody.MatchString(c.Body) {
+			if prev != nil {
+				m.Commands[name] = prev
+			} else {
+				delete(m.Commands, name)
 			}
-			name := strings.TrimSpace(a.Values[0])
-			if how == "providecommand" {
-				if _, have := m.Commands[name]; have {
-					continue
-				}
-			}
-			n, _ := strconv.Atoi(strings.TrimSpace(a.Values[1]))
-			m.Commands[name] = &Macro{Name: name, Args: n, Default: a.Values[2], HasDefault: a.Has[2], Body: a.Values[3], How: "newcommand", File: file}
-		case "def", "gdef", "edef", "xdef":
-			a, end, ok := ReadArgs(text, at, "c")
-			if !ok || !strings.HasPrefix(a.Values[0], `\`) {
-				continue
-			}
-			params := defParams.Find(text[end:])
-			body := skipSpace(text, end+len(params))
-			if body >= len(text) || text[body] != '{' {
-				continue
-			}
-			in, e, gok := Group(text, body)
-			if !gok {
-				continue
-			}
-			m.Commands[a.Values[0]] = &Macro{Name: a.Values[0], Args: len(params) / 2, Body: string(text[in : e-1]), How: "def", File: file}
-		case "let":
-			a, end, ok := ReadArgs(text, at, "c")
-			if !ok {
-				continue
-			}
-			j := skipSpace(text, end)
-			if j < len(text) && text[j] == '=' {
-				j++
-			}
-			b, _, ok := ReadArgs(text, j, "c")
-			if !ok || !strings.HasPrefix(b.Values[0], `\`) {
-				continue
-			}
-			m.Commands[a.Values[0]] = &Macro{Name: a.Values[0], Body: b.Values[0], How: "let", File: file}
-		case "DeclareMathOperator":
-			a, _, ok := ReadArgs(text, at, "*cm")
-			if !ok {
-				continue
-			}
-			op := `\operatorname`
-			if a.Star {
-				op += "*"
-			}
-			m.Commands[a.Values[0]] = &Macro{Name: a.Values[0], Body: op + "{" + a.Values[1] + "}", How: "operator", File: file}
-		case "newenvironment", "renewenvironment":
-			a, _, ok := ReadArgs(text, at, "*moomm")
-			if !ok {
-				continue
-			}
-			name := strings.TrimSpace(a.Values[0])
-			n, _ := strconv.Atoi(strings.TrimSpace(a.Values[1]))
-			if _, have := m.Envs[name]; !have {
-				m.EnvOrder = append(m.EnvOrder, name)
-			}
-			m.Envs[name] = &Env{Name: name, Args: n, Default: a.Values[2], HasDefault: a.Has[2], Begin: a.Values[3], End: a.Values[4], Off: loc[0], File: file}
-		case "NewDocumentCommand", "RenewDocumentCommand", "DeclareDocumentCommand":
-			a, _, ok := ReadArgs(text, at, "cmm")
-			if !ok {
-				continue
-			}
-			n := strings.Count(a.Values[1], "m") + strings.Count(a.Values[1], "o")
-			m.Commands[a.Values[0]] = &Macro{Name: a.Values[0], Args: n, Body: a.Values[2], How: "newcommand", File: file}
 		}
 	}
+}
+
+// readOne reads the definition at loc. A definition of a reference command
+// that gives no reference again keeps the definition before it.
+func (m *Macros) readOne(text []byte, file, how string, loc []int) {
+	at := loc[1]
+	switch how {
+	case "newcommand", "renewcommand", "providecommand", "DeclareRobustCommand":
+		a, _, ok := ReadArgs(text, at, "*coom")
+		if !ok {
+			return
+		}
+		name := strings.TrimSpace(a.Values[0])
+		if how == "providecommand" {
+			if _, have := m.Commands[name]; have {
+				return
+			}
+		}
+		n, _ := strconv.Atoi(strings.TrimSpace(a.Values[1]))
+		m.Commands[name] = &Macro{Name: name, Args: n, Default: a.Values[2], HasDefault: a.Has[2], Body: a.Values[3], How: "newcommand", File: file}
+	case "newcommandtwoopt", "renewcommandtwoopt":
+		// \newcommandtwoopt{\theo}[3][][]{...}: the first two arguments
+		// are optional. Seen in the gold pilot (set E).
+		a, _, ok := ReadArgs(text, at, "*cooom")
+		if !ok {
+			return
+		}
+		name := strings.TrimSpace(a.Values[0])
+		n, _ := strconv.Atoi(strings.TrimSpace(a.Values[1]))
+		if n < 2 {
+			return
+		}
+		m.Commands[name] = &Macro{Name: name, Args: n, Default: a.Values[2], HasDefault: true, Default2: a.Values[3], Opts: 2, Body: a.Values[4], How: "newcommand", File: file}
+	case "def", "gdef", "edef", "xdef":
+		a, end, ok := ReadArgs(text, at, "c")
+		if !ok || !strings.HasPrefix(a.Values[0], `\`) {
+			return
+		}
+		params := defParams.Find(text[end:])
+		body := skipSpace(text, end+len(params))
+		if body >= len(text) || text[body] != '{' {
+			return
+		}
+		in, e, gok := Group(text, body)
+		if !gok {
+			return
+		}
+		m.Commands[a.Values[0]] = &Macro{Name: a.Values[0], Args: len(params) / 2, Body: string(text[in : e-1]), How: "def", File: file}
+	case "let":
+		a, end, ok := ReadArgs(text, at, "c")
+		if !ok {
+			return
+		}
+		j := skipSpace(text, end)
+		if j < len(text) && text[j] == '=' {
+			j++
+		}
+		b, _, ok := ReadArgs(text, j, "c")
+		if !ok || !strings.HasPrefix(b.Values[0], `\`) {
+			return
+		}
+		m.Commands[a.Values[0]] = &Macro{Name: a.Values[0], Body: b.Values[0], How: "let", File: file}
+	case "DeclareMathOperator":
+		a, _, ok := ReadArgs(text, at, "*cm")
+		if !ok {
+			return
+		}
+		op := `\operatorname`
+		if a.Star {
+			op += "*"
+		}
+		m.Commands[a.Values[0]] = &Macro{Name: a.Values[0], Body: op + "{" + a.Values[1] + "}", How: "operator", File: file}
+	case "newenvironment", "renewenvironment":
+		a, _, ok := ReadArgs(text, at, "*moomm")
+		if !ok {
+			return
+		}
+		name := strings.TrimSpace(a.Values[0])
+		n, _ := strconv.Atoi(strings.TrimSpace(a.Values[1]))
+		if _, have := m.Envs[name]; !have {
+			m.EnvOrder = append(m.EnvOrder, name)
+		}
+		m.Envs[name] = &Env{Name: name, Args: n, Default: a.Values[2], HasDefault: a.Has[2], Begin: a.Values[3], End: a.Values[4], Off: loc[0], File: file}
+	case "NewDocumentCommand", "RenewDocumentCommand", "DeclareDocumentCommand":
+		a, _, ok := ReadArgs(text, at, "cmm")
+		if !ok {
+			return
+		}
+		n := strings.Count(a.Values[1], "m") + strings.Count(a.Values[1], "o")
+		m.Commands[a.Values[0]] = &Macro{Name: a.Values[0], Args: n, Body: a.Values[2], How: "newcommand", File: file}
+	}
+}
+
+// Spec is the argument spec of a call of the command, as ReadArgs reads it.
+func (c *Macro) Spec() string {
+	o := c.Opts
+	if o == 0 && c.HasDefault {
+		o = 1
+	}
+	o = max(0, min(o, c.Args))
+	return strings.Repeat("o", o) + strings.Repeat("m", c.Args-o)
+}
+
+// Fill is the body of the command with the arguments of a call in it.
+func (c *Macro) Fill(a Args) string {
+	body := c.Body
+	for i := len(a.Values) - 1; i >= 0; i-- {
+		v := a.Values[i]
+		if i < len(a.Has) && !a.Has[i] {
+			v = c.Default
+			if i == 1 {
+				v = c.Default2
+			}
+		}
+		body = strings.ReplaceAll(body, "#"+strconv.Itoa(i+1), v)
+	}
+	return body
 }
 
 // maxExpansion stops the expansion of a text that grows without end.
@@ -198,22 +302,11 @@ func (m *Macros) expandOnce(s string) (string, bool) {
 		if !ok || mac.How == "def" && strings.Contains(mac.Body, "\\def") {
 			continue
 		}
-		spec := strings.Repeat("m", mac.Args)
-		if mac.HasDefault && mac.Args > 0 {
-			spec = "o" + strings.Repeat("m", mac.Args-1)
-		}
-		a, end, ok := ReadArgs(text, loc[1], spec)
+		a, end, ok := ReadArgs(text, loc[1], mac.Spec())
 		if !ok {
 			continue
 		}
-		body := mac.Body
-		for i := len(a.Values) - 1; i >= 0; i-- {
-			v := a.Values[i]
-			if !a.Has[i] {
-				v = mac.Default
-			}
-			body = strings.ReplaceAll(body, "#"+strconv.Itoa(i+1), v)
-		}
+		body := mac.Fill(a)
 		out.Write(text[at:loc[0]])
 		out.WriteString(body)
 		// A command name ends at the first byte that is not a letter. Keep a

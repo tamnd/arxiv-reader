@@ -1,0 +1,33 @@
+% Pattern: attach/head. A proof whose head is a braced group after
+% \begin{proof}, as {Proof of Lemma~\ref{a}.}, in place of the option,
+% proves what the head names. Seen in the gold pilot (set X).
+% want lemma-1 statement/lemma 1.1
+% want theorem-1 statement/theorem 1.2
+% want proof-1 proof - proves=lemma-1
+% want proof-2 proof - proves=theorem-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\begin{document}
+\section{One}
+
+\begin{lemma}\label{l:sup}
+A bounded set of reals has a least upper bound.
+\end{lemma}
+
+\begin{theorem}\label{t:main}
+Every bounded monotone sequence converges.
+\end{theorem}
+
+\section{Proofs}
+
+\begin{proof}{Proof of Lemma~\ref{l:sup}.}
+This is the completeness axiom.
+\end{proof}
+
+\vspace{1cm}
+\begin{proof}{\bf Proof of Theorem~\ref{t:main}.}
+Take the least upper bound of the terms.
+\end{proof}
+\end{document}

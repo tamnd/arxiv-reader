@@ -1,0 +1,25 @@
+% Pattern: proof/attach/wrapper. A proof wrapper whose second argument goes
+% into the end mark and names what the proof proves, by a reference. The
+% proof comes after another statement, so only the argument attaches it.
+% Seen in the gold pilot (set E).
+% want theorem-1 statement/theorem 1 status=here labels=main
+% want lemma-1 statement/lemma 2 status=none
+% want proof-1 proof - proves=theorem-1
+\documentclass{article}
+\usepackage{amsthm}
+\newenvironment{PROOF}[2][\proofname.]
+{\begin{proof}[#1]\renewcommand{\qedsymbol}{\textsquare$_{\rm #2}$}}
+{\end{proof}}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\begin{document}
+\begin{theorem}\label{main}
+A statement.
+\end{theorem}
+\begin{lemma}
+A helper.
+\end{lemma}
+\begin{PROOF}{\ref{main}}
+A step.
+\end{PROOF}
+\end{document}

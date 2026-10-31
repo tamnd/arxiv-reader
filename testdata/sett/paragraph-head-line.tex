@@ -1,0 +1,10 @@
+% Pattern: head/paragraph. A \paragraph head on the line right after the
+% text of a paragraph, with no empty line between them, starts an item.
+% Seen in the gold pilot (set X).
+% want head-1 context/hypothesis -
+\documentclass{article}
+\begin{document}
+\section{One}
+We begin with the first assumption of the cited paper.
+\paragraph{\cite[Assumption 2.4]{key}:} The function is continuous.
+\end{document}

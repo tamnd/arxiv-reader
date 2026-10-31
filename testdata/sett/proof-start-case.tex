@@ -1,0 +1,19 @@
+% Pattern: head/case. A proof starts with a bold stage head right after its
+% \begin, and a second stage follows. Each stage is a case of the proof, the
+% first one too, since a proof has no head of its own to write again. Seen in
+% the gold pilot (set X).
+% want theorem-1 statement/theorem 1 status=here
+% want proof-1 proof - proves=theorem-1
+% want head-1 other/case A
+% want head-2 other/case B
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\begin{document}
+\begin{theorem} Every regular cardinal is large. \end{theorem}
+\begin{proof}
+\textbf{Stage A:} We force by the initial segments of the tree.
+
+\textbf{Stage B:} We show that the forcing is closed.
+\end{proof}
+\end{document}

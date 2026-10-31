@@ -1,0 +1,17 @@
+% Pattern: structure/declaration. The class reads its theorems from a
+% configuration file with \InputIfFileExists, and the file declares a hidden
+% proof only under a flag that an option of the class sets; without the option
+% the hidden proof is a comment. So the lemma and the definition are items,
+% numbered within the section, and the hidden proof is not. Seen in the gold
+% pilot (set X).
+% want lemma-1 statement/lemma 1.1 status=here
+% want proof-1 proof - proves=lemma-1
+% want defn-1 definition 1.2
+\documentclass[english]{cfgjour}
+\begin{document}
+\section{One}
+\begin{lemma} Every compact space is fine. \end{lemma}
+\begin{proof} Cover the space by balls. \end{proof}
+\begin{hproof} A note for the authors. \end{hproof}
+\begin{defn} A space is nice when it is compact. \end{defn}
+\end{document}

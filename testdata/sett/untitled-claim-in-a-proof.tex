@@ -1,0 +1,31 @@
+% Pattern: kind/untitled. An environment with an empty title, numbered
+% within the theorems, holds the claims of a proof. A proof proves each
+% one, so each is a statement. A wrapper of the paper sets \thethm to its
+% argument for one use, and that does not change the numbers of the paper.
+% Seen in the gold pilot (set E).
+% want thm-1 statement/theorem 1.1 status=here
+% want proof-1 proof - proves=thm-1
+% want stat-1 statement 1.1.1 status=here
+% want proof-2 proof - proves=stat-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{thm}{Theorem}[section]
+\newtheorem{stat}{}[thm]
+\newenvironment{namedthm}[1]
+    {\def\thethm{#1}\begin{thm}}
+    {\end{thm}}
+\begin{document}
+\section{One}
+\begin{thm}
+A statement.
+\end{thm}
+\begin{proof}
+A step.
+\begin{stat}
+A claim.
+\end{stat}
+\begin{proof}
+A sub step.
+\end{proof}
+\end{proof}
+\end{document}

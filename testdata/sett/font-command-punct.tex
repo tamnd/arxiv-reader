@@ -1,0 +1,20 @@
+% Pattern: head/case. A command of one argument writes it in bold with a
+% period, \nc{\p}[1]{\bigskip\noindent\textbf{#1.}}, where \nc is
+% \newcommand, and a proof writes its steps and cases with it. Seen in the
+% gold pilot (set X).
+% want theorem-1 statement/theorem 1
+% want proof-1 proof - proves=theorem-1
+% want head-1 other/case 1
+% want head-2 other/case 2
+\documentclass{article}
+\newcommand{\nc}{\newcommand}
+\nc{\p}[1]{\bigskip\noindent\textbf{#1.}}
+\newtheorem{theorem}{Theorem}
+\begin{document}
+\begin{theorem} Every compact space is bounded. \end{theorem}
+\begin{proof}
+\p{Step 1: a cover} Take a cover of the space by balls.
+
+\p{Step 2: a finite part} Take a finite part of the cover.
+\end{proof}
+\end{document}

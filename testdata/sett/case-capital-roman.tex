@@ -1,0 +1,19 @@
+% Pattern: head/case. "Case (I)." and "Case (II)." number the cases with the
+% capital Roman numerals in the parentheses. Seen in the gold pilot (set X).
+% want lemma-1 statement/lemma 1
+% want proof-1 proof - proves=lemma-1
+% want head-1 other/case (I)
+% want head-2 other/case (II)
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{lemma}{Lemma}
+\begin{document}
+\begin{lemma} Every finite space is compact. \end{lemma}
+\begin{proof}
+Let $x$ be a point.
+
+\paragraph{Case (I). } Suppose that $x=0$. Then the claim is clear.
+
+\paragraph{Case (II). } Suppose that $x\neq 0$. Then the claim is clear too.
+\end{proof}
+\end{document}

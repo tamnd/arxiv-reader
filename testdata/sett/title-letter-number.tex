@@ -1,0 +1,15 @@
+% Pattern: number/title. An unnumbered environment whose title ends in a letter
+% prints the letter as its number. Seen in the gold pilot (set X).
+% want thma-1 statement/theorem A
+% want corc-1 statement/corollary C
+% want theorem-1 statement/theorem 1.1
+\documentclass{amsart}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem*{thmA}{Theorem A}
+\newtheorem*{corC}{Corollary C}
+\begin{document}
+\begin{thmA} Every compact space is bounded. \end{thmA}
+\begin{corC} Every finite space is bounded. \end{corC}
+\section{One}
+\begin{theorem} Every finite space is compact. \end{theorem}
+\end{document}

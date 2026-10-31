@@ -1,0 +1,20 @@
+% Pattern: proof/amsthm/article. The proof is written inside the environment
+% of its theorem, before \end{theorem}. It proves the theorem that holds it.
+% Seen in the gold pilot (set E).
+% want theorem-1 statement/theorem 1 status=here labels=th:a
+% want proof-1 proof - proves=theorem-1 parent=theorem-1 labels=eq:a
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\begin{document}
+\begin{theorem}\label{th:a}
+A statement.
+\begin{proof}
+A step with
+\begin{equation}\label{eq:a}
+x = y.
+\end{equation}
+The last step.
+\end{proof}
+\end{theorem}
+\end{document}

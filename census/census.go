@@ -58,7 +58,9 @@ type Occurrence struct {
 	// Counter is the counter that the occurrence steps, and Number its number
 	// from the best witness. NumberFrom says which witness: aux, render,
 	// counter or head.
-	Counter    string `json:"counter,omitempty"`
+	Counter string `json:"counter,omitempty"`
+	// code is the body of the command of a head, which sets the counters.
+	code       string
 	Number     string `json:"number,omitempty"`
 	NumberFrom string `json:"number_from,omitempty"`
 	// Model is the number that the counter model gives, Aux the number that
@@ -67,6 +69,11 @@ type Occurrence struct {
 	Model   string `json:"-"`
 	Aux     string `json:"-"`
 	Printed string `json:"-"`
+	// Arg is the number that the use of a wrapper gives as an argument.
+	Arg string `json:"-"`
+	// Ref is the label whose number the head prints, as \ref{thm:main} of
+	// \begin{restate}{\ref{thm:main}}.
+	Ref string `json:"-"`
 	// Labels is each \label of an env or head occurrence. For a label
 	// occurrence, Target is the label key. For a textref, Target is the title
 	// and number that the text names.
@@ -124,6 +131,8 @@ type Census struct {
 	Labels map[string]string
 	// AuxLabels is the number of each label that the .aux file gives.
 	AuxLabels map[string]string
+	// auxAnchor is the counter of the hyperref anchor of each label.
+	auxAnchor map[string]string
 	// Findings is each finding of rules D07, D08 and D09.
 	Findings []Finding
 	// touched is each counter that the paper sets by hand, so that the check
@@ -131,6 +140,8 @@ type Census struct {
 	touched map[string]bool
 	// Restatable is the macro of each restatable of thm-restate.
 	Restatable map[string]bool
+	// hides is each theorem style whose head does not print the number.
+	hides map[string]bool
 }
 
 // Finding is one finding of the census checks.
@@ -143,14 +154,14 @@ type Finding struct {
 
 var (
 	beginEnv   = regexp.MustCompile(`\\begin\s*\{([^{}]{1,64})\}`)
-	labelCmd   = regexp.MustCompile(`\\label\s*\{([^{}]*)\}`)
+	labelCmd   = regexp.MustCompile(`\\(?:th)?label\s*\{([^{}]*)\}`)
 	restateCmd = regexp.MustCompile(`\\([A-Za-z@]+)\*`)
 )
 
 // Run takes the census of one main file. It counts the occurrences, numbers
 // them with the counter model, and runs the checks of AX4.4.
 func Run(in Input) *Census {
-	c := &Census{In: in, Labels: map[string]string{}, AuxLabels: map[string]string{}, Restatable: map[string]bool{}}
+	c := &Census{In: in, Labels: map[string]string{}, AuxLabels: map[string]string{}, auxAnchor: map[string]string{}, Restatable: map[string]bool{}}
 	d := in.Doc
 	if d == nil || d.Body == 0 {
 		return c
@@ -158,6 +169,9 @@ func Run(in Input) *Census {
 	for _, a := range in.Aux {
 		for k, v := range ParseAux(a) {
 			c.AuxLabels[k] = v
+		}
+		for k, v := range auxAnchors(a) {
+			c.auxAnchor[k] = v
 		}
 	}
 	c.envs()
@@ -218,11 +232,82 @@ func (c *Census) envs() {
 				o.Opt, o.HasOpt, o.Inner = string(d.Text[in:e-1]), true, e
 			}
 		}
+		if decl.NumberArg > 0 {
+			o.Arg, o.Ref = wrapperArg(d, name, decl.NumberArg, inner)
+		}
+		// A theorem style whose head does not print the number, with the
+		// note \ref{thm:main}, prints the number of thm:main. Seen in the
+		// gold pilot (set X).
+		if m := refOnly.FindStringSubmatch(o.Opt); m != nil && c.hidden(decl.Style) {
+			o.Ref = strings.TrimSpace(m[1])
+		}
+		// \newtheorem*{again}{Theorem \ref{thm:main}} restates thm:main
+		// and prints its number. Seen in the gold pilot (set X).
+		if m := titleRef.FindStringSubmatch(decl.Title); m != nil && !decl.Numbered && o.Ref == "" {
+			o.Ref = strings.TrimSpace(m[1])
+		}
 		o.Close, o.End = closeOf(d, name, o.Inner)
 		if o.Close == d.End {
 			o.Flags = append(o.Flags, "unclosed")
 		}
 	}
+}
+
+var styleDecl = regexp.MustCompile(`\\newtheoremstyle\s*\{`)
+
+// hidden tells whether the theorem style, of \newtheoremstyle, has a head
+// spec that does not print the number, as {\thmname{#1}\thmnote{ #3}}.
+func (c *Census) hidden(style string) bool {
+	if c.hides == nil {
+		c.hides = map[string]bool{}
+		d := c.In.Doc
+		for _, text := range append([][]byte{d.Preamble()}, tex.LocalFiles(d)...) {
+			for _, x := range styleDecl.FindAllIndex(text, -1) {
+				a, _, ok := tex.ReadArgs(text, x[1]-1, "mmmmmmmmm")
+				if !ok {
+					continue
+				}
+				spec := a.Values[8]
+				if strings.TrimSpace(spec) != "" && !strings.Contains(spec, "#2") && !strings.Contains(spec, `\thmnumber`) {
+					c.hides[strings.TrimSpace(a.Values[0])] = true
+				}
+			}
+		}
+	}
+	return style != "" && c.hides[style]
+}
+
+// titleRef is the title of a theorem that ends with a \ref, as Theorem
+// \ref{thm:main}.
+var titleRef = regexp.MustCompile(`\\(?:ref|cref|Cref)\s*\{([^{}]+)\}\s*$`)
+
+// refOnly is an argument that is only a \ref, as \ref{thm:main}.
+var refOnly = regexp.MustCompile(`^\s*\\(?:ref|cref|Cref)\s*\{([^{}]+)\}\s*$`)
+
+// wrapperArg reads argument k of the use of wrapper env at inner, as A of
+// \begin{customthm}{A}. An argument \ref{key} gives the label key instead.
+// Seen in the gold pilot (set X).
+func wrapperArg(d *tex.Document, env string, k, inner int) (arg, ref string) {
+	e := d.Macros.Envs[env]
+	if e == nil || k > e.Args {
+		return "", ""
+	}
+	spec := strings.Repeat("m", e.Args)
+	if e.HasDefault {
+		spec = "o" + spec[1:]
+	}
+	a, _, ok := tex.ReadArgs(d.Text, inner, spec)
+	if !ok || !a.Has[k-1] {
+		return "", ""
+	}
+	v := strings.TrimSpace(a.Values[k-1])
+	if m := refOnly.FindStringSubmatch(v); m != nil {
+		return "", strings.TrimSpace(m[1])
+	}
+	if len(v) > 12 || strings.ContainsAny(v, `\{}$`) {
+		return "", ""
+	}
+	return v, ""
 }
 
 func (c *Census) occ(typ, env string, decl *theorems.Declaration, off, inner int) *Occurrence {
@@ -261,11 +346,11 @@ func closeOf(d *tex.Document, name string, from int) (close, end int) {
 
 // heads counts each manual head of AX3.4 outside the env occurrences.
 func (c *Census) heads() {
-	var skip []tex.Region
+	var spans []theorems.EnvSpan
 	for _, o := range c.Occurrences {
-		skip = append(skip, tex.Region{From: o.Off, To: o.End})
+		spans = append(spans, theorems.EnvSpan{Off: o.Off, Inner: o.Inner, Close: o.Close, Proof: o.Item == "proof"})
 	}
-	for _, h := range theorems.FindHeads(c.In.Doc, c.In.Titles, skip) {
+	for _, h := range theorems.FindHeads(c.In.Doc, c.In.Titles, spans) {
 		typ := Head
 		if h.Proof {
 			typ = Proof
@@ -282,6 +367,7 @@ func (c *Census) heads() {
 		if h.Number != "" {
 			o.NumberFrom = "head"
 		}
+		o.Counter, o.code = h.Counter, h.Code
 		if h.Form == "section" || h.Form == "command" {
 			o.Flags = append(o.Flags, h.Form)
 		}

@@ -1,0 +1,32 @@
+% Pattern: head/proof. Bold heads write "The main Theorem A" and a second
+% proof of a statement as "An alternative proof of Theorem 1.1" or as
+% "alternative Proof" right after the first proof. The alternative proof with
+% no target proves what the proof before it proves. Seen in the gold pilot
+% (set X).
+% want head-1 statement/theorem A
+% want head-2 statement/theorem 1.1
+% want head-3 proof - proves=head-2
+% want head-4 statement/theorem 1.2
+% want head-5 proof - proves=head-4
+% want head-6 proof - proves=head-4
+% want head-7 proof - proves=head-2
+\documentclass{article}
+\begin{document}
+\section{One}
+
+{\bf The main Theorem A}\quad Every compact space is bounded.
+
+{\bf Theorem 1.1}\quad Every finite space is compact.
+
+{\bf Proof.}\quad Cover the space by finitely many sets. $\Box$
+
+{\bf Theorem 1.2}\quad Every closed part of a compact space is compact.
+
+{\bf Proof.}\quad Take a cover of the part. $\Box$
+
+{\bf alternative Proof :}\quad Use nets instead of covers. $\Box$
+
+Some text between them.
+
+{\bf An alternative proof of Theorem 1.1}: \quad Count the points of the space. $\Box$
+\end{document}

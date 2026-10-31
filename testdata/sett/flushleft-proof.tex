@@ -1,0 +1,13 @@
+% Pattern: head/proof. A group that starts with an alignment and holds a
+% group with the proof head and the text of the proof is a proof. Seen in
+% the gold pilot (set X).
+% want thm-1 statement/theorem 1
+% want head-1 proof - proves=thm-1
+\documentclass{article}
+\newtheorem{thm}{Theorem}
+\begin{document}
+\section{One}
+\begin{thm} Every compact space is bounded. \end{thm}
+
+{\flushleft{\emph{Proof:} Cover the space by finitely many balls.}}
+\end{document}

@@ -2,6 +2,7 @@ package theorems
 
 import (
 	"fmt"
+	"maps"
 	"path"
 	"regexp"
 	"slices"
@@ -19,11 +20,14 @@ type Declaration struct {
 	// Counter is the counter that the environment steps. Shared is the
 	// environment whose counter it shares, and Within is the counter that
 	// resets it.
-	Counter  string `json:"counter,omitempty"`
-	Shared   string `json:"shared,omitempty"`
-	Within   string `json:"within,omitempty"`
-	Numbered bool   `json:"numbered"`
-	Style    string `json:"style,omitempty"`
+	Counter string `json:"counter,omitempty"`
+	Shared  string `json:"shared,omitempty"`
+	Within  string `json:"within,omitempty"`
+	// EmptyWithin is true for \newtheorem{env}{Title}[], whose number
+	// prints with a 0 before it, as "01".
+	EmptyWithin bool   `json:"empty_within,omitempty"`
+	Numbered    bool   `json:"numbered"`
+	Style       string `json:"style,omitempty"`
 	// Item is the item kind of the title.
 	Item string `json:"item"`
 	// Proof is true for a proof environment.
@@ -36,6 +40,10 @@ type Declaration struct {
 	Form string `json:"form,omitempty"`
 	// Inner is the environment that a wrapper opens.
 	Inner string `json:"inner,omitempty"`
+	// NumberArg is the argument of a wrapper use that prints the number, as
+	// #1 of \newenvironment{customthm}[1]{\renewcommand\theinner{#1}\inner},
+	// or 0.
+	NumberArg int `json:"number_arg,omitempty"`
 	// TitleArg is true when each use gives the title as the first argument,
 	// as \begin{thm}{Claim}. Title and Item are then empty, and TitleOf reads
 	// them from the use.
@@ -44,6 +52,9 @@ type Declaration struct {
 	// is the title of a use that does not give it.
 	TitleOpt     bool   `json:"title_opt,omitempty"`
 	TitleDefault string `json:"title_default,omitempty"`
+	// TitlePrefix is the title that the head writes right before the
+	// argument, as "Theorem#1", where the argument only adds to it.
+	TitlePrefix string `json:"title_prefix,omitempty"`
 	// Off is the offset of the declaration in the expanded text, or -1.
 	Off int `json:"-"`
 }
@@ -90,6 +101,10 @@ type Classes struct {
 	Classes  map[string][]classEnv `yaml:"classes"`
 	Packages map[string][]classEnv `yaml:"packages"`
 	Proofs   []string              `yaml:"proofs"`
+	// Counters is the counter that each theorem-like environment of a class
+	// steps, whatever the declaration says, for a class that defines
+	// \newtheorem again.
+	Counters map[string]string `yaml:"counters"`
 }
 
 type classEnv struct {
@@ -98,6 +113,7 @@ type classEnv struct {
 	Numbered *bool  `yaml:"numbered"`
 	Proof    bool   `yaml:"proof"`
 	Shared   string `yaml:"shared"`
+	Within   string `yaml:"within"`
 }
 
 // ParseClasses reads manifests/classes.yaml.
@@ -140,7 +156,7 @@ func NewResolver() *Resolver {
 }
 
 var (
-	declCmd   = regexp.MustCompile(`\\(newtheorem|renewtheorem|spnewtheorem|declaretheorem|newproof|newdefinition|newremark|newaliascnt|theoremstyle|numberwithin|counterwithin|newenvironment|renewenvironment|newmdtheoremenv|newtcbtheorem|NewTheorem)\b`)
+	declCmd   = regexp.MustCompile(`\\(newtheoremrm|newtheorem|renewtheorem|spnewtheorem|declaretheorem|newproof|newdefinition|newremark|newaliascnt|theoremstyle|numberwithin|counterwithin|newenvironment|renewenvironment|newmdtheoremenv|newtcbtheorem|NewTheorem)\b`)
 	stepCount = regexp.MustCompile(`\\refstepcounter\s*\{([^}]+)\}`)
 	innerEnv  = regexp.MustCompile(`\\begin\s*\{([^}]+)\}`)
 )
@@ -154,7 +170,7 @@ var (
 func (r *Resolver) Resolve(d *tex.Document) *Set {
 	s := &Set{Envs: map[string]*Declaration{}, Aliases: map[string]string{}, NumberWithin: map[string]string{}}
 	for _, name := range sortedNames(d.Local) {
-		r.scan(s, d.Local[name], "local:"+name, -1)
+		r.scan(s, tex.LocalText(d, name), "local:"+name, -1)
 	}
 	r.scan(s, d.Text, "paper", 0)
 	r.macroDecls(s, d)
@@ -178,11 +194,81 @@ func (r *Resolver) Resolve(d *tex.Document) *Set {
 	for i := 0; i < 3; i++ {
 		r.wrappers(s, d)
 	}
+	letEnvs(s, d)
 	r.usedProofs(s, d)
+	r.macroTitles(s, d)
+	r.springerOptions(s, d)
 	for _, d := range s.Envs {
 		d.Counter = s.counterOf(d)
 	}
+	if c := r.Classes.Counters[r.tableClass(d)]; c != "" {
+		for _, e := range s.Envs {
+			if e.Numbered && !e.Proof && (e.From == "paper" || strings.HasPrefix(e.From, "class:")) {
+				e.Counter = c
+			}
+		}
+	}
 	return s
+}
+
+// springerClasses are the classes of Springer that read the options
+// envcountsame, envcountsect and envcountchap.
+var springerClasses = map[string]bool{"llncs": true, "svjour": true, "svjour3": true, "svmult": true, "svmono": true, "svproc": true}
+
+// springerOptions applies the options of a Springer class to its environments
+// and to each \spnewtheorem that names no counter. envcountsame makes them
+// share the counter of theorem, and envcountsect and envcountchap number them
+// within the section or the chapter. Seen in the gold pilot (set X).
+func (r *Resolver) springerOptions(s *Set, d *tex.Document) {
+	if !springerClasses[r.tableClass(d)] {
+		return
+	}
+	same, within := false, ""
+	for _, o := range d.Options {
+		switch o {
+		case "envcountsame":
+			same = true
+		case "envcountsect":
+			within = "section"
+		case "envcountchap":
+			within = "chapter"
+		}
+	}
+	if !same && within == "" {
+		return
+	}
+	for _, e := range s.Envs {
+		if !e.Numbered || e.Proof || e.Shared != "" || e.Within != "" || !(strings.HasPrefix(e.From, "class:") || e.Form == "spnewtheorem") {
+			continue
+		}
+		if same && e.Env != "theorem" {
+			e.Shared = "theorem"
+		} else {
+			e.Within = within
+		}
+	}
+}
+
+var protectCmd = regexp.MustCompile(`\\protect\b\s*`)
+
+// macroTitles expands a title written as a macro. LyX writes
+// \newtheorem{thm}{\protect\theoremname} and defines \theoremname with
+// \providecommand, so the title is the macro's body. Seen in the gold pilot
+// (set E).
+func (r *Resolver) macroTitles(s *Set, d *tex.Document) {
+	for _, e := range s.Envs {
+		if e.Proof || !strings.Contains(e.Title, `\`) {
+			continue
+		}
+		t := protectCmd.ReplaceAllString(e.Title, "")
+		t = strings.TrimSpace(strings.Trim(d.Macros.Expand(t), "{} "))
+		if t == e.Title || strings.Contains(t, `\`) {
+			continue
+		}
+		if item := r.Titles.Kind(t); item != Unknown && item != "proof" {
+			e.Title, e.Item = t, item
+		}
+	}
 }
 
 var loadClassCmd = regexp.MustCompile(`\\LoadClass(?:WithOptions)?\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}`)
@@ -230,7 +316,7 @@ func (r *Resolver) fromClass(e classEnv, from string) *Declaration {
 	if e.Proof {
 		numbered = false
 	}
-	d := &Declaration{Env: e.Env, Title: e.Title, Numbered: numbered, Proof: e.Proof, Shared: e.Shared, From: from, Off: -1}
+	d := &Declaration{Env: e.Env, Title: e.Title, Numbered: numbered, Proof: e.Proof, Shared: e.Shared, Within: e.Within, From: from, Off: -1}
 	d.Item = r.item(d)
 	return d
 }
@@ -295,7 +381,7 @@ func (r *Resolver) scan(s *Set, text []byte, from string, base int) {
 			if a, _, ok := tex.ReadArgs(text, at, "*omm"); ok {
 				s.NumberWithin[strings.TrimSpace(a.Values[1])] = strings.TrimSpace(a.Values[2])
 			}
-		case "newtheorem", "renewtheorem", "spnewtheorem", "newdefinition", "newremark", "NewTheorem":
+		case "newtheorem", "newtheoremrm", "renewtheorem", "spnewtheorem", "newdefinition", "newremark", "NewTheorem":
 			d, ok := newTheorem(text, at)
 			if !ok {
 				continue
@@ -368,6 +454,7 @@ func newTheorem(text []byte, at int) (*Declaration, bool) {
 	d.Shared = strings.TrimSpace(b.Values[0])
 	d.Title = strings.TrimSpace(b.Values[1])
 	d.Within = strings.TrimSpace(b.Values[2])
+	d.EmptyWithin = b.Has[2] && d.Within == "" && d.Shared == ""
 	if d.Env == "" || strings.ContainsAny(d.Env, "#\\") {
 		return nil, false
 	}
@@ -444,17 +531,65 @@ func splitKeys(s string) []string {
 // and read. The calls in the local .sty and .cls files are read too, because a
 // class such as siamart declares its theorems with \newsiamthm.
 func (r *Resolver) macroDecls(s *Set, d *tex.Document) {
-	r.macroCalls(s, d, d.Text, "paper", true)
+	lets := declLets(d)
+	r.macroCalls(s, d, d.Text, "paper", true, lets)
 	for _, name := range sortedNames(d.Local) {
-		r.macroCalls(s, d, d.Local[name], "local:"+name, false)
+		r.macroCalls(s, d, d.Local[name], "local:"+name, false, lets)
 	}
+}
+
+// letEnv is \let\claim\claimx, which makes an environment the same as
+// another one when \let\endclaim\endclaimx goes with it.
+var letEnv = regexp.MustCompile(`\\let\s*\\([A-Za-z]+)\s*=?\s*\\([A-Za-z]+)`)
+
+// letEnvs gives the declaration of Y to each environment X of \let\X\Y and
+// \let\endX\endY. Seen in the gold pilot (set X).
+func letEnvs(s *Set, d *tex.Document) {
+	lets := map[string]string{}
+	for _, m := range letEnv.FindAllSubmatch(d.Text, -1) {
+		lets[string(m[1])] = string(m[2])
+	}
+	for _, x := range slices.Sorted(maps.Keys(lets)) {
+		y := lets[x]
+		from := s.Envs[y]
+		if from == nil || x == y || lets["end"+x] != "end"+y {
+			continue
+		}
+		nd := *from
+		nd.Env = x
+		s.add(&nd, true)
+	}
+}
+
+// letDecl is \let\@defthm\newtheorem: a name for a command that declares.
+var letDecl = regexp.MustCompile(`\\let\s*(\\[A-Za-z@]+)\s*=?\s*\\(newtheoremrm|newtheorem|declaretheorem|spnewtheorem)\b`)
+
+// declLets is each name that \let makes for a command that declares, as
+// \let\@defthm\newtheorem with \def\defthm#1#2#3{\@defthm{#1}{#2}}. The first
+// \let of a name holds. Seen in the gold pilot (set X).
+func declLets(d *tex.Document) map[string]string {
+	out := map[string]string{}
+	for _, m := range letDecl.FindAllSubmatch(d.Text, -1) {
+		if _, ok := out[string(m[1])]; !ok {
+			out[string(m[1])] = `\` + string(m[2])
+		}
+	}
+	return out
 }
 
 // macroCalls expands each call in text of a macro that declares a theorem. The
 // offset of a declaration is the offset of its call only when text is the
 // paper.
-func (r *Resolver) macroCalls(s *Set, d *tex.Document, text []byte, from string, paper bool) {
-	for _, name := range sortedNames(declMacros(d.Macros)) {
+func (r *Resolver) macroCalls(s *Set, d *tex.Document, text []byte, from string, paper bool, lets map[string]string) {
+	// The expansion stops at a command that declares, as \newtheoremrm,
+	// which tac.cls defines. Seen in the gold pilot (set X).
+	keep := tex.NewMacros()
+	for name, c := range d.Macros.Commands {
+		if m := declCmd.FindStringIndex(name); m == nil || m[0] != 0 || m[1] != len(name) {
+			keep.Commands[name] = c
+		}
+	}
+	for _, name := range sortedNames(declMacros(d.Macros, lets)) {
 		m := d.Macros.Commands[name]
 		call := regexp.MustCompile(regexp.QuoteMeta(name) + `\b`)
 		for _, loc := range call.FindAllIndex(text, -1) {
@@ -469,7 +604,7 @@ func (r *Resolver) macroCalls(s *Set, d *tex.Document, text []byte, from string,
 				}
 				end = e
 			}
-			expanded := d.Macros.Expand(string(text[loc[0]:end]))
+			expanded := keep.Expand(string(text[loc[0]:end]))
 			sub := &Set{Envs: map[string]*Declaration{}, Aliases: s.Aliases, NumberWithin: s.NumberWithin}
 			r.scan(sub, []byte(expanded), from, -1)
 			for _, e := range sub.List() {
@@ -484,10 +619,10 @@ func (r *Resolver) macroCalls(s *Set, d *tex.Document, text []byte, from string,
 }
 
 // declMacros is the set of the macros with arguments whose body declares a theorem.
-func declMacros(ms *tex.Macros) map[string][]byte {
+func declMacros(ms *tex.Macros, lets map[string]string) map[string][]byte {
 	out := map[string][]byte{}
 	for name, m := range ms.Commands {
-		if m.Args > 0 && declCmd.MatchString(m.Body) {
+		if m.Args > 0 && (declCmd.MatchString(m.Body) || slices.ContainsFunc(slices.Sorted(maps.Keys(lets)), func(l string) bool { return strings.Contains(m.Body, l) })) {
 			out[name] = nil
 		}
 	}
@@ -534,6 +669,9 @@ func (r *Resolver) wrappers(s *Set, d *tex.Document) {
 				if w.Shared == "" && w.Numbered {
 					w.Shared = inner
 				}
+				if m := theArg.FindStringSubmatch(e.Begin); m != nil && m[1] == inner {
+					w.NumberArg = int(m[2][0] - '0')
+				}
 				s.add(&w, false)
 			}
 			continue
@@ -541,6 +679,11 @@ func (r *Resolver) wrappers(s *Set, d *tex.Document) {
 		if code, ok := titledBegin(d.Macros, e); ok {
 			w := &Declaration{Env: name, TitleArg: true, Item: Unknown, From: "wrapper", Form: "titled", Off: e.Off}
 			w.TitleOpt, w.TitleDefault = e.HasDefault, e.Default
+			if m := titlePrefix.FindStringSubmatch(code); m != nil && r.Titles.Known(m[1]) {
+				// {\bf \theitem. Theorem#1.} with \begin{theo}{\label{a}}:
+				// the title is Theorem. Seen in the gold pilot (set X).
+				w.TitlePrefix = m[1]
+			}
 			if r.Classes.IsProofName(name) {
 				// A paper that defines proof again with a title argument
 				// still writes proofs with it.
@@ -573,6 +716,9 @@ func (r *Resolver) wrappers(s *Set, d *tex.Document) {
 
 var cmdCall = regexp.MustCompile(`\\([A-Za-z@]+)`)
 
+// theArg is \renewcommand\theinner{#1} in the begin code of a wrapper.
+var theArg = regexp.MustCompile(`\\(?:renewcommand\*?|def|gdef)\s*\{?\s*\\the([A-Za-z@]+)\s*\}?\s*\{\s*#([1-9])\s*\}`)
+
 // innerCommand gives the environment that a wrapper opens with its command
 // and closes with \end<name>, as in the pattern
 //
@@ -596,6 +742,9 @@ func innerCommand(s *Set, begin, end string) string {
 
 // titleHead finds #1 inside a bold, italic or small caps group or argument.
 var titleHead = regexp.MustCompile(`\{\s*\\(?:bf|bfseries|sc|scshape|it|itshape|sl)\b[^{}]*(?:\{[^{}]*\}[^{}]*)*#1|\\(?:textbf|textsc|textit|emph)\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*#1`)
+
+// titlePrefix is a title right before the argument in the head.
+var titlePrefix = regexp.MustCompile(`([A-Za-z]{3,})#1`)
 
 // titledBegin tells if an environment prints a head whose title is its first
 // argument. The begin code can do it itself, or it can call one command of
@@ -641,6 +790,9 @@ func (d *Declaration) TitleOf(text []byte, inner int, t *Titles) (title, item st
 	title = strings.TrimSpace(strings.TrimRight(stripFonts(title), ".: "))
 	if d.Proof {
 		return title, "proof", end
+	}
+	if d.TitlePrefix != "" {
+		return d.TitlePrefix, t.Kind(d.TitlePrefix), end
 	}
 	return title, t.Kind(title), end
 }

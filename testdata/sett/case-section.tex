@@ -1,0 +1,21 @@
+% Pattern: head/case. A section titled "Case" and a formula, out of any
+% proof, is a case, as \subsection*{Case: $n=1$} or \subsubsection{Case of
+% $X=B$}, and a numbered one prints the number of the section. Seen in the
+% gold pilot (set X).
+% want head-1 other/case -
+% want head-2 other/case 1.1
+% want head-3 other/case 1.1.1
+\documentclass{article}
+\begin{document}
+\section{Examples}
+We list the groups for small $n$.
+
+\subsection*{Case: $n=1$}
+There is one group of order two.
+
+\subsection{Case $\boldsymbol{n=2}$}
+There are two groups up to conjugation.
+
+\subsubsection{Case of $X=B$}
+Here the space is the ball.
+\end{document}

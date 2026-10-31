@@ -1,6 +1,7 @@
 package tex
 
 import (
+	"bytes"
 	"regexp"
 	"strings"
 )
@@ -72,6 +73,21 @@ func BuildTree(text []byte, from, to int) *Tree {
 		}
 		return p
 	}
+	addSection := func(cmd string, off, at int, spec string) {
+		a, end, ok := ReadArgs(text, at, spec)
+		if !ok {
+			return
+		}
+		level := sectionLevels[cmd]
+		for len(secs) > 0 && t.Nodes[secs[len(secs)-1]].Level >= level {
+			s := secs[len(secs)-1]
+			t.Nodes[s].Close, t.Nodes[s].To = off, off
+			secs = secs[:len(secs)-1]
+		}
+		n := Node{Kind: "section", Name: cmd, Star: a.Star, Level: level, Title: strings.TrimSpace(a.Values[len(a.Values)-1]), From: off, Inner: end, Parent: parent(), Appendix: appendix, Closed: true}
+		t.Nodes = append(t.Nodes, n)
+		secs = append(secs, len(t.Nodes)-1)
+	}
 	body := text[from:to]
 	for _, m := range structure.FindAllSubmatchIndex(body, -1) {
 		off := from + m[0]
@@ -81,6 +97,16 @@ func BuildTree(text []byte, from, to int) *Tree {
 		switch {
 		case m[2] >= 0 && string(body[m[2]:m[3]]) == "begin":
 			name := strings.TrimSpace(string(body[m[4]:m[5]]))
+			if _, ok := sectionLevels[strings.TrimSuffix(name, "*")]; ok && name != "paragraph" {
+				// \begin{section}{Introduction} ... \end{section} is a
+				// section head, as \section{Introduction}. Seen in the gold
+				// pilot (set X).
+				addSection(strings.TrimSuffix(name, "*"), off, from+m[1], "om")
+				if k := len(t.Nodes) - 1; k >= 0 && t.Nodes[k].From == off {
+					t.Nodes[k].Star = strings.HasSuffix(name, "*")
+				}
+				continue
+			}
 			n := Node{Kind: "env", Name: name, From: off, Inner: from + m[1], Parent: parent(), Appendix: appendix}
 			if name == "appendix" || name == "appendices" {
 				appendix = true
@@ -89,7 +115,11 @@ func BuildTree(text []byte, from, to int) *Tree {
 					t.Appendix = off
 				}
 			}
-			if j := skipSpace(text, n.Inner); j < to && text[j] == '[' {
+			// TeX looks for the [ of the option over spaces and one line end,
+			// and not over a blank line: "\begin{proof}", a blank line and
+			// "[$\Rightarrow$] Suppose" is a proof with no option. Seen in the
+			// gold pilot (set X).
+			if j := skipSpace(text, n.Inner); j < to && text[j] == '[' && bytes.Count(text[n.Inner:j], []byte("\n")) < 2 {
 				if in, e, ok := Group(text, j); ok && e-j < 2000 {
 					n.Opt, n.OptAt, n.HasOpt, n.Inner = string(text[in:e-1]), in, true, e
 				}
@@ -110,20 +140,7 @@ func BuildTree(text []byte, from, to int) *Tree {
 				break
 			}
 		case m[6] >= 0:
-			cmd := string(body[m[6]:m[7]])
-			a, end, ok := ReadArgs(text, from+m[1], "*om")
-			if !ok {
-				continue
-			}
-			level := sectionLevels[cmd]
-			for len(secs) > 0 && t.Nodes[secs[len(secs)-1]].Level >= level {
-				s := secs[len(secs)-1]
-				t.Nodes[s].Close, t.Nodes[s].To = off, off
-				secs = secs[:len(secs)-1]
-			}
-			n := Node{Kind: "section", Name: cmd, Star: a.Star, Level: level, Title: strings.TrimSpace(a.Values[1]), From: off, Inner: end, Parent: parent(), Appendix: appendix, Closed: true}
-			t.Nodes = append(t.Nodes, n)
-			secs = append(secs, len(t.Nodes)-1)
+			addSection(string(body[m[6]:m[7]]), off, from+m[1], "*om")
 		default:
 			appendix = true
 			if t.Appendix == 0 {

@@ -1,0 +1,44 @@
+% Pattern: head/case. A case or a step head that gives its number as a word
+% ("First case"), glued to the title ("STEP-1", "Step1", "Step $1$"), with a
+% parenthesis ("Case 1)", "Case (a)") or with no number ("Case: ...", "Final
+% step") is an item. Seen in the gold pilot (set X).
+% want theorem-1 statement/theorem 1 status=here
+% want proof-1 proof - proves=theorem-1
+% want head-1 other/case 1
+% want head-2 other/case 2
+% want head-3 other/case 1
+% want head-4 other/case 2
+% want head-5 other/case 3
+% want head-6 other/case 1
+% want head-7 other/case (a)
+% want head-8 other/case -
+% want head-9 other/case -
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\begin{document}
+\begin{theorem}
+Every compact space is bounded.
+\end{theorem}
+\begin{proof}
+Take a cover by balls.
+
+\textbf{First case:} the cover is finite.
+
+\textbf{Second case:} the cover is infinite.
+
+\noindent\textbf{STEP-1} Take a finite subcover.
+
+\indent \textbf{Step2.} Take the largest radius.
+
+{\em Step $3$}. Add the distances.
+
+\emph{Case 1).} The radius is one.
+
+\paragraph{Case (a): the set is an interval.} Measure it.
+
+\textit{Case: the set is a point.} It is plain.
+
+{\bf Final step.} Sum up.
+\end{proof}
+\end{document}

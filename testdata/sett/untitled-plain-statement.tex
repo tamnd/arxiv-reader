@@ -1,0 +1,25 @@
+% Pattern: kind/untitled. An environment of the plain style with no title and
+% a counter of its own is a statement, with a proof or without one. An
+% untitled environment that shares the counter of the theorems is a numbered
+% paragraph, and so is one whose body is blank. The proof after a statement
+% proves it with no flag. Seen in the gold pilot (set X).
+% want point-1 statement 1 status=none
+% want point-2 statement 2 status=here
+% want proof-1 proof - proves=point-2 flags=
+% want point-3 unknown 3
+% want theorem-1 statement/theorem 1 status=none
+% want para-1 unknown 2
+\documentclass{article}
+\usepackage{amsthm}
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}
+\newtheorem{point}{}
+\newtheorem{para}[theorem]{}
+\begin{document}
+\begin{point} A set is finite when it has a bijection to some $n$. \end{point}
+\begin{point} Every finite set is countable. \end{point}
+\begin{proof} Take the bijection. \end{proof}
+\begin{point} \ \end{point}
+\begin{theorem} Every countable set is small. \end{theorem}
+\begin{para} We now turn to the sets that are not countable. \end{para}
+\end{document}

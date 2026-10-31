@@ -1,0 +1,29 @@
+% Pattern: attach/announce. A \paragraph{Proof of Lemma 1} before a proof, in a
+% class that defines \paragraph. Seen in the gold pilot (set X).
+% want lemma-1 statement/lemma 1
+% want theorem-1 statement/theorem 1
+% want proof-1 proof - flag=orphan
+% want proof-2 proof - proves=lemma-1
+% want proof-3 proof - proves=theorem-1
+\documentclass{journal}
+\usepackage{amsthm}
+\newtheorem{lemma}{Lemma}
+\newtheorem{theorem}{Theorem}
+\begin{document}
+\begin{lemma} Every compact space is bounded. \end{lemma}
+\begin{theorem} Every finite space is compact. \end{theorem}
+\section{Proofs}
+\begin{proof}
+A proof of something else.
+\end{proof}
+
+\paragraph{Proof of Lemma 1 }
+\begin{proof}
+Then it holds.
+\end{proof}
+
+\paragraph{Proof of Theorem 1}
+\begin{proof}
+Then it holds.
+\end{proof}
+\end{document}

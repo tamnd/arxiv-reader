@@ -1,0 +1,22 @@
+% Pattern: number/argument. A wrapper \newenvironment{restate}[1] with
+% \def\thetheorem{#1} prints the number of \ref{thm:main} for its argument,
+% and the \addtocounter{theorem}{-1} of its end code takes back the step, so
+% the theorem after it is 2.2. Seen in the gold pilot (set X).
+% want theorem-1 statement/theorem 1.1
+% want theorem-2 statement/theorem 2.1
+% want restate-1 statement/theorem 1.1
+% want theorem-3 statement/theorem 2.2
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}[section]
+\newenvironment{restate}[1]
+    {\def\thetheorem{#1}\begin{theorem}}
+    {\end{theorem}\addtocounter{theorem}{-1}}
+\begin{document}
+\section{One}
+\begin{theorem}\label{thm:main} Every finite space is compact. \end{theorem}
+\section{Two}
+\begin{theorem} Every point is closed. \end{theorem}
+\begin{restate}{\ref{thm:main}} Every finite space is compact. \end{restate}
+\begin{theorem} Every closed set is compact. \end{theorem}
+\end{document}

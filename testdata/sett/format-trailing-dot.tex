@@ -1,0 +1,13 @@
+% Pattern: number/format. A format that ends in a dot, as
+% \renewcommand{\thedefinition}{S.\arabic{definition}.}, prints the dot after
+% the number, and the number is S.1. Seen in the gold pilot (set X).
+% want definition-1 definition S.1
+% want definition-2 definition S.2
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{definition}{Definition}
+\renewcommand{\thedefinition}{S.\arabic{definition}.}
+\begin{document}
+\begin{definition} A space is fine when it is compact. \end{definition}
+\begin{definition} A space is good when it is finite. \end{definition}
+\end{document}

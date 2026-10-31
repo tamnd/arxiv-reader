@@ -1,0 +1,18 @@
+% Pattern: number/counter. \newtheorem{note}[theorem]{Note} defines \note,
+% which opens the environment without \begin and steps the shared counter,
+% so the lemma after it is 1.3. Seen in the gold pilot (set X).
+% want theorem-1 statement/theorem 1.1
+% want lemma-1 statement/lemma 1.3
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{note}[theorem]{Note}
+\begin{document}
+\section{One}
+\begin{theorem} Every finite space is compact. \end{theorem}
+\note
+every space here is a topological space.
+
+\begin{lemma} Every point is closed. \end{lemma}
+\end{document}

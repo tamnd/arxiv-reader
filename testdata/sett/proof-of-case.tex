@@ -1,0 +1,19 @@
+% Pattern: attach/case. "Proof of case (i)" inside a proof is a part of that
+% proof and proves what the proof proves. Seen in the gold pilot (set X).
+% want thm-1 statement/theorem 1
+% want proof-1 proof - proves=thm-1
+% want head-1 proof - proves=thm-1
+% want head-2 proof - proves=thm-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{thm}{Theorem}
+\begin{document}
+\section{One}
+\begin{thm} Every compact space is bounded. \end{thm}
+\begin{proof} We show two cases.
+
+{\it Proof of case (i).} The space is finite, so it is bounded.
+
+{\it Proof of case (ii).} Cover the space by finitely many balls.
+\end{proof}
+\end{document}

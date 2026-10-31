@@ -1,0 +1,33 @@
+% Pattern: head/command. The paper writes each step of a proof with a command
+% whose first argument is the number of the step and whose second is its
+% title. Seen in the gold pilot (set E).
+% want theorem-1 statement/theorem 1
+% want proof-1 proof - proves=theorem-1
+% want head-1 other/case 1
+% want head-2 other/case 2
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{theorem}{Theorem}
+\makeatletter
+\newcommand{\proofpart}[2]{%
+  \par
+  \addvspace{\medskipamount}%
+  \noindent\emph{Step #1: #2}\par\nobreak
+  \addvspace{\smallskipamount}%
+  \@afterheading
+}
+\makeatother
+\begin{document}
+\begin{theorem}
+Every compact space is bounded.
+\end{theorem}
+\begin{proof}
+We take two steps.
+
+\proofpart{1}{The cover:}
+Cover the space by balls.
+
+\proofpart{2}{The finite part:}
+Take a finite part of the cover.
+\end{proof}
+\end{document}

@@ -1,0 +1,22 @@
+% Pattern: head/cite. A cite by number after the number or the name of a
+% head, as "Lemma 1[6,9]", is the source, and so is a cite after a named
+% conjecture, as "Vizing's conjecture \cite{key}.". The words after the
+% first word of a named theorem can be in lower case. Seen in the gold pilot
+% (set X).
+% want head-1 statement/lemma 1
+% want head-2 statement/theorem -
+% want head-3 conjecture -
+% want head-4 statement/theorem -
+\documentclass{article}
+\begin{document}
+\section{One}
+We recall the results that we use.
+
+\noindent{\bf Lemma 1[6,9]} {\it Every compact space is bounded.}
+
+{\bf Theorem (Heine's Theorem) [9]}. Every closed bounded set is compact.
+
+\noindent\textbf{Bounded conjecture \cite{key}.} Every space is bounded.
+
+\textbf{Analytic continuous fundamental theorem.} Every finite set is closed.
+\end{document}

@@ -1,0 +1,16 @@
+% Pattern: head/abbreviation. A head in bold abbreviates its title and the
+% number comes after the period, as "{\bf Prop. 9.3.0}". Seen in the gold
+% pilot (set X).
+% want head-1 statement/proposition 1.2
+% want head-2 proof - proves=head-1
+% want head-3 statement/theorem 1.3
+\documentclass{article}
+\begin{document}
+Some text before.
+
+{\bf Prop. 1.2}\quad Every compact space is bounded.
+
+{\it Proof.} Cover the space by balls. $\Box$
+
+{\bf Thm. 1.3} A closed part of a compact space is compact.
+\end{document}

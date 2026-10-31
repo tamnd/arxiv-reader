@@ -1,0 +1,22 @@
+% Pattern: number/format. \def\thetheorem in the body of \newenvironment sets
+% the format only inside that environment, and the paper keeps the format of
+% \newtheorem. Seen in the gold pilot (set X).
+% want theorem-1 statement/theorem 1.1
+% want theorem-2 statement/theorem 2.1
+\documentclass{article}
+\newtheorem{theorem}{Theorem}[section]
+\newcounter{parenttheorem}
+\newenvironment{subtheorems}{%
+  \refstepcounter{theorem}%
+  \setcounter{parenttheorem}{\value{theorem}}%
+  \setcounter{theorem}{0}%
+  \def\thetheorem{\theparenttheorem\alph{theorem}}%
+}{%
+  \setcounter{theorem}{\value{parenttheorem}}%
+}
+\begin{document}
+\section{One}
+\begin{theorem} Every compact space is bounded. \end{theorem}
+\section{Two}
+\begin{theorem} Every finite space is bounded. \end{theorem}
+\end{document}

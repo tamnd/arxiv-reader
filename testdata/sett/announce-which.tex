@@ -1,0 +1,35 @@
+% Pattern: attach/announce. A sentence that announces the proof and goes on
+% with a clause on what it proves, as "Here we prove Lemma~\ref{a}, which
+% will allow us to infer ...", announces the proof after it. Seen in the
+% gold pilot (set X).
+% want lemma-1 statement/lemma 1.1
+% want lemma-2 statement/lemma 1.2
+% want proof-1 proof - proves=lemma-2
+% want proof-2 proof - proves=lemma-1
+\documentclass{article}
+\usepackage{amsthm}
+\newtheorem{lemma}{Lemma}[section]
+\begin{document}
+\section{One}
+
+\begin{lemma}\label{l:one}
+Every convergent sequence is bounded.
+\end{lemma}
+
+\begin{lemma}\label{l:two}
+Every Cauchy sequence is bounded.
+\end{lemma}
+
+\begin{proof}
+Take the ball of radius one around a far term.
+\end{proof}
+
+\section{The first lemma}
+
+Here we prove Lemma~\ref{l:one}, which will allow us to infer that a
+sequence with no bound has no limit $\lambda$.
+
+\begin{proof}
+Take the ball of radius one around the limit.
+\end{proof}
+\end{document}

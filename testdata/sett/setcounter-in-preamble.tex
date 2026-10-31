@@ -1,0 +1,14 @@
+% Pattern: number/setcounter-preamble. \setcounter{section}{-1} before
+% \begin{document} makes the first section 0. Seen in the gold pilot (set X).
+% want theorem-1 statement/theorem 0.1 status=none
+% want lemma-1 statement/lemma 1.1 status=none
+\documentclass{amsart}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\setcounter{section}{-1}
+\begin{document}
+\section{Introduction}
+\begin{theorem} Every compact space is bounded. \end{theorem}
+\section{Products}
+\begin{lemma} Every finite product of compact spaces is compact. \end{lemma}
+\end{document}

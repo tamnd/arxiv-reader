@@ -1,0 +1,33 @@
+% Pattern: attach/ref. A proof titled with a reference command of a
+% package, as \refeq of mathtools, proves what the label names. Seen in the
+% gold pilot (set X).
+% want theorem-1 statement/theorem 1.1
+% want lemma-1 statement/lemma 1.2
+% want proof-1 proof - proves=lemma-1
+% want proof-2 proof - proves=theorem-1
+\documentclass{article}
+\usepackage{amsthm}
+\usepackage{mathtools}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\begin{document}
+\section{One}
+
+\begin{theorem}\label{t:main}
+Every bounded monotone sequence converges.
+\end{theorem}
+
+\begin{lemma}\label{l:sup}
+A bounded set of reals has a least upper bound.
+\end{lemma}
+
+\begin{proof}
+This is the completeness axiom.
+\end{proof}
+
+\section{The proof of the theorem}
+
+\begin{proof}[Proof of Theorem \refeq{t:main}]
+Take the least upper bound of the terms.
+\end{proof}
+\end{document}
