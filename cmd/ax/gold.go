@@ -395,7 +395,7 @@ func goldScoreE(root, version string, picks []gold.Pick, report string) error {
 		if err != nil {
 			return err
 		}
-		s.AddPaper(g, es)
+		s.AddPaper(gold.InItems(g, recs), es)
 	}
 	md := s.Markdown()
 	fmt.Print(md)
