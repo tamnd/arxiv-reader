@@ -71,6 +71,25 @@ func TestCodeOf(t *testing.T) {
 	}
 }
 
+func TestAreaOf(t *testing.T) {
+	for _, c := range []struct {
+		cats []string
+		msc  string
+		want string
+	}{
+		{[]string{"math.AG"}, "14J32 (Primary), 11G25", "14"},
+		{[]string{"math.GR", "math.CO"}, "", "20"},
+		{[]string{"hep-th", "math.QA"}, "", "17"},
+		{[]string{"math.CV"}, "", "30"},
+		{[]string{"hep-th", "gr-qc"}, "", "hep-th"},
+	} {
+		r := metadata.Record{Categories: c.cats, MSCClass: c.msc}
+		if got := AreaOf(r); got != c.want {
+			t.Errorf("AreaOf(%v, %q) = %q, want %q", c.cats, c.msc, got, c.want)
+		}
+	}
+}
+
 func objs() []objects.Record {
 	return []objects.Record{
 		{Kind: "statement", Subkind: "theorem", Paper: "2312.00752", Version: "2", Local: "theorem-1", Number: "1", Label: "thm:a", Path: "source", Item: "statement.theorem", Span: &objects.Span{File: "a.tex", From: 10, To: 14}, ProofStatus: "here"},
