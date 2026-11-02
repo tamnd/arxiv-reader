@@ -46,7 +46,7 @@ func censusReport(args []string) error {
 		if !ok {
 			m = map[string]string{}
 			_ = plane.Scan(shard, func(r metadata.Record) error {
-				m[r.ID] = gold.CodeOf(r)
+				m[r.ID] = gold.AreaOf(r)
 				return nil
 			})
 			codes[shard] = m
@@ -136,7 +136,7 @@ func censusReport(args []string) error {
 					l, _ = licence.Latest(r)
 				}
 				ref := fmt.Sprintf("%sv%d", r.ID, latest.Version)
-				code := gold.CodeOf(r)
+				code := gold.AreaOf(r)
 				if code == "" {
 					code = "unknown"
 				}

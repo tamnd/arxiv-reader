@@ -99,6 +99,38 @@ func CodeOf(r metadata.Record) string {
 	return r.Primary()
 }
 
+// categoryMSC gives the MSC2020 areas of the arXiv math categories, after the
+// descriptions of the categories on arXiv. It is the table of math2-agent
+// (importer/arxiv), which gives a row the first of these areas, so that the
+// census and the rows of math2 name the same area for a paper.
+var categoryMSC = map[string][]string{
+	"math.AC": {"13"}, "math.AG": {"14"}, "math.AP": {"35"}, "math.AT": {"55"},
+	"math.CA": {"26"}, "math.CO": {"05"}, "math.CT": {"18"},
+	"math.CV": {"30", "32"}, "math.DG": {"53"}, "math.DS": {"37"}, "math.FA": {"46"}, "math.GM": {"00"},
+	"math.GN": {"54"}, "math.GR": {"20"}, "math.GT": {"57"}, "math.HO": {"01"}, "math.IT": {"94"},
+	"math.KT": {"19"}, "math.LO": {"03"}, "math.MG": {"51", "52"}, "math.MP": {"81"}, "math-ph": {"81"},
+	"math.NA": {"65"}, "math.NT": {"11"}, "math.OA": {"46", "47"}, "math.OC": {"49", "90", "93"},
+	"math.PR": {"60"}, "math.QA": {"17", "81"}, "math.RA": {"16"}, "math.RT": {"20", "22"},
+	"math.SG": {"53"}, "math.SP": {"35", "47", "58"}, "math.ST": {"62"}, "stat.TH": {"62"},
+}
+
+// AreaOf is the area of a record in the census report (corpus arxiv AX1.5):
+// the MSC code at two digits of the first code in its msc_class, or else the
+// first MSC area of its categories, in their order. A paper with neither gets
+// its primary category. The metadata from the Kaggle snapshot has no
+// msc_class, so without the categories no paper of it would get an MSC area.
+func AreaOf(r metadata.Record) string {
+	if m := mscCode.FindStringSubmatch(r.MSCClass); m != nil {
+		return m[1]
+	}
+	for _, c := range r.Categories {
+		if a := categoryMSC[c]; len(a) > 0 {
+			return a[0]
+		}
+	}
+	return r.Primary()
+}
+
 // Draw draws a set from the pool. The draw is the same for the same pool and
 // seed. Inside each group the codes are in proportion to the pool, and each
 // code with at least MinCodeSize papers in the pool gets at least MinPerCode
