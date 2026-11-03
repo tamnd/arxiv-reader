@@ -83,7 +83,10 @@ func (m *Macros) sectionCalls() map[string]Macro {
 // pilot (set X).
 var sectionName = regexp.MustCompile(`^\\(?:part|chapter|(?:sub)*section|(?:sub)?paragraph)\*?$`)
 
-var argAlias = regexp.MustCompile(`^(\\begin\s*\{[^{}\\#]{1,64}\})((?:\s*\{#[1-9]\})+)$`)
+// The body may end with font switches, as
+// \renewcommand{\th}[1]{\begin{thm}{#1} \sl}, which change only the look of
+// the text. Seen in 2610.17317.
+var argAlias = regexp.MustCompile(`^(\\begin\s*\{[^{}\\#]{1,64}\})((?:\s*\{#[1-9]\})+)(?:\s*\\(?:sl|it|em|bf|rm|sc|slshape|itshape|upshape|bfseries|mdseries|normalfont)\b)*\s*$`)
 
 var argRef = regexp.MustCompile(`#([1-9])`)
 

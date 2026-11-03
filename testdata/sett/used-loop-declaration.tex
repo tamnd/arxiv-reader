@@ -1,0 +1,16 @@
+% Pattern: declaration/used. The paper declares its theorems by a loop of
+% \forcsvlist over a macro of \newtheorem, which the resolver does not read,
+% so the theorem and the lemma count as used environments. Seen in
+% 2610.02049.
+% want theorem-1 statement/theorem 1
+% want lemma-1 statement/lemma 1
+% want proof-1 proof - proves=lemma-1
+\documentclass{amsart}
+\usepackage{etoolbox}
+\def\newthm#1{\newtheorem{#1}{\MakeUppercase#1}}
+\forcsvlist\newthm{theorem,lemma}
+\begin{document}
+\begin{theorem} Every finite space is compact. \end{theorem}
+\begin{lemma} Every point is closed. \end{lemma}
+\begin{proof} Clear. \end{proof}
+\end{document}

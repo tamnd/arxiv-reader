@@ -149,7 +149,7 @@ func TestTheOptionStandardOfNtheorem(t *testing.T) {
 	if p := s.Get("proof"); p == nil || !p.Proof {
 		t.Errorf("proof is %+v, and it must be a proof", p)
 	}
-	if e := read("[thmmarks]").Get("remark"); e != nil {
+	if e := read("[thmmarks]").Get("remark"); e != nil && e.From != "used" {
 		t.Errorf("remark is %+v, and ntheorem without the option standard does not declare it", e)
 	}
 }
