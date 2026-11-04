@@ -1,0 +1,12 @@
+% Pattern: alias/argument. A command opens a theorem with its argument and then
+% switches the font, as \renewcommand{\th}[1]{\begin{thm}{#1} \sl}, and closes
+% it with \eth. Seen in 2610.17317.
+% want thm-1 statement/theorem 1
+\documentclass{amsart}
+\newtheorem{Thm}{Theorem}
+\newenvironment{thm}[1]{\begin{Thm}\label{T:#1}}{\end{Thm}}
+\renewcommand{\th}[1]{\begin{thm}{#1} \sl }
+\renewcommand{\eth}{\end{thm} }
+\begin{document}
+\th{main} Every finite space is compact. \eth
+\end{document}

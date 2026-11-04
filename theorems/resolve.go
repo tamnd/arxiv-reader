@@ -195,7 +195,7 @@ func (r *Resolver) Resolve(d *tex.Document) *Set {
 		r.wrappers(s, d)
 	}
 	letEnvs(s, d)
-	r.usedProofs(s, d)
+	r.Used(s, d)
 	r.macroTitles(s, d)
 	r.springerOptions(s, d)
 	for _, d := range s.Envs {
@@ -296,19 +296,6 @@ func (r *Resolver) tableClass(d *tex.Document) string {
 		c = strings.TrimSpace(string(m[1]))
 	}
 	return ""
-}
-
-// usedProofs adds an entry for each environment that the body uses, that has
-// no declaration, and whose name is a proof name. A class can define proof
-// with \def\proof, which the resolver does not read, and a paper writes its
-// proofs with it.
-func (r *Resolver) usedProofs(s *Set, d *tex.Document) {
-	for _, n := range d.Tree.Nodes {
-		if _, ok := s.Envs[n.Name]; ok || n.Kind != "env" || !r.Classes.IsProofName(n.Name) {
-			continue
-		}
-		s.add(&Declaration{Env: n.Name, Title: "Proof", Proof: true, Item: "proof", From: "used", Off: -1}, false)
-	}
 }
 
 func (r *Resolver) fromClass(e classEnv, from string) *Declaration {
@@ -799,14 +786,19 @@ func (d *Declaration) TitleOf(text []byte, inner int, t *Titles) (title, item st
 
 // Used adds an entry for each environment that the body uses, that has no
 // declaration, and whose name is a title or a proof name. Such an environment
-// is declared in a way that the resolver does not read, and it must still be
-// counted.
+// is declared in a way that the resolver does not read, as by a loop of
+// \forcsvlist over a macro of \newtheorem, and it must still be counted. Seen
+// in 2610.02049. An environment that the paper declares with \newenvironment
+// and that is not theorem-like is not one.
 func (r *Resolver) Used(s *Set, d *tex.Document) {
 	for _, n := range d.Tree.Nodes {
 		if n.Kind != "env" {
 			continue
 		}
 		if _, ok := s.Envs[n.Name]; ok {
+			continue
+		}
+		if _, ok := d.Macros.Envs[n.Name]; ok && !r.Classes.IsProofName(n.Name) {
 			continue
 		}
 		name := strings.TrimSuffix(n.Name, "*")
@@ -833,6 +825,8 @@ var nonItemEnvs = map[string]bool{
 	"case": true, "cases": true, "step": true, "part": true, "algorithm": true,
 	"note": true, "comment": true, "solution": false, "conditions": true,
 	"property": false, "def": true, "setting": true, "setup": true,
+	"description": true, "abstract": true, "acknowledgments": true,
+	"acknowledgements": true, "acknowledgment": true, "acknowledgement": true,
 }
 
 func sortedNames(m map[string][]byte) []string {
