@@ -825,6 +825,8 @@ var nonItemEnvs = map[string]bool{
 	"case": true, "cases": true, "step": true, "part": true, "algorithm": true,
 	"note": true, "comment": true, "solution": false, "conditions": true,
 	"property": false, "def": true, "setting": true, "setup": true,
+	"description": true, "abstract": true, "acknowledgments": true,
+	"acknowledgements": true, "acknowledgment": true, "acknowledgement": true,
 }
 
 func sortedNames(m map[string][]byte) []string {
