@@ -6,7 +6,7 @@ require (
 	github.com/parquet-go/parquet-go v0.32.0
 	github.com/tamnd/arxiv-cli v0.2.0
 	golang.org/x/net v0.62.0
-	golang.org/x/text v0.43.0
+	golang.org/x/text v0.44.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
